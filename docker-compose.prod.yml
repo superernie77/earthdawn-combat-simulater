@@ -41,10 +41,6 @@ services:
       - traefik.http.routers.earthdawn.tls=true
       - traefik.http.routers.earthdawn.entrypoints=web,websecure
       - traefik.http.routers.earthdawn.tls.certresolver=mytlschallenge
-      - traefik.http.routers.earthdawn.middlewares=earthdawn@docker
-      - traefik.http.middlewares.earthdawn.headers.SSLRedirect=true
-      - traefik.http.middlewares.earthdawn.headers.forceSTSHeader=true
-      - traefik.http.middlewares.earthdawn.headers.STSSeconds=315360000
       - traefik.http.services.earthdawn.loadbalancer.server.port=80
     networks:
       - internal
