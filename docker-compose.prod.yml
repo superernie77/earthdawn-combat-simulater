@@ -37,6 +37,7 @@ services:
       - earthdawn-backend
     labels:
       - traefik.enable=true
+      - traefik.docker.network=n8n_default
       - traefik.http.routers.earthdawn.rule=Host(`earthdawn.${DOMAIN_NAME}`)
       - traefik.http.routers.earthdawn.tls=true
       - traefik.http.routers.earthdawn.entrypoints=web,websecure
