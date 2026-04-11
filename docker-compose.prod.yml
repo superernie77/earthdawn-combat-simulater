@@ -1,0 +1,60 @@
+services:
+
+  earthdawn-db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: earthdawn
+      POSTGRES_USER: earthdawn
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - earthdawn_db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  earthdawn-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://earthdawn-db:5432/earthdawn
+      SPRING_DATASOURCE_USERNAME: earthdawn
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8081
+    depends_on:
+      - earthdawn-db
+    networks:
+      - internal
+
+  earthdawn-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: always
+    depends_on:
+      - earthdawn-backend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.earthdawn.rule=Host(`earthdawn.${DOMAIN_NAME}`)
+      - traefik.http.routers.earthdawn.tls=true
+      - traefik.http.routers.earthdawn.entrypoints=web,websecure
+      - traefik.http.routers.earthdawn.tls.certresolver=mytlschallenge
+      - traefik.http.routers.earthdawn.middlewares=earthdawn@docker
+      - traefik.http.middlewares.earthdawn.headers.SSLRedirect=true
+      - traefik.http.middlewares.earthdawn.headers.forceSTSHeader=true
+      - traefik.http.middlewares.earthdawn.headers.STSSeconds=315360000
+      - traefik.http.services.earthdawn.loadbalancer.server.port=80
+    networks:
+      - internal
+      - n8n_default  # joins Traefik's network so it can be routed
+
+volumes:
+  earthdawn_db_data:
+
+networks:
+  internal:
+    driver: bridge
+  n8n_default:
+    external: true  # Traefik already runs here
