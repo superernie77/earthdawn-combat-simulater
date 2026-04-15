@@ -4,6 +4,7 @@ import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
 import com.earthdawn.model.Equipment;
 import com.earthdawn.model.GameCharacter;
+import com.earthdawn.model.SpellDefinition;
 import com.earthdawn.service.CharacterService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -109,6 +110,27 @@ public class CharacterController {
     @DeleteMapping("/{id}/equipment/{equipmentId}")
     public GameCharacter removeEquipment(@PathVariable Long id, @PathVariable Long equipmentId) {
         return characterService.removeEquipment(id, equipmentId);
+    }
+
+    // --- Zauber ---
+
+    @GetMapping("/spells")
+    public List<SpellDefinition> getSpells(@RequestParam(required = false) String discipline) {
+        if (discipline != null && !discipline.isBlank()) {
+            return characterService.getSpellsByDiscipline(discipline);
+        }
+        return characterService.getAllSpells();
+    }
+
+    @PostMapping("/{id}/spells")
+    public GameCharacter addSpell(@PathVariable Long id, @RequestParam Long spellDefinitionId) {
+        return characterService.addSpell(id, spellDefinitionId);
+    }
+
+    @DeleteMapping("/{id}/spells/{spellId}")
+    public ResponseEntity<Void> removeSpell(@PathVariable Long id, @PathVariable Long spellId) {
+        characterService.removeSpell(id, spellId);
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{id}")

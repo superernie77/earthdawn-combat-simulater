@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Character, DerivedStats, Equipment } from '../models/character.model';
+import { Character, DerivedStats, Equipment, SpellDefinition } from '../models/character.model';
 
 @Injectable({ providedIn: 'root' })
 export class CharacterService {
@@ -91,6 +91,27 @@ export class CharacterService {
 
   removeEquipment(characterId: number, equipmentId: number): Observable<Character> {
     return this.http.delete<Character>(`${this.base}/${characterId}/equipment/${equipmentId}`);
+  }
+
+  // --- Zauber ---
+
+  getSpells(discipline?: string): Observable<SpellDefinition[]> {
+    if (discipline) {
+      return this.http.get<SpellDefinition[]>(`${this.base}/spells`, { params: { discipline } });
+    }
+    return this.http.get<SpellDefinition[]>(`${this.base}/spells`);
+  }
+
+  addSpell(characterId: number, spellDefinitionId: number): Observable<Character> {
+    return this.http.post<Character>(
+      `${this.base}/${characterId}/spells`,
+      null,
+      { params: { spellDefinitionId } }
+    );
+  }
+
+  removeSpell(characterId: number, spellId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${characterId}/spells/${spellId}`);
   }
 
   delete(id: number): Observable<void> {

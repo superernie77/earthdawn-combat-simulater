@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
-import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment } from '../../models/character.model';
+import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, SpellDefinition } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -351,6 +351,46 @@ import { ProbeResult } from '../../models/dice.model';
           </div>
         </mat-tab>
 
+        <!-- Sprüche -->
+        <mat-tab label="Sprüche" *ngIf="isMagicUser()">
+          <div class="tab-content">
+            <div class="section-header">
+              <div class="section-title">Gelernte Zauber</div>
+              <mat-form-field appearance="fill" style="width:250px">
+                <mat-label>Zauber hinzufügen</mat-label>
+                <mat-select [(ngModel)]="selectedSpellId" (ngModelChange)="addSpell()">
+                  <mat-option *ngFor="let s of availableSpells" [value]="s.id">
+                    {{ s.name }} (Kreis {{ s.circle }})
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="spell-list">
+              <div class="spell-item" *ngFor="let cs of character.spells">
+                <div class="spell-info">
+                  <span class="spell-name">{{ cs.spellDefinition.name }}</span>
+                  <span class="spell-circle">Kreis {{ cs.spellDefinition.circle }}</span>
+                </div>
+                <div class="spell-details">
+                  <span class="spell-badge" [ngClass]="spellTypeBadgeClass(cs.spellDefinition)">
+                    {{ spellTypeLabel(cs.spellDefinition) }}
+                  </span>
+                  <span class="spell-threads" *ngIf="cs.spellDefinition.threads > 0">
+                    {{ cs.spellDefinition.threads }} {{ cs.spellDefinition.threads === 1 ? 'Faden' : 'Fäden' }} (FW {{ cs.spellDefinition.weavingDifficulty }})
+                  </span>
+                  <span class="spell-threads" *ngIf="cs.spellDefinition.threads === 0">Sofortzauber</span>
+                  <span class="spell-effect">{{ cs.spellDefinition.description }}</span>
+                </div>
+                <button mat-icon-button color="warn" (click)="removeSpell(cs.id)" matTooltip="Entfernen">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="equip-empty" *ngIf="!character.spells?.length">Keine Zauber gelernt</div>
+            </div>
+          </div>
+        </mat-tab>
+
         <!-- Notizen -->
         <mat-tab label="Notizen">
           <div class="tab-content">
@@ -473,6 +513,25 @@ import { ProbeResult } from '../../models/dice.model';
     .equip-desc { font-size: 0.78rem; color: #666; font-style: italic; }
     .equip-empty { color: #555; font-size: 0.82rem; font-style: italic; padding: 4px 0 8px; }
     .equip-add-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+    .spell-list { display: flex; flex-direction: column; gap: 6px; }
+    .spell-item {
+      display: flex; align-items: center; gap: 10px;
+      background: #1e1a16; border: 1px solid #3a3028; border-radius: 6px; padding: 8px 12px;
+    }
+    .spell-info { min-width: 160px; }
+    .spell-name { font-weight: 600; color: #e0d5c0; display: block; }
+    .spell-circle { font-size: 0.75rem; color: #666; }
+    .spell-details { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap; }
+    .spell-badge {
+      border-radius: 10px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700;
+      &.spell-damage { background: rgba(255,112,67,0.15); color: #ff7043; }
+      &.spell-buff { background: rgba(102,187,106,0.15); color: #66bb6a; }
+      &.spell-debuff { background: rgba(239,83,80,0.15); color: #ef5350; }
+      &.spell-heal { background: rgba(66,165,245,0.15); color: #42a5f5; }
+    }
+    .spell-threads { font-size: 0.78rem; color: #ab47bc; }
+    .spell-effect { font-size: 0.78rem; color: #888; font-style: italic; }
   `]
 })
 export class CharacterSheetComponent implements OnInit {
@@ -484,6 +543,9 @@ export class CharacterSheetComponent implements OnInit {
   selectedSkillId?: number;
   availableTalents: TalentDefinition[] = [];
   availableSkills: SkillDefinition[] = [];
+
+  selectedSpellId?: number;
+  availableSpells: SpellDefinition[] = [];
 
   newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, description: '' };
@@ -501,9 +563,9 @@ export class CharacterSheetComponent implements OnInit {
   circles = Array.from({ length: 15 }, (_, i) => i + 1);
 
   derivedFields = [
-    { key: 'physicalDefense', label: 'Körperliche Verteidigung' },
-    { key: 'spellDefense', label: 'Zauberverteidigung' },
-    { key: 'socialDefense', label: 'Soziale Verteidigung' },
+    { key: 'physicalDefense', label: 'KV (Körperliche Verteidigung)' },
+    { key: 'spellDefense', label: 'MV (Mystische Verteidigung)' },
+    { key: 'socialDefense', label: 'SV (Soziale Verteidigung)' },
     { key: 'woundThreshold', label: 'Wundenschwelle' },
     { key: 'unconsciousnessRating', label: 'Bewusstlosigkeitsschwelle' },
     { key: 'deathRating', label: 'Todesschwelle' },
@@ -531,6 +593,7 @@ export class CharacterSheetComponent implements OnInit {
     this.characterService.findById(id).subscribe(c => {
       this.character = c;
       this.loadDerived();
+      this.loadAvailableSpells();
     });
     this.refService.getTalents().subscribe(t => this.availableTalents = t);
     this.refService.getSkills().subscribe(s => this.availableSkills = s);
@@ -748,5 +811,57 @@ export class CharacterSheetComponent implements OnInit {
     this.characterService.removeEquipment(this.character.id, e.id).subscribe(c => {
       this.character = c;
     });
+  }
+
+  // --- Zauber ---
+
+  private static MAGIC_DISCIPLINES = ['Elementarist', 'Illusionist', 'Magier', 'Geisterbeschwörer'];
+
+  isMagicUser(): boolean {
+    return !!this.character?.discipline && CharacterSheetComponent.MAGIC_DISCIPLINES.includes(this.character.discipline.name);
+  }
+
+  loadAvailableSpells(): void {
+    if (!this.isMagicUser()) return;
+    this.characterService.getSpells(this.character!.discipline!.name).subscribe(spells => {
+      this.availableSpells = spells.filter(s =>
+        !this.character!.spells?.some(cs => cs.spellDefinition.id === s.id)
+      );
+    });
+  }
+
+  addSpell(): void {
+    if (!this.character?.id || !this.selectedSpellId) return;
+    this.characterService.addSpell(this.character.id, this.selectedSpellId).subscribe(c => {
+      this.character = c;
+      this.selectedSpellId = undefined;
+      this.loadAvailableSpells();
+    });
+  }
+
+  removeSpell(spellId: number): void {
+    if (!this.character?.id) return;
+    this.characterService.removeSpell(this.character.id, spellId).subscribe(() => {
+      this.character!.spells = this.character!.spells.filter(s => s.id !== spellId);
+      this.loadAvailableSpells();
+    });
+  }
+
+  spellTypeLabel(spell: SpellDefinition): string {
+    switch (spell.effectType) {
+      case 'DAMAGE': return 'Schaden ' + spell.effectStep;
+      case 'BUFF':   return 'Buff';
+      case 'DEBUFF': return 'Debuff';
+      case 'HEAL':   return 'Heilung ' + spell.effectStep;
+    }
+  }
+
+  spellTypeBadgeClass(spell: SpellDefinition): string {
+    switch (spell.effectType) {
+      case 'DAMAGE': return 'spell-badge spell-damage';
+      case 'BUFF':   return 'spell-badge spell-buff';
+      case 'DEBUFF': return 'spell-badge spell-debuff';
+      case 'HEAL':   return 'spell-badge spell-heal';
+    }
   }
 }

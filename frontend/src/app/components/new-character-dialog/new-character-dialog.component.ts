@@ -34,7 +34,7 @@ import { DisciplineDefinition, emptyCharacter } from '../../models/character.mod
           <mat-label>Disziplin *</mat-label>
           <mat-select formControlName="disciplineId">
             <mat-option *ngFor="let d of disciplines" [value]="d.id">
-              {{ d.name }} (Karma d{{ d.karmaStep }})
+              {{ d.name }}
             </mat-option>
           </mat-select>
           <mat-error *ngIf="form.get('disciplineId')?.hasError('required')">Disziplin ist erforderlich</mat-error>

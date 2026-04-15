@@ -21,6 +21,7 @@ public class CharacterService {
     private final CharacterRepository characterRepo;
     private final TalentDefinitionRepository talentDefRepo;
     private final SkillDefinitionRepository skillDefRepo;
+    private final SpellDefinitionRepository spellDefRepo;
     private final ModifierAggregator modifierAggregator;
 
     public List<GameCharacter> findAll() {
@@ -238,6 +239,40 @@ public class CharacterService {
         GameCharacter c = findById(characterId);
         c.getEquipment().removeIf(e -> e.getId().equals(equipmentId));
         return characterRepo.save(c);
+    }
+
+    // --- Zauber ---
+
+    public GameCharacter addSpell(Long characterId, Long spellDefinitionId) {
+        GameCharacter c = findById(characterId);
+        SpellDefinition def = spellDefRepo.findById(spellDefinitionId)
+                .orElseThrow(() -> new EntityNotFoundException("Zauber nicht gefunden: " + spellDefinitionId));
+
+        // Duplikat-Check
+        boolean alreadyHas = c.getSpells().stream()
+                .anyMatch(s -> s.getSpellDefinition().getId().equals(spellDefinitionId));
+        if (alreadyHas) throw new IllegalStateException("Charakter hat diesen Zauber bereits.");
+
+        CharacterSpell spell = CharacterSpell.builder()
+                .character(c)
+                .spellDefinition(def)
+                .build();
+        c.getSpells().add(spell);
+        return characterRepo.save(c);
+    }
+
+    public void removeSpell(Long characterId, Long spellId) {
+        GameCharacter c = findById(characterId);
+        c.getSpells().removeIf(s -> s.getId().equals(spellId));
+        characterRepo.save(c);
+    }
+
+    public List<SpellDefinition> getAllSpells() {
+        return spellDefRepo.findAllByOrderByDisciplineAscCircleAscNameAsc();
+    }
+
+    public List<SpellDefinition> getSpellsByDiscipline(String discipline) {
+        return spellDefRepo.findByDisciplineOrderByCircleAscNameAsc(discipline);
     }
 
     public void delete(Long id) {

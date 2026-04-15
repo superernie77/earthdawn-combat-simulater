@@ -111,25 +111,25 @@ import { Character } from '../../models/character.model';
             <button class="combat-option-toggle aggressive"
               [class.active]="aggressiveAttack"
               (click)="toggleAggressiveAttack()"
-              matTooltip="+3 auf nächsten Angriff, 1 Schaden, -3 auf alle Verteidigungswerte">
+              matTooltip="+3 auf nächsten Angriff, 1 Schaden, -3 KV/MV/SV">
               <mat-icon>local_fire_department</mat-icon>
               Aggressiver Angriff
             </button>
             <div class="aggressive-info" *ngIf="aggressiveAttack">
               <span class="info-bonus">+3 Step</span>
-              <span class="info-penalty">-3 VK (diese Runde)</span>
+              <span class="info-penalty">-3 KV/MV/SV</span>
               <span class="info-cost">1 Schaden</span>
             </div>
             <button class="combat-option-toggle defensive"
               [class.active]="defensiveStance"
               (click)="toggleDefensiveStance()"
-              matTooltip="-3 auf nächsten Angriff, +3 auf alle Verteidigungswerte">
+              matTooltip="-3 auf nächsten Angriff, +3 KV/MV/SV">
               <mat-icon>shield</mat-icon>
               Defensive Haltung
             </button>
             <div class="aggressive-info" *ngIf="defensiveStance">
               <span class="info-penalty">-3 Step</span>
-              <span class="info-bonus">+3 VK</span>
+              <span class="info-bonus">+3 KV/MV/SV</span>
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ import { Character } from '../../models/character.model';
             <div class="result-meta">
               <div class="probe-name">{{ lastProbeResult.probeName }}</div>
               <div>Step {{ lastProbeResult.step }} · {{ lastProbeResult.diceExpression }}
-                <span *ngIf="lastProbeResult.karmaUsed" style="color:#c9a84c"> + Karma d{{ karmaStep }}</span>
+                <span *ngIf="lastProbeResult.karmaUsed" style="color:#c9a84c"> + Karma W6</span>
               </div>
               <div>TN {{ lastProbeResult.targetNumber }}</div>
               <div class="success-degree" [ngClass]="degreeClass(lastProbeResult)">
@@ -219,7 +219,7 @@ import { Character } from '../../models/character.model';
               <span *ngIf="d.exploded" class="explode-icon">💥</span>
             </div>
             <div class="die-result karma-die" *ngIf="lastProbeResult.karmaRoll">
-              <span class="die-sides" style="color:#c9a84c">★ d{{ karmaStep }}</span>
+              <span class="die-sides" style="color:#c9a84c">★ W6</span>
               <span class="die-rolls">{{ lastProbeResult.karmaRoll.dice[0].rolls.join(' + ') }}</span>
               <span *ngIf="lastProbeResult.karmaRoll.exploded" class="explode-icon">💥</span>
             </div>
@@ -235,7 +235,7 @@ import { Character } from '../../models/character.model';
             </div>
             <div class="result-meta">
               <div>Step {{ lastRoll.step }} · {{ lastRoll.diceExpression }}
-                <span *ngIf="lastKarmaRoll" style="color:#c9a84c"> + Karma d{{ karmaStep }}</span>
+                <span *ngIf="lastKarmaRoll" style="color:#c9a84c"> + Karma W6</span>
               </div>
               <div *ngIf="lastKarmaRoll" class="karma-breakdown">
                 Basis: {{ lastRoll.total }} + Karma: {{ lastKarmaRoll.total }} = {{ totalWithKarma() }}
@@ -249,7 +249,7 @@ import { Character } from '../../models/character.model';
               <span *ngIf="d.exploded" class="explode-icon">💥</span>
             </div>
             <div class="die-result karma-die" *ngIf="lastKarmaRoll">
-              <span class="die-sides" style="color:#c9a84c">★ d{{ karmaStep }}</span>
+              <span class="die-sides" style="color:#c9a84c">★ W6</span>
               <span class="die-rolls">{{ lastKarmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="lastKarmaRoll.dice[0].rolls.length > 1" class="die-total"> = {{ lastKarmaRoll.total }}</span></span>
               <span *ngIf="lastKarmaRoll.exploded" class="explode-icon">💥</span>
             </div>
@@ -475,7 +475,7 @@ export class DiceRollerComponent implements OnInit {
   history: Array<{ step: number; diceExpression: string; total: number; exploded: boolean; probeName?: string; success?: boolean; extraSuccesses?: number }> = [];
   showTable = false;
   useKarma = false;
-  readonly karmaStep = 6; // Karma ist immer W6
+  readonly karmaStep = 4; // W6 = Step 4 in der Stufentabelle
   quickSteps = [3, 5, 7, 8, 10, 12, 14, 16, 19];
 
   allCharacters: Character[] = [];
@@ -605,17 +605,17 @@ export class DiceRollerComponent implements OnInit {
       if (wasAggressive && this.activeChar?.id) {
         this.characterService.updateField(this.activeChar.id, 'damage', 1).subscribe(updated => {
           this.activeChar = updated;
-          this.snack.open(`Aggressiver Angriff: 1 Schaden, -3 Verteidigung!`, 'OK', { duration: 3000 });
+          this.snack.open(`Aggressiver Angriff: 1 Schaden, -3 KV/MV/SV!`, 'OK', { duration: 3000 });
         });
       }
       if (wasDefensive) {
-        this.snack.open(`Defensive Haltung: +3 Verteidigung diese Runde!`, 'OK', { duration: 3000 });
+        this.snack.open(`Defensive Haltung: +3 KV/MV/SV diese Runde!`, 'OK', { duration: 3000 });
       }
 
       if (this.useKarma) {
         this.diceService.roll(this.karmaStep).subscribe(kr => {
           this.lastKarmaRoll = kr;
-          this.history.unshift({ step: r.step, diceExpression: r.diceExpression + `+d${this.karmaStep}★`, total: r.total + kr.total, exploded: r.exploded || kr.exploded });
+          this.history.unshift({ step: r.step, diceExpression: r.diceExpression + '+W6★', total: r.total + kr.total, exploded: r.exploded || kr.exploded });
           if (this.history.length > 30) this.history.pop();
 
           // Karma vom Charakter abziehen
@@ -710,11 +710,11 @@ export class DiceRollerComponent implements OnInit {
       if (wasAggressive && this.activeChar?.id) {
         this.characterService.updateField(this.activeChar.id, 'damage', 1).subscribe(updated => {
           this.activeChar = updated;
-          this.snack.open(`Aggressiver Angriff: 1 Schaden, -3 Verteidigung!`, 'OK', { duration: 3000 });
+          this.snack.open(`Aggressiver Angriff: 1 Schaden, -3 KV/MV/SV!`, 'OK', { duration: 3000 });
         });
       }
       if (wasDefensive) {
-        this.snack.open(`Defensive Haltung: +3 Verteidigung diese Runde!`, 'OK', { duration: 3000 });
+        this.snack.open(`Defensive Haltung: +3 KV/MV/SV diese Runde!`, 'OK', { duration: 3000 });
       }
 
       if (r.karmaUsed && this.activeChar?.id) {

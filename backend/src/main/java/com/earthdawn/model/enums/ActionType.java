@@ -16,5 +16,7 @@ public enum ActionType {
     FREE_ACTION,
     DODGE,
     STAND_UP,
-    AUFSPRINGEN
+    AUFSPRINGEN,
+    THREADWEAVE,
+    SPELL_CAST
 }

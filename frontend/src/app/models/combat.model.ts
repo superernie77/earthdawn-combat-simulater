@@ -7,7 +7,8 @@ export type ActionType =
   | 'TALENT_TEST' | 'SKILL_TEST' | 'RECOVERY_TEST'
   | 'INITIATIVE' | 'EFFECT_ADDED' | 'EFFECT_REMOVED'
   | 'VALUE_CHANGED' | 'ROUND_CHANGE' | 'FREE_ACTION' | 'DODGE'
-  | 'STAND_UP' | 'AUFSPRINGEN';
+  | 'STAND_UP' | 'AUFSPRINGEN'
+  | 'THREADWEAVE' | 'SPELL_CAST';
 
 export interface ModifierEntry {
   targetStat: string;
@@ -63,6 +64,9 @@ export interface CombatantState {
   knockedDown: boolean;
   pendingAttackBonus: number;
   pendingDefenseBonus: number;
+  preparingSpellId?: number;
+  threadsWoven: number;
+  threadsRequired: number;
   activeEffects: ActiveEffect[];
 }
 
@@ -153,6 +157,62 @@ export interface DodgeResult {
   woundThreshold: number;
   targetDefeated: boolean;
   knockdownResult?: KnockdownResult;
+  description: string;
+}
+
+export interface ThreadweaveRequest {
+  sessionId: number;
+  casterCombatantId: number;
+  spellId: number;
+  spendKarma: boolean;
+}
+
+export interface ThreadweaveResult {
+  casterName: string;
+  spellName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  targetNumber: number;
+  success: boolean;
+  threadsWoven: number;
+  threadsRequired: number;
+  readyToCast: boolean;
+  description: string;
+}
+
+export interface SpellCastRequest {
+  sessionId: number;
+  casterCombatantId: number;
+  targetCombatantId?: number;
+  spellId: number;
+  spendKarma: boolean;
+}
+
+export interface SpellCastResult {
+  casterName: string;
+  targetName: string;
+  spellName: string;
+  effectType: 'DAMAGE' | 'BUFF' | 'DEBUFF' | 'HEAL';
+  castStep: number;
+  castRoll: RollResult;
+  karmaRoll?: RollResult;
+  defenseValue: number;
+  success: boolean;
+  extraSuccesses: number;
+  damageStep?: number;
+  damageRoll?: RollResult;
+  armorValue?: number;
+  netDamage?: number;
+  woundDealt?: boolean;
+  newWounds?: number;
+  totalWounds?: number;
+  woundThreshold?: number;
+  targetDefeated?: boolean;
+  knockdownResult?: KnockdownResult;
+  effectApplied?: string;
+  effectDuration?: number;
+  healedAmount?: number;
   description: string;
 }
 

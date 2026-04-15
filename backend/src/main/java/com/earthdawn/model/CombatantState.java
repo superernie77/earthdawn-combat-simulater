@@ -85,6 +85,21 @@ public class CombatantState {
     @Column(columnDefinition = "text")
     private String pendingDamageRollJson;
 
+    // --- Zauber-Vorbereitung (Fadenweben) ---
+
+    /** ID des aktuell vorbereiteten Zaubers (null = kein Zauber in Vorbereitung) */
+    private Long preparingSpellId;
+
+    /** Bereits gewobene Fäden */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int threadsWoven = 0;
+
+    /** Benötigte Fäden (kopiert vom Zauber bei Beginn) */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int threadsRequired = 0;
+
     @OneToMany(mappedBy = "combatantState", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<ActiveEffect> activeEffects = new ArrayList<>();

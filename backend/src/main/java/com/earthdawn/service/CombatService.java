@@ -601,7 +601,8 @@ public class CombatService {
                 .build();
     }
 
-    private KnockdownResult applyDamageToDefender(CombatSession session, CombatantState defender, int netDamage) {
+    /** Package-private: auch von SpellService genutzt */
+    KnockdownResult applyDamageToDefender(CombatSession session, CombatantState defender, int netDamage) {
         defender.setCurrentDamage(defender.getCurrentDamage() + netDamage);
         int wt = modifiers.getEffectiveValue(defender, StatType.WOUND_THRESHOLD, TriggerContext.ALWAYS);
         int newWounds = netDamage / wt;
@@ -643,7 +644,7 @@ public class CombatService {
         ActiveEffect effect = ActiveEffect.builder()
                 .combatantState(combatant)
                 .name("Niedergeschlagen")
-                .description("−3 auf alle Proben, −3 KVK/ZVK")
+                .description("−3 auf alle Proben, −3 KV/MV/SV")
                 .sourceType(SourceType.CONDITION)
                 .remainingRounds(-1)
                 .negative(true)
@@ -868,15 +869,15 @@ public class CombatService {
         return sb.toString();
     }
 
-    private CombatantState findCombatant(CombatSession session, Long combatantId) {
+    CombatantState findCombatant(CombatSession session, Long combatantId) {
         return session.getCombatants().stream()
                 .filter(c -> c.getId().equals(combatantId))
                 .findFirst()
                 .orElseThrow(() -> new EntityNotFoundException("Kombattant nicht gefunden: " + combatantId));
     }
 
-    private void addLog(CombatSession session, String actorName, String targetName,
-                        ActionType actionType, String description, boolean success) {
+    void addLog(CombatSession session, String actorName, String targetName,
+                ActionType actionType, String description, boolean success) {
         CombatLog entry = CombatLog.builder()
                 .combatSession(session)
                 .round(session.getRound())
@@ -890,7 +891,7 @@ public class CombatService {
         session.getLog().add(entry);
     }
 
-    private void broadcast(CombatSession session) {
+    void broadcast(CombatSession session) {
         try {
             websocket.convertAndSend("/topic/combat/" + session.getId(), session);
         } catch (Exception e) {

@@ -52,6 +52,31 @@ export interface Equipment {
   mysticalArmor: number;
 }
 
+export interface SpellDefinition {
+  id: number;
+  name: string;
+  discipline: string;
+  circle: number;
+  threads: number;
+  weavingDifficulty: number;
+  castingDifficulty: number;
+  effectType: 'DAMAGE' | 'BUFF' | 'DEBUFF' | 'HEAL';
+  effectStep: number;
+  useMysticArmor: boolean;
+  modifyStat?: string;
+  modifyOperation?: string;
+  modifyValue?: number;
+  modifyTrigger?: string;
+  duration: number;
+  description: string;
+  effectDescription: string;
+}
+
+export interface CharacterSpell {
+  id: number;
+  spellDefinition: SpellDefinition;
+}
+
 export interface Character {
   id?: number;
   name: string;
@@ -100,6 +125,7 @@ export interface Character {
   talents: CharacterTalent[];
   skills: CharacterSkill[];
   equipment: Equipment[];
+  spells: CharacterSpell[];
 }
 
 export interface DerivedStats {
@@ -142,6 +168,7 @@ export function emptyCharacter(): Character {
     notes: '',
     talents: [],
     skills: [],
-    equipment: []
+    equipment: [],
+    spells: []
   };
 }

@@ -4,7 +4,9 @@ import { Observable } from 'rxjs';
 import {
   CombatSession, AttackActionRequest, CombatActionResult,
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
-  DodgeRequest, DodgeResult, StandUpResult
+  DodgeRequest, DodgeResult, StandUpResult,
+  ThreadweaveRequest, ThreadweaveResult,
+  SpellCastRequest, SpellCastResult
 } from '../models/combat.model';
 
 @Injectable({ providedIn: 'root' })
@@ -116,5 +118,22 @@ export class CombatService {
 
   getLog(sessionId: number): Observable<CombatLog[]> {
     return this.http.get<CombatLog[]>(`${this.base}/sessions/${sessionId}/log`);
+  }
+
+  // --- Zauber ---
+
+  weaveThread(sessionId: number, req: ThreadweaveRequest): Observable<ThreadweaveResult> {
+    return this.http.post<ThreadweaveResult>(`${this.base}/sessions/${sessionId}/weave-thread`, req);
+  }
+
+  castSpell(sessionId: number, req: SpellCastRequest): Observable<SpellCastResult> {
+    return this.http.post<SpellCastResult>(`${this.base}/sessions/${sessionId}/cast-spell`, req);
+  }
+
+  cancelSpellPreparation(sessionId: number, combatantId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/cancel-spell`,
+      {}
+    );
   }
 }

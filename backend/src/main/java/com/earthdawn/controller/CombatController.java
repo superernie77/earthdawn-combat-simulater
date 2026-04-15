@@ -5,6 +5,7 @@ import com.earthdawn.model.ActiveEffect;
 import com.earthdawn.model.CombatLog;
 import com.earthdawn.model.CombatSession;
 import com.earthdawn.service.CombatService;
+import com.earthdawn.service.SpellService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class CombatController {
 
     private final CombatService combatService;
+    private final SpellService spellService;
 
     @GetMapping("/sessions")
     public List<CombatSession> findAll() {
@@ -128,5 +130,26 @@ public class CombatController {
     @GetMapping("/sessions/{id}/log")
     public List<CombatLog> getLog(@PathVariable Long id) {
         return combatService.getLog(id);
+    }
+
+    // --- Zauber ---
+
+    @PostMapping("/sessions/{id}/weave-thread")
+    public ThreadweaveResult weaveThread(@PathVariable Long id, @RequestBody ThreadweaveRequest req) {
+        req.setSessionId(id);
+        return spellService.weaveThread(req);
+    }
+
+    @PostMapping("/sessions/{id}/cast-spell")
+    public SpellCastResult castSpell(@PathVariable Long id, @RequestBody SpellCastRequest req) {
+        req.setSessionId(id);
+        return spellService.castSpell(req);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/cancel-spell")
+    public ResponseEntity<Void> cancelSpellPreparation(@PathVariable Long id,
+                                                        @PathVariable Long combatantId) {
+        spellService.cancelSpellPreparation(id, combatantId);
+        return ResponseEntity.ok().build();
     }
 }

@@ -19,9 +19,11 @@ import { WebSocketService } from '../../services/websocket.service';
 import {
   CombatSession, CombatantState, AttackActionRequest,
   CombatActionResult, ActiveEffect, FreeActionRequest, FreeActionResult,
-  DodgeRequest, DodgeResult, StandUpResult
+  DodgeRequest, DodgeResult, StandUpResult,
+  ThreadweaveRequest, ThreadweaveResult,
+  SpellCastRequest, SpellCastResult
 } from '../../models/combat.model';
-import { Character } from '../../models/character.model';
+import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
 @Component({
   selector: 'app-combat-tracker',
@@ -132,7 +134,11 @@ import { Character } from '../../models/character.model';
                 <span class="combatant-name">{{ c.character.name }}</span>
                 <span class="discipline-badge">{{ c.character.discipline?.name }}</span>
                 <mat-icon *ngIf="c.defeated" style="color:#f44336;font-size:16px">skull</mat-icon>
-                <span *ngIf="c.knockedDown && !c.defeated" class="knocked-badge" matTooltip="Niedergeschlagen: −3 auf alle Proben, −3 KVK/ZVK">↓ Nieder</span>
+                <span *ngIf="c.knockedDown && !c.defeated" class="knocked-badge" matTooltip="Niedergeschlagen: −3 auf alle Proben, −3 KV/MV/SV">↓ Nieder</span>
+                <span *ngIf="c.preparingSpellId && !c.defeated" class="spell-prep-badge"
+                  matTooltip="Zauber vorbereitet: {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }} Fäden)">
+                  ⟡ {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }})
+                </span>
               </div>
               <div class="comb-actions">
                 <span *ngIf="session!.status === 'ACTIVE' && c.hasActedThisRound && !c.defeated" class="acted-badge" matTooltip="Hat diese Runde bereits gehandelt">Gehandelt</span>
@@ -155,10 +161,34 @@ import { Character } from '../../models/character.model';
                   matTooltip="Aufspringen (GE-Probe vs 6, 2 Schaden — kann danach noch angreifen)">
                   <mat-icon>directions_run</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE'"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && isMagicCombatant(c) && !c.preparingSpellId"
+                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openThreadweaveDialog(c)"
+                  matTooltip="Faden weben (Hauptaktion)">
+                  <mat-icon>all_inclusive</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && isMagicCombatant(c) && c.preparingSpellId"
+                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openThreadweaveDialog(c)"
+                  matTooltip="Weiteren Faden weben ({{ c.threadsWoven }}/{{ c.threadsRequired }})">
+                  <mat-icon>all_inclusive</mat-icon> {{ c.threadsWoven }}/{{ c.threadsRequired }}
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && canCastSpell(c)"
+                  class="combat-option-btn spellcast-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openSpellCastDialog(c)"
+                  matTooltip="Zauber wirken">
+                  <mat-icon>auto_fix_high</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && c.preparingSpellId && !c.defeated"
+                  class="combat-option-btn cancel-spell-btn"
+                  (click)="cancelSpell(c)"
+                  matTooltip="Zaubervorbereitung abbrechen">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && !isMagicCombatant(c)"
                   class="combat-option-btn use-action" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="useAction(c)"
-                  matTooltip="Aktion benutzen (Zauber / Faden weben / Sonstiges)">
+                  matTooltip="Aktion benutzen (Sonstiges)">
                   <mat-icon>auto_awesome</mat-icon>
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && freeActionTalentsOf(c).length > 0"
@@ -210,14 +240,14 @@ import { Character } from '../../models/character.model';
             </div>
             <!-- Defense Values -->
             <div class="comb-defense-row">
-              <span class="def-stat" matTooltip="Körperliche Verteidigung">
-                <mat-icon>shield</mat-icon> {{ pd(c) }}
+              <span class="def-stat" matTooltip="KV – Körperliche Verteidigung">
+                <mat-icon>shield</mat-icon> KV {{ pd(c) }}
               </span>
-              <span class="def-stat mystic" matTooltip="Zauberverteidigung">
-                <mat-icon>auto_awesome</mat-icon> {{ sd(c) }}
+              <span class="def-stat mystic" matTooltip="MV – Mystische Verteidigung">
+                <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}
               </span>
-              <span class="def-stat social" matTooltip="Soziale Verteidigung">
-                <mat-icon>people</mat-icon> {{ socD(c) }}
+              <span class="def-stat social" matTooltip="SV – Soziale Verteidigung">
+                <mat-icon>people</mat-icon> SV {{ socD(c) }}
               </span>
               <span class="def-stat armor-phys" matTooltip="Körperliche Rüstung" *ngIf="pa(c) > 0">
                 <mat-icon>security</mat-icon> {{ pa(c) }}
@@ -281,7 +311,7 @@ import { Character } from '../../models/character.model';
               <div class="roll-block-totals">
                 <span class="roll-big-total">{{ r.attackRoll.total + (r.karmaRoll?.total ?? 0) }}</span>
                 <span class="roll-big-vs">vs</span>
-                <span class="roll-big-target">VK {{ r.defenseValue }}</span>
+                <span class="roll-big-target">KV {{ r.defenseValue }}</span>
               </div>
             </div>
             <div class="dice-breakdown-mini">
@@ -492,25 +522,25 @@ import { Character } from '../../models/character.model';
           <button class="combat-option-toggle aggressive"
             [class.active]="attackDialog.aggressiveAttack"
             (click)="toggleDialogAggressive()"
-            matTooltip="+3 Stufen, 1 Schaden, -3 VK">
+            matTooltip="+3 Stufen, 1 Schaden, -3 KV">
             <mat-icon>local_fire_department</mat-icon>
             Aggressiver Angriff
           </button>
           <div class="aggressive-info" *ngIf="attackDialog.aggressiveAttack">
             <span class="info-bonus">+3 Step</span>
-            <span class="info-penalty">-3 VK</span>
+            <span class="info-penalty">-3 KV</span>
             <span class="info-cost">1 Schaden</span>
           </div>
           <button class="combat-option-toggle defensive"
             [class.active]="attackDialog.defensiveStance"
             (click)="toggleDialogDefensive()"
-            matTooltip="-3 Stufen, +3 Verteidigung">
+            matTooltip="-3 Stufen, +3 KV">
             <mat-icon>shield</mat-icon>
             Defensive Haltung
           </button>
           <div class="aggressive-info" *ngIf="attackDialog.defensiveStance">
             <span class="info-penalty">-3 Step</span>
-            <span class="info-bonus">+3 VK</span>
+            <span class="info-bonus">+3 KV</span>
           </div>
         </div>
         <mat-form-field appearance="fill" style="width:100%">
@@ -659,7 +689,7 @@ import { Character } from '../../models/character.model';
                 <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
                 <ng-container *ngIf="r.defenseValue > 0">
                   <span class="roll-big-vs">vs</span>
-                  <span class="roll-big-target">VK {{ r.defenseValue }}</span>
+                  <span class="roll-big-target">KV {{ r.defenseValue }}</span>
                 </ng-container>
               </div>
             </div>
@@ -755,6 +785,256 @@ import { Character } from '../../models/character.model';
           </div>
         </div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="standUpModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Threadweave Dialog -->
+    <div class="attack-dialog" *ngIf="threadweaveDialog.open">
+      <div class="dialog-backdrop" (click)="threadweaveDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">all_inclusive</mat-icon>Faden weben: {{ threadweaveDialog.caster?.character?.name }}</h3>
+        <div *ngIf="threadweaveDialog.caster?.preparingSpellId" style="color:#b39ddb;font-size:0.85rem;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+          <mat-icon style="font-size:16px;height:16px;width:16px">info</mat-icon>
+          Bereitet vor: {{ spellNameOf(threadweaveDialog.caster!) }} ({{ threadweaveDialog.caster!.threadsWoven }}/{{ threadweaveDialog.caster!.threadsRequired }} Fäden)
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Zauber</mat-label>
+          <mat-select [(ngModel)]="threadweaveDialog.spellId" [disabled]="!!threadweaveDialog.caster?.preparingSpellId">
+            <mat-option *ngFor="let s of spellsOf(threadweaveDialog.caster)" [value]="s.spellDefinition.id">
+              {{ s.spellDefinition.name }} ({{ s.spellDefinition.threads }} Fäden, SW {{ s.spellDefinition.weavingDifficulty }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="threadweaveDialog.spendKarma"
+            [class.disabled]="(threadweaveDialog.caster?.currentKarma ?? 0) <= 0"
+            (click)="(threadweaveDialog.caster?.currentKarma ?? 0) > 0 && (threadweaveDialog.spendKarma = !threadweaveDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(threadweaveDialog.caster?.currentKarma ?? 0) <= 0">
+              {{ threadweaveDialog.caster?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="threadweaveDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performThreadweave()" [disabled]="!threadweaveDialog.spellId">
+            <mat-icon>all_inclusive</mat-icon> Faden weben
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threadweave Result Modal -->
+    <div class="result-modal" *ngIf="threadweaveModal.open">
+      <div class="dialog-backdrop" (click)="threadweaveModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="threadweaveModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'all_inclusive' : 'close' }}</mat-icon>
+          {{ r.success ? 'FADEN GEWOBEN' : 'FEHLGESCHLAGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.casterName }}</span>
+          <span style="color:#b39ddb;font-weight:600;margin:0 6px">{{ r.spellName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Fadenweben · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">SW {{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="roll-divider"></div>
+          <div class="thread-progress-bar">
+            <span class="thread-label">Fäden</span>
+            <div class="thread-dots">
+              <span *ngFor="let woven of threadDots(r)" [class]="'thread-dot ' + (woven ? 'woven' : 'empty')"></span>
+            </div>
+            <span class="thread-count">{{ r.threadsWoven }}/{{ r.threadsRequired }}</span>
+          </div>
+          <div class="spell-ready-banner" *ngIf="r.readyToCast">
+            <mat-icon>auto_fix_high</mat-icon> Bereit zum Wirken!
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="threadweaveModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Spell Cast Dialog -->
+    <div class="attack-dialog" *ngIf="spellCastDialog.open">
+      <div class="dialog-backdrop" (click)="spellCastDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ce93d8">auto_fix_high</mat-icon>Zauber wirken: {{ spellCastDialog.caster?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Zauber</mat-label>
+          <mat-select [(ngModel)]="spellCastDialog.spellId">
+            <mat-option *ngFor="let s of readySpellsOf(spellCastDialog.caster)" [value]="s.spellDefinition.id">
+              {{ s.spellDefinition.name }}
+              <span *ngIf="s.spellDefinition.effectType === 'DAMAGE'"> (Schaden)</span>
+              <span *ngIf="s.spellDefinition.effectType === 'HEAL'"> (Heilung)</span>
+              <span *ngIf="s.spellDefinition.effectType === 'BUFF'"> (Buff)</span>
+              <span *ngIf="s.spellDefinition.effectType === 'DEBUFF'"> (Debuff)</span>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" style="width:100%" *ngIf="spellNeedsTarget()">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="spellCastDialog.targetId">
+            <mat-option *ngFor="let c of spellTargets()" [value]="c.id">
+              {{ c.character.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="spellCastDialog.spendKarma"
+            [class.disabled]="(spellCastDialog.caster?.currentKarma ?? 0) <= 0"
+            (click)="(spellCastDialog.caster?.currentKarma ?? 0) > 0 && (spellCastDialog.spendKarma = !spellCastDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(spellCastDialog.caster?.currentKarma ?? 0) <= 0">
+              {{ spellCastDialog.caster?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="spellCastDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performSpellCast()" [disabled]="!spellCastDialog.spellId">
+            <mat-icon>auto_fix_high</mat-icon> Wirken
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spell Cast Result Modal -->
+    <div class="result-modal" *ngIf="spellCastModal.open">
+      <div class="dialog-backdrop" (click)="spellCastModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="spellCastModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'auto_fix_high' : 'close' }}</mat-icon>
+          {{ r.success ? spellOutcomeLabel(r) : 'FEHLGESCHLAGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.casterName }}</span>
+          <span style="color:#ce93d8;font-weight:600;margin:0 6px">{{ r.spellName }}</span>
+          <ng-container *ngIf="r.targetName">
+            <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+            <span class="result-target">{{ r.targetName }}</span>
+          </ng-container>
+        </div>
+        <div class="result-rolls">
+          <!-- Cast roll block -->
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Spruchzauberei · Step {{ r.castStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.castRoll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">MV {{ r.defenseValue }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.castRoll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Damage spells -->
+          <ng-container *ngIf="r.success && r.effectType === 'DAMAGE' && r.damageRoll">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row" *ngIf="r.extraSuccesses > 0">
+              <span class="roll-label">Übererfolge</span>
+              <span class="roll-expr">{{ r.extraSuccesses }}× → +{{ r.extraSuccesses * 2 }} Stufen</span>
+              <span class="roll-value extra-success">+{{ r.extraSuccesses * 2 }}</span>
+            </div>
+            <div class="roll-block" style="background:rgba(206,147,216,0.06);border:1px solid #4a2050">
+              <div class="roll-block-header">
+                <span class="roll-block-label">
+                  Zauberschaden · Step {{ r.damageStep }}
+                  <span class="step-calc" *ngIf="r.extraSuccesses > 0">
+                    ({{ r.damageStep! - r.extraSuccesses * 2 }} + {{ r.extraSuccesses * 2 }} Übererfolge)
+                  </span>
+                </span>
+                <div class="roll-block-totals">
+                  <span class="roll-big-total" style="color:#ce93d8">{{ r.damageRoll!.total }}</span>
+                  <ng-container *ngIf="(r.armorValue ?? 0) > 0">
+                    <span class="roll-big-vs">−</span>
+                    <span class="roll-big-total" style="color:#888;font-size:1.4rem">{{ r.armorValue }}</span>
+                    <span class="roll-big-vs">=</span>
+                    <span class="roll-big-total" style="color:#ba68c8">{{ r.netDamage }}</span>
+                  </ng-container>
+                </div>
+              </div>
+              <div class="dice-breakdown-mini">
+                <div class="die-mini" *ngFor="let d of r.damageRoll!.dice" [class.exploded]="d.exploded">
+                  <span class="die-mini-sides">W{{ d.sides }}</span>
+                  <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                  <span *ngIf="d.exploded" class="explode-mini">💥</span>
+                </div>
+              </div>
+            </div>
+            <div class="wound-banner" *ngIf="r.woundDealt">
+              <mat-icon>bolt</mat-icon>
+              {{ r.newWounds }} WUNDE{{ (r.newWounds ?? 0) > 1 ? 'N' : '' }} erlitten!
+              Gesamt: {{ r.totalWounds }} · WS {{ r.woundThreshold }}
+            </div>
+            <div class="defeat-banner" *ngIf="r.targetDefeated">
+              <mat-icon>skull</mat-icon> {{ r.targetName }} ist bewusstlos!
+            </div>
+            <ng-container *ngIf="r.knockdownResult as kd">
+              <div class="knockdown-banner" [class.knocked]="kd.knockedDown" [class.stood]="!kd.knockedDown">
+                <mat-icon>{{ kd.knockedDown ? 'airline_seat_flat' : 'accessibility_new' }}</mat-icon>
+                STR {{ kd.roll.total }} vs {{ kd.targetNumber }} →
+                {{ kd.knockedDown ? 'NIEDERGESCHLAGEN!' : 'Bleibt stehen' }}
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <!-- Heal spells -->
+          <ng-container *ngIf="r.success && r.effectType === 'HEAL'">
+            <div class="roll-divider"></div>
+            <div class="spell-heal-banner">
+              <mat-icon>healing</mat-icon> {{ r.healedAmount }} Schaden geheilt
+            </div>
+          </ng-container>
+
+          <!-- Buff/Debuff spells -->
+          <ng-container *ngIf="r.success && (r.effectType === 'BUFF' || r.effectType === 'DEBUFF')">
+            <div class="roll-divider"></div>
+            <div class="spell-effect-banner" [class.buff]="r.effectType === 'BUFF'" [class.debuff]="r.effectType === 'DEBUFF'">
+              <mat-icon>{{ r.effectType === 'BUFF' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              {{ r.effectApplied }} ({{ r.effectDuration }} Runden)
+            </div>
+          </ng-container>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="spellCastModal.open = false">
           Schließen
         </button>
       </div>
@@ -1003,6 +1283,52 @@ import { Character } from '../../models/character.model';
     .combat-option-btn.aufspringen-btn { color: #42a5f5; border-color: #1a3050; }
     .combat-option-btn.aufspringen-btn:hover { border-color: #42a5f5; background: rgba(66,165,245,0.1); }
 
+    /* Spell badges & buttons */
+    .spell-prep-badge {
+      font-size: 10px; font-weight: 700; color: #b39ddb; background: rgba(179,157,219,0.15);
+      border: 1px solid #b39ddb; border-radius: 8px; padding: 2px 7px;
+      letter-spacing: 0.03em;
+    }
+    .combat-option-btn.threadweave-btn { color: #b39ddb; border-color: #4a3070; }
+    .combat-option-btn.threadweave-btn:not([disabled]):hover { border-color: #b39ddb; background: rgba(179,157,219,0.1); }
+    .combat-option-btn.spellcast-btn { color: #ce93d8; border-color: #5a2060; }
+    .combat-option-btn.spellcast-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
+    .combat-option-btn.cancel-spell-btn { color: #888; border-color: #3a3028; }
+    .combat-option-btn.cancel-spell-btn:hover { border-color: #ef5350; color: #ef5350; }
+    .thread-progress-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: #1e1a16; border-radius: 5px; padding: 8px 12px;
+    }
+    .thread-label { color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; min-width: 40px; }
+    .thread-dots { display: flex; gap: 6px; flex: 1; }
+    .thread-dot {
+      width: 14px; height: 14px; border-radius: 50%; border: 2px solid #555;
+      &.woven { background: #b39ddb; border-color: #b39ddb; }
+      &.empty { background: none; }
+    }
+    .thread-count { color: #b39ddb; font-weight: 700; font-size: 1rem; min-width: 30px; text-align: right; }
+    .spell-ready-banner {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: rgba(206,147,216,0.15); border: 1px solid #ce93d8;
+      border-radius: 6px; padding: 8px; color: #ce93d8;
+      font-weight: 700; font-size: 0.95rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+    }
+    .spell-heal-banner {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: rgba(76,175,80,0.15); border: 1px solid #4caf50;
+      border-radius: 6px; padding: 8px; color: #4caf50;
+      font-weight: 700; font-size: 1rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+    }
+    .spell-effect-banner {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      border-radius: 6px; padding: 8px; font-weight: 700; font-size: 0.9rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+      &.buff { background: rgba(76,175,80,0.15); border: 1px solid #4caf50; color: #4caf50; }
+      &.debuff { background: rgba(239,83,80,0.15); border: 1px solid #ef5350; color: #ef5350; }
+    }
+
     /* Inline dialogs */
     .attack-dialog, .effect-dialog {
       position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
@@ -1078,6 +1404,25 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   } = { open: false };
 
   standUpModal: { open: boolean; result?: StandUpResult } = { open: false };
+
+  threadweaveDialog: {
+    open: boolean;
+    caster?: CombatantState;
+    spellId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  threadweaveModal: { open: boolean; result?: ThreadweaveResult } = { open: false };
+
+  spellCastDialog: {
+    open: boolean;
+    caster?: CombatantState;
+    spellId?: number;
+    targetId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  spellCastModal: { open: boolean; result?: SpellCastResult } = { open: false };
 
   constructor(
     private route: ActivatedRoute,
@@ -1499,5 +1844,143 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 })
     });
+  }
+
+  // --- Spellcasting ---
+
+  private readonly MAGIC_DISCIPLINES = ['Elementarist', 'Illusionist', 'Magier', 'Geisterbeschwörer'];
+
+  isMagicCombatant(c: CombatantState): boolean {
+    return this.MAGIC_DISCIPLINES.includes(c.character.discipline?.name ?? '');
+  }
+
+  spellsOf(c?: CombatantState): CharacterSpell[] {
+    return c?.character.spells ?? [];
+  }
+
+  readySpellsOf(c?: CombatantState): CharacterSpell[] {
+    if (!c) return [];
+    // If a spell is being prepared and threads are complete, only that spell can be cast
+    if (c.preparingSpellId && c.threadsWoven >= c.threadsRequired) {
+      return (c.character.spells ?? []).filter(s => s.spellDefinition.id === c.preparingSpellId);
+    }
+    // Also show 0-thread spells that can be cast without weaving
+    return (c.character.spells ?? []).filter(s => s.spellDefinition.threads === 0);
+  }
+
+  canCastSpell(c: CombatantState): boolean {
+    return this.isMagicCombatant(c) && this.readySpellsOf(c).length > 0;
+  }
+
+  spellNameOf(c: CombatantState): string {
+    if (!c.preparingSpellId) return '';
+    const spell = (c.character.spells ?? []).find(s => s.spellDefinition.id === c.preparingSpellId);
+    return spell?.spellDefinition.name ?? '???';
+  }
+
+  openThreadweaveDialog(c: CombatantState): void {
+    this.threadweaveDialog = {
+      open: true,
+      caster: c,
+      spellId: c.preparingSpellId ?? (this.spellsOf(c).length > 0 ? this.spellsOf(c)[0].spellDefinition.id : undefined),
+      spendKarma: false
+    };
+  }
+
+  performThreadweave(): void {
+    if (!this.session || !this.threadweaveDialog.caster || !this.threadweaveDialog.spellId) return;
+    const req: ThreadweaveRequest = {
+      sessionId: this.session.id,
+      casterCombatantId: this.threadweaveDialog.caster.id,
+      spellId: this.threadweaveDialog.spellId,
+      spendKarma: this.threadweaveDialog.spendKarma
+    };
+    this.combatService.weaveThread(this.session.id, req).subscribe({
+      next: result => {
+        this.threadweaveDialog.open = false;
+        this.threadweaveModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  openSpellCastDialog(c: CombatantState): void {
+    const readySpells = this.readySpellsOf(c);
+    this.spellCastDialog = {
+      open: true,
+      caster: c,
+      spellId: readySpells.length > 0 ? readySpells[0].spellDefinition.id : undefined,
+      targetId: undefined,
+      spendKarma: false
+    };
+  }
+
+  spellNeedsTarget(): boolean {
+    if (!this.spellCastDialog.spellId || !this.spellCastDialog.caster) return false;
+    const spell = this.spellsOf(this.spellCastDialog.caster)
+      .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition;
+    if (!spell) return false;
+    return spell.effectType === 'DAMAGE' || spell.effectType === 'DEBUFF';
+  }
+
+  spellTargets(): CombatantState[] {
+    if (!this.spellCastDialog.caster) return [];
+    const spell = this.spellsOf(this.spellCastDialog.caster)
+      .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition;
+    if (!spell) return [];
+    if (spell.effectType === 'BUFF' || spell.effectType === 'HEAL') {
+      // Friendly targets (same side)
+      return (this.session?.combatants ?? []).filter(c => !c.defeated);
+    }
+    // Enemy targets
+    return (this.session?.combatants ?? []).filter(c => c.id !== this.spellCastDialog.caster?.id && !c.defeated);
+  }
+
+  performSpellCast(): void {
+    if (!this.session || !this.spellCastDialog.caster || !this.spellCastDialog.spellId) return;
+    const req: SpellCastRequest = {
+      sessionId: this.session.id,
+      casterCombatantId: this.spellCastDialog.caster.id,
+      targetCombatantId: this.spellCastDialog.targetId,
+      spellId: this.spellCastDialog.spellId,
+      spendKarma: this.spellCastDialog.spendKarma
+    };
+    this.combatService.castSpell(this.session.id, req).subscribe({
+      next: result => {
+        this.spellCastDialog.open = false;
+        this.spellCastModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  cancelSpell(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.cancelSpellPreparation(this.session.id, c.id).subscribe({
+      next: () => this.combatService.findById(this.session!.id).subscribe(s => this.session = s),
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 })
+    });
+  }
+
+  threadDots(r: ThreadweaveResult): boolean[] {
+    return Array.from({ length: r.threadsRequired }, (_, i) => i < r.threadsWoven);
+  }
+
+  spellOutcomeLabel(r: SpellCastResult): string {
+    switch (r.effectType) {
+      case 'DAMAGE': return 'TREFFER';
+      case 'HEAL': return 'GEHEILT';
+      case 'BUFF': return 'VERSTÄRKT';
+      case 'DEBUFF': return 'GESCHWÄCHT';
+      default: return 'ERFOLG';
+    }
   }
 }
