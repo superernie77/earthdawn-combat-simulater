@@ -4,6 +4,8 @@ import com.earthdawn.dto.*;
 import com.earthdawn.model.ActiveEffect;
 import com.earthdawn.model.CombatLog;
 import com.earthdawn.model.CombatSession;
+import com.earthdawn.model.enums.DeclaredActionType;
+import com.earthdawn.model.enums.DeclaredStance;
 import com.earthdawn.service.CombatService;
 import com.earthdawn.service.SpellService;
 import lombok.RequiredArgsConstructor;
@@ -118,6 +120,20 @@ public class CombatController {
                                        @PathVariable Long combatantId,
                                        @PathVariable Long effectId) {
         return combatService.removeEffect(id, combatantId, effectId);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/declare")
+    public CombatSession declareAction(@PathVariable Long id,
+                                        @PathVariable Long combatantId,
+                                        @RequestParam DeclaredStance stance,
+                                        @RequestParam DeclaredActionType actionType) {
+        return combatService.declareAction(id, combatantId, stance, actionType);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/undeclare")
+    public CombatSession undeclareAction(@PathVariable Long id,
+                                          @PathVariable Long combatantId) {
+        return combatService.undeclareAction(id, combatantId);
     }
 
     @PostMapping("/sessions/{id}/combatants/{combatantId}/combat-option")

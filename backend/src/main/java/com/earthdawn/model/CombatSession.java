@@ -1,5 +1,6 @@
 package com.earthdawn.model;
 
+import com.earthdawn.model.enums.CombatPhase;
 import com.earthdawn.model.enums.CombatStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,6 +30,12 @@ public class CombatSession {
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private CombatStatus status = CombatStatus.SETUP;
+
+    /** Aktuelle Phase der Runde: DECLARATION (Ansage) oder ACTION (nach Initiative). */
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20) default 'ACTION'")
+    @Builder.Default
+    private CombatPhase phase = CombatPhase.ACTION;
 
     private LocalDateTime createdAt;
 

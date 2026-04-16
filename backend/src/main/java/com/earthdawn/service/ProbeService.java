@@ -56,7 +56,7 @@ public class ProbeService {
         // Karma
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && character.getKarmaCurrent() > 0) {
-            karmaRoll = diceService.roll(6); // Karma ist immer W6
+            karmaRoll = diceService.roll(4); // Stufe 4 = W6
             total += karmaRoll.getTotal();
             character.setKarmaCurrent(Math.max(0, character.getKarmaCurrent() - 1));
             characterRepo.save(character);

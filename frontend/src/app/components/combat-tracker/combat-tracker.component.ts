@@ -62,6 +62,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <button mat-raised-button color="primary" *ngIf="session.status === 'SETUP'" (click)="rollInitiative()">
             <mat-icon>casino</mat-icon> Initiative würfeln
           </button>
+          <span *ngIf="session.status === 'ACTIVE'" class="phase-badge"
+                [class.phase-declaration]="session.phase === 'DECLARATION'"
+                [class.phase-action]="session.phase === 'ACTION'">
+            {{ session.phase === 'DECLARATION' ? '📢 Ansagephase' : '⚔ Aktionsphase' }}
+            <span *ngIf="session.phase === 'DECLARATION'"> ({{ declarationProgress() }})</span>
+          </span>
           <button mat-stroked-button *ngIf="session.status === 'ACTIVE'" (click)="nextRound()">
             <mat-icon>skip_next</mat-icon> Nächste Runde
           </button>
@@ -142,56 +148,60 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               </div>
               <div class="comb-actions">
                 <span *ngIf="session!.status === 'ACTIVE' && c.hasActedThisRound && !c.defeated" class="acted-badge" matTooltip="Hat diese Runde bereits gehandelt">Gehandelt</span>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE'"
+                <span *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.declaredStance === 'AGGRESSIVE' && !c.defeated"
+                      class="stance-badge aggressive" matTooltip="Aggressive Haltung: +3 Angriff, -3 Verteidigung">⚔ Aggressiv</span>
+                <span *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.declaredStance === 'DEFENSIVE' && !c.defeated"
+                      class="stance-badge defensive" matTooltip="Defensive Haltung: -3 Angriff, +3 Verteidigung">🛡 Defensiv</span>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
                   class="attack-btn"
                   [disabled]="c.hasActedThisRound || c.defeated || !isActiveTurn(c)"
                   (click)="openAttackDialog(c)" matTooltip="Angreifen">
                   <mat-icon>sports_martial_arts</mat-icon> Angriff
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && c.knockedDown && !c.defeated"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
                   class="combat-option-btn standup-btn"
                   [disabled]="c.hasActedThisRound"
                   (click)="performStandUp(c)"
                   matTooltip="Aufstehen (Hauptaktion)">
                   <mat-icon>accessibility_new</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && c.knockedDown && !c.defeated"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
                   class="combat-option-btn aufspringen-btn"
                   (click)="openAufspringenDialog(c)"
                   matTooltip="Aufspringen (GE-Probe vs 6, 2 Schaden — kann danach noch angreifen)">
                   <mat-icon>directions_run</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && isMagicCombatant(c) && !c.preparingSpellId"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && !c.preparingSpellId"
                   class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="openThreadweaveDialog(c)"
                   matTooltip="Faden weben (Hauptaktion)">
                   <mat-icon>all_inclusive</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && isMagicCombatant(c) && c.preparingSpellId"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && c.preparingSpellId"
                   class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="openThreadweaveDialog(c)"
                   matTooltip="Weiteren Faden weben ({{ c.threadsWoven }}/{{ c.threadsRequired }})">
                   <mat-icon>all_inclusive</mat-icon> {{ c.threadsWoven }}/{{ c.threadsRequired }}
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && canCastSpell(c)"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && canCastSpell(c)"
                   class="combat-option-btn spellcast-btn" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="openSpellCastDialog(c)"
                   matTooltip="Zauber wirken">
                   <mat-icon>auto_fix_high</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && c.preparingSpellId && !c.defeated"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.preparingSpellId && !c.defeated"
                   class="combat-option-btn cancel-spell-btn"
                   (click)="cancelSpell(c)"
                   matTooltip="Zaubervorbereitung abbrechen">
                   <mat-icon>cancel</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && !isMagicCombatant(c)"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && !isMagicCombatant(c)"
                   class="combat-option-btn use-action" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="useAction(c)"
                   matTooltip="Aktion benutzen (Sonstiges)">
                   <mat-icon>auto_awesome</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && freeActionTalentsOf(c).length > 0"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && freeActionTalentsOf(c).length > 0"
                   class="combat-option-btn free-action" [disabled]="c.defeated"
                   (click)="openFreeActionDialog(c)"
                   matTooltip="Freie Kampfaktion einsetzen">
@@ -202,6 +212,44 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <mat-icon>close</mat-icon>
                 </button>
               </div>
+            </div>
+            <!-- Declaration Phase UI -->
+            <div class="declaration-row"
+                 *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && !c.defeated">
+              <span class="declaration-label">Haltung:</span>
+              <button class="decl-btn" [class.active]="c.declaredStance === 'NONE'"
+                      (click)="setDeclaredStance(c, 'NONE')" matTooltip="Keine Haltung">
+                Neutral
+              </button>
+              <button class="decl-btn aggressive" [class.active]="c.declaredStance === 'AGGRESSIVE'"
+                      (click)="setDeclaredStance(c, 'AGGRESSIVE')"
+                      matTooltip="Aggressiv: +3 Angriff, -3 Verteidigung, 1 Schaden">
+                ⚔ Aggressiv
+              </button>
+              <button class="decl-btn defensive" [class.active]="c.declaredStance === 'DEFENSIVE'"
+                      (click)="setDeclaredStance(c, 'DEFENSIVE')"
+                      matTooltip="Defensiv: -3 Angriff, +3 Verteidigung">
+                🛡 Defensiv
+              </button>
+              <span class="declaration-label" style="margin-left:12px">Handlung:</span>
+              <button class="decl-btn" [class.active]="c.declaredActionType === 'WEAPON'"
+                      (click)="setDeclaredActionType(c, 'WEAPON')">
+                🗡 Waffe
+              </button>
+              <button class="decl-btn" [class.active]="c.declaredActionType === 'SPELL'"
+                      (click)="setDeclaredActionType(c, 'SPELL')"
+                      [disabled]="!isMagicCombatant(c)">
+                ✨ Zauber
+              </button>
+              <button mat-raised-button color="primary" class="decl-confirm"
+                      *ngIf="!c.hasDeclared"
+                      (click)="confirmDeclaration(c)">
+                <mat-icon>check</mat-icon> Ansage bestätigen
+              </button>
+              <span *ngIf="c.hasDeclared" class="decl-confirmed">
+                <mat-icon style="color:#4caf50;font-size:18px">check_circle</mat-icon> Angesagt
+                <button mat-stroked-button (click)="undeclare(c)" style="margin-left:6px">Ändern</button>
+              </span>
             </div>
             <!-- Damage Track -->
             <div class="comb-damage-row">
@@ -518,30 +566,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       <div class="dialog-backdrop" (click)="attackDialog.open = false"></div>
       <div class="dialog-box">
         <h3>Angriff: {{ attackDialog.attacker?.character?.name }}</h3>
-        <div class="dialog-combat-options">
-          <button class="combat-option-toggle aggressive"
-            [class.active]="attackDialog.aggressiveAttack"
-            (click)="toggleDialogAggressive()"
-            matTooltip="+3 Stufen, 1 Schaden, -3 KV">
-            <mat-icon>local_fire_department</mat-icon>
-            Aggressiver Angriff
-          </button>
-          <div class="aggressive-info" *ngIf="attackDialog.aggressiveAttack">
-            <span class="info-bonus">+3 Step</span>
-            <span class="info-penalty">-3 KV</span>
-            <span class="info-cost">1 Schaden</span>
-          </div>
-          <button class="combat-option-toggle defensive"
-            [class.active]="attackDialog.defensiveStance"
-            (click)="toggleDialogDefensive()"
-            matTooltip="-3 Stufen, +3 KV">
-            <mat-icon>shield</mat-icon>
-            Defensive Haltung
-          </button>
-          <div class="aggressive-info" *ngIf="attackDialog.defensiveStance">
-            <span class="info-penalty">-3 Step</span>
-            <span class="info-bonus">+3 KV</span>
-          </div>
+        <div class="dialog-stance-info" *ngIf="attackDialog.attacker?.declaredStance === 'AGGRESSIVE'">
+          ⚔ Aggressiv angesagt: +3 Angriff / -3 Verteidigung / 1 Schaden
+        </div>
+        <div class="dialog-stance-info defensive" *ngIf="attackDialog.attacker?.declaredStance === 'DEFENSIVE'">
+          🛡 Defensiv angesagt: -3 Angriff / +3 Verteidigung
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
@@ -1078,6 +1107,50 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .heroes-header { color: #4caf50; background: rgba(76,175,80,0.08); border: 1px solid rgba(76,175,80,0.2); }
     .enemies-header { color: #ef5350; background: rgba(239,83,80,0.08); border: 1px solid rgba(239,83,80,0.2); }
 
+    .phase-badge {
+      display: inline-flex; align-items: center; padding: 6px 12px;
+      border-radius: 16px; font-size: 0.85rem; font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .phase-badge.phase-declaration {
+      background: rgba(255,193,7,0.1); color: #ffb300; border-color: rgba(255,179,0,0.4);
+    }
+    .phase-badge.phase-action {
+      background: rgba(76,175,80,0.1); color: #66bb6a; border-color: rgba(102,187,106,0.4);
+    }
+    .stance-badge {
+      display: inline-flex; align-items: center; padding: 2px 8px;
+      border-radius: 10px; font-size: 0.75rem; font-weight: 600;
+    }
+    .stance-badge.aggressive { background: rgba(255,112,67,0.15); color: #ff7043; border: 1px solid #ff7043; }
+    .stance-badge.defensive { background: rgba(66,165,245,0.15); color: #42a5f5; border: 1px solid #42a5f5; }
+
+    .dialog-stance-info {
+      padding: 8px 12px; margin-bottom: 12px; border-radius: 6px;
+      background: rgba(255,112,67,0.1); color: #ff7043; border: 1px solid #ff7043;
+      font-size: 0.9rem; font-weight: 600;
+    }
+    .dialog-stance-info.defensive {
+      background: rgba(66,165,245,0.1); color: #42a5f5; border-color: #42a5f5;
+    }
+    .declaration-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      padding: 8px; margin: 6px 0; border-radius: 6px;
+      background: rgba(255,179,0,0.06); border: 1px dashed rgba(255,179,0,0.3);
+    }
+    .declaration-label { font-size: 0.78rem; color: #aaa; font-weight: 600; }
+    .decl-btn {
+      padding: 4px 10px; border-radius: 6px; border: 1px solid #3a3028;
+      background: transparent; color: #aaa; font-size: 0.82rem; cursor: pointer;
+    }
+    .decl-btn:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; }
+    .decl-btn.active { border-color: #c9a84c; color: #c9a84c; background: rgba(201,168,76,0.12); }
+    .decl-btn.aggressive.active { border-color: #ff7043; color: #ff7043; background: rgba(255,112,67,0.12); }
+    .decl-btn.defensive.active { border-color: #42a5f5; color: #42a5f5; background: rgba(66,165,245,0.12); }
+    .decl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .decl-confirm { margin-left: auto; }
+    .decl-confirmed { display: inline-flex; align-items: center; gap: 4px; color: #4caf50; font-size: 0.82rem; margin-left: auto; }
+
     .comb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .comb-title { display: flex; align-items: center; gap: 8px; }
     .initiative-badge {
@@ -1531,16 +1604,32 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       .subscribe(s => this.session = s);
   }
 
-  aggressiveAttack(c: CombatantState): void {
+  // --- Ansagephase ---
+
+  setDeclaredStance(c: CombatantState, stance: 'NONE' | 'AGGRESSIVE' | 'DEFENSIVE'): void {
+    c.declaredStance = stance as any;
+  }
+
+  setDeclaredActionType(c: CombatantState, actionType: 'WEAPON' | 'SPELL'): void {
+    c.declaredActionType = actionType as any;
+  }
+
+  confirmDeclaration(c: CombatantState): void {
     if (!this.session) return;
-    this.combatService.declareCombatOption(this.session.id, c.id, 'AGGRESSIVE_ATTACK')
+    this.combatService.declareAction(this.session.id, c.id, c.declaredStance, c.declaredActionType)
       .subscribe(s => this.session = s);
   }
 
-  defensiveStance(c: CombatantState): void {
+  undeclare(c: CombatantState): void {
     if (!this.session) return;
-    this.combatService.declareCombatOption(this.session.id, c.id, 'DEFENSIVE_STANCE')
+    this.combatService.undeclareAction(this.session.id, c.id)
       .subscribe(s => this.session = s);
+  }
+
+  declarationProgress(): string {
+    const combs = (this.session?.combatants ?? []).filter(c => !c.defeated);
+    const done = combs.filter(c => c.hasDeclared).length;
+    return `${done}/${combs.length}`;
   }
 
   openAttackDialog(attacker: CombatantState): void {
@@ -1571,16 +1660,6 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       aggressiveAttack: false,
       defensiveStance: false
     };
-  }
-
-  toggleDialogAggressive(): void {
-    this.attackDialog.aggressiveAttack = !this.attackDialog.aggressiveAttack;
-    if (this.attackDialog.aggressiveAttack) this.attackDialog.defensiveStance = false;
-  }
-
-  toggleDialogDefensive(): void {
-    this.attackDialog.defensiveStance = !this.attackDialog.defensiveStance;
-    if (this.attackDialog.defensiveStance) this.attackDialog.aggressiveAttack = false;
   }
 
   possibleTargets(): CombatantState[] {

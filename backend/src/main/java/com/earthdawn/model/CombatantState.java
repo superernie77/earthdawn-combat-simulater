@@ -1,5 +1,7 @@
 package com.earthdawn.model;
 
+import com.earthdawn.model.enums.DeclaredActionType;
+import com.earthdawn.model.enums.DeclaredStance;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
@@ -99,6 +101,25 @@ public class CombatantState {
     @Column(columnDefinition = "integer default 0")
     @Builder.Default
     private int threadsRequired = 0;
+
+    // --- Deklarationsphase (Ansage zu Rundenbeginn) ---
+
+    /** Hat dieser Kombattant für die aktuelle Runde bereits deklariert? */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean hasDeclared = false;
+
+    /** Gewählte Haltung für diese Runde. */
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20) default 'NONE'")
+    @Builder.Default
+    private DeclaredStance declaredStance = DeclaredStance.NONE;
+
+    /** Gewählter Handlungstyp für diese Runde. */
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20) default 'WEAPON'")
+    @Builder.Default
+    private DeclaredActionType declaredActionType = DeclaredActionType.WEAPON;
 
     @OneToMany(mappedBy = "combatantState", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default

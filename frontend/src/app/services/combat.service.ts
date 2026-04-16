@@ -6,7 +6,8 @@ import {
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
-  SpellCastRequest, SpellCastResult
+  SpellCastRequest, SpellCastResult,
+  DeclaredStance, DeclaredActionType
 } from '../models/combat.model';
 
 @Injectable({ providedIn: 'root' })
@@ -82,6 +83,22 @@ export class CombatService {
   removeEffect(sessionId: number, combatantId: number, effectId: number): Observable<CombatSession> {
     return this.http.delete<CombatSession>(
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/effects/${effectId}`
+    );
+  }
+
+  declareAction(sessionId: number, combatantId: number,
+                stance: DeclaredStance, actionType: DeclaredActionType): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/declare`,
+      null,
+      { params: { stance, actionType } }
+    );
+  }
+
+  undeclareAction(sessionId: number, combatantId: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/undeclare`,
+      {}
     );
   }
 

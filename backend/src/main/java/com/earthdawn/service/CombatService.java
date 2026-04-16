@@ -80,12 +80,18 @@ public class CombatService {
 
     // --- Initiative ---
 
+    /**
+     * Start des Kampfes: Session wird aktiv, Runde 1 beginnt in der Deklarationsphase.
+     * Initiative wird erst gewürfelt, wenn alle Kombattanten deklariert haben.
+     */
     public CombatSession rollInitiative(Long sessionId) {
         CombatSession session = findById(sessionId);
-        String summary = rerollInitiative(session);
         session.setStatus(CombatStatus.ACTIVE);
         session.setRound(1);
-        addLog(session, null, null, ActionType.INITIATIVE, "Initiative gewürfelt. Runde 1 beginnt! " + summary, true);
+        session.setPhase(CombatPhase.DECLARATION);
+        resetDeclarations(session);
+        addLog(session, null, null, ActionType.ROUND_CHANGE,
+                "Runde 1 beginnt — Ansagephase. Alle Kombattanten wählen Haltung und Handlung.", true);
         CombatSession saved = sessionRepo.save(session);
         broadcast(saved);
         return saved;
@@ -121,6 +127,9 @@ public class CombatService {
         if (attacker.isDefeated()) {
             throw new IllegalStateException(attacker.getCharacter().getName() + " ist bewusstlos/besiegt und kann nicht handeln!");
         }
+        if (session.getPhase() != CombatPhase.ACTION) {
+            throw new IllegalStateException("Angriff nur in der Aktionsphase möglich (nicht während der Ansage).");
+        }
         if (attacker.isHasActedThisRound()) {
             throw new IllegalStateException(attacker.getCharacter().getName() + " hat diese Runde bereits gehandelt!");
         }
@@ -148,67 +157,21 @@ public class CombatService {
         }
         attackStep += req.getBonusSteps();
 
-        // Aggressiver Angriff: +3 Stufen, 1 Schaden, -3 Verteidigung
-        boolean wasAggressive = req.isAggressiveAttack();
-        if (wasAggressive) {
-            attackStep += 3;
-            attacker.setCurrentDamage(attacker.getCurrentDamage() + 1);
-            ActiveEffect penalty = ActiveEffect.builder()
-                    .combatantState(attacker)
-                    .name("Aggressiver Angriff")
-                    .description("-3 auf alle Verteidigungswerte")
-                    .sourceType(SourceType.CONDITION)
-                    .remainingRounds(1)
-                    .negative(true)
-                    .modifiers(List.of(
-                            ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(-3)
-                                    .triggerContext(TriggerContext.ALWAYS).build(),
-                            ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(-3)
-                                    .triggerContext(TriggerContext.ALWAYS).build(),
-                            ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(-3)
-                                    .triggerContext(TriggerContext.ALWAYS).build()
-                    ))
-                    .build();
-            attacker.getActiveEffects().add(penalty);
-        }
+        // Aggressive/defensive Haltung werden in der Ansagephase deklariert — die zugehörigen
+        // Boni/Mali sind bereits als ActiveEffect am Angreifer aktiv und fließen über
+        // den ModifierAggregator automatisch in attackStep / Verteidigungswerte ein.
+        boolean wasAggressive = attacker.getDeclaredStance() == DeclaredStance.AGGRESSIVE;
+        Math.max(1, attackStep); // no-op safeguard
 
-        // Defensive Haltung: -3 Stufen, +3 Verteidigung
-        if (req.isDefensiveStance()) {
-            attackStep = Math.max(1, attackStep - 3);
-            attacker.setPendingDefenseBonus(attacker.getPendingDefenseBonus() + 3);
-            ActiveEffect bonus = ActiveEffect.builder()
-                    .combatantState(attacker)
-                    .name("Defensive Haltung")
-                    .description("+3 auf alle Verteidigungswerte")
-                    .sourceType(SourceType.CONDITION)
-                    .remainingRounds(1)
-                    .negative(false)
-                    .modifiers(List.of(
-                            ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(3)
-                                    .triggerContext(TriggerContext.ALWAYS).build(),
-                            ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(3)
-                                    .triggerContext(TriggerContext.ALWAYS).build(),
-                            ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
-                                    .operation(ModifierOperation.ADD).value(3)
-                                    .triggerContext(TriggerContext.ALWAYS).build()
-                    ))
-                    .build();
-            attacker.getActiveEffects().add(bonus);
-        }
-
-        // 2. Karma
+        // 2. Karma — immer W6 (Stufe 4)
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4); // Karma ist immer W6 (Step 4 = W6)
+            karmaRoll = diceService.roll(4);
             attacker.setCurrentKarma(attacker.getCurrentKarma() - 1);
         }
 
-        // 3. Angriffswurf
+        // 3. Angriffswurf (mindestens Stufe 1)
+        attackStep = Math.max(1, attackStep);
         RollResult attackRoll = diceService.roll(attackStep);
         int attackTotal = attackRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
 
@@ -312,11 +275,15 @@ public class CombatService {
         CombatSession session = findById(sessionId);
         session.setRound(session.getRound() + 1);
 
-        // Effekt-Dauer reduzieren, ausstehende Boni zurücksetzen
+        // Effekt-Dauer reduzieren, ausstehende Boni + Haltungs-Effekte zurücksetzen
         for (CombatantState combatant : session.getCombatants()) {
             combatant.setHasActedThisRound(false);
             combatant.setPendingAttackBonus(0);
             combatant.setPendingDefenseBonus(0);
+            // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
+            combatant.getActiveEffects().removeIf(effect ->
+                    "Aggressiver Angriff".equals(effect.getName())
+                 || "Defensive Haltung".equals(effect.getName()));
             combatant.getActiveEffects().removeIf(effect -> {
                 if (effect.getRemainingRounds() == -1) return false;
                 effect.setRemainingRounds(effect.getRemainingRounds() - 1);
@@ -324,14 +291,147 @@ public class CombatService {
             });
         }
 
-        // Initiative neu würfeln und Reihenfolge neu sortieren
-        String initiativeSummary = rerollInitiative(session);
+        // Neue Runde beginnt in der Ansagephase
+        session.setPhase(CombatPhase.DECLARATION);
+        resetDeclarations(session);
 
         addLog(session, null, null, ActionType.ROUND_CHANGE,
-                "Runde " + session.getRound() + " beginnt! " + initiativeSummary, true);
+                "Runde " + session.getRound() + " beginnt — Ansagephase. Alle wählen Haltung und Handlung.", true);
         CombatSession saved = sessionRepo.save(session);
         broadcast(saved);
         return saved;
+    }
+
+    // --- Ansagephase ---
+
+    /** Ein Kombattant deklariert Haltung und Handlungstyp. Kann beliebig oft geändert werden. */
+    public CombatSession declareAction(Long sessionId, Long combatantId,
+                                        DeclaredStance stance, DeclaredActionType actionType) {
+        CombatSession session = findById(sessionId);
+        if (session.getPhase() != CombatPhase.DECLARATION) {
+            throw new IllegalStateException("Ansagen sind nur in der Ansagephase möglich.");
+        }
+        CombatantState combatant = findCombatant(session, combatantId);
+        if (combatant.isDefeated()) {
+            throw new IllegalStateException(combatant.getCharacter().getName() + " ist besiegt und kann nicht deklarieren.");
+        }
+
+        combatant.setDeclaredStance(stance != null ? stance : DeclaredStance.NONE);
+        combatant.setDeclaredActionType(actionType != null ? actionType : DeclaredActionType.WEAPON);
+        combatant.setHasDeclared(true);
+
+        String stanceLabel = switch (combatant.getDeclaredStance()) {
+            case AGGRESSIVE -> "Aggressiv";
+            case DEFENSIVE -> "Defensiv";
+            default -> "Neutral";
+        };
+        String actionLabel = combatant.getDeclaredActionType() == DeclaredActionType.SPELL ? "Zauber" : "Waffe";
+        addLog(session, combatant.getCharacter().getName(), null, ActionType.COMBAT_OPTION,
+                combatant.getCharacter().getName() + " sagt an: " + stanceLabel + " / " + actionLabel + ".", true);
+
+        // Alle nicht-besiegten deklariert? → Haltungseffekte anwenden + Initiative rollen → ACTION
+        boolean allDeclared = session.getCombatants().stream()
+                .filter(c -> !c.isDefeated())
+                .allMatch(CombatantState::isHasDeclared);
+        if (allDeclared) {
+            applyDeclaredStances(session);
+            String summary = rerollInitiative(session);
+            session.setPhase(CombatPhase.ACTION);
+            addLog(session, null, null, ActionType.INITIATIVE,
+                    "Alle Ansagen erfolgt. Initiative gewürfelt! " + summary, true);
+        }
+
+        CombatSession saved = sessionRepo.save(session);
+        broadcast(saved);
+        return saved;
+    }
+
+    /** Ansagephase erneut öffnen (z.B. um Auswahl zu ändern). Nur möglich, solange noch nicht alle deklariert haben. */
+    public CombatSession undeclareAction(Long sessionId, Long combatantId) {
+        CombatSession session = findById(sessionId);
+        if (session.getPhase() != CombatPhase.DECLARATION) {
+            throw new IllegalStateException("Ansage kann nur in der Ansagephase zurückgenommen werden.");
+        }
+        CombatantState combatant = findCombatant(session, combatantId);
+        combatant.setHasDeclared(false);
+        CombatSession saved = sessionRepo.save(session);
+        broadcast(saved);
+        return saved;
+    }
+
+    private void resetDeclarations(CombatSession session) {
+        for (CombatantState c : session.getCombatants()) {
+            c.setHasDeclared(false);
+            c.setDeclaredStance(DeclaredStance.NONE);
+            c.setDeclaredActionType(DeclaredActionType.WEAPON);
+        }
+    }
+
+    /** Wendet die Auswirkungen der deklarierten Haltungen an (Aggressiv / Defensiv). */
+    private void applyDeclaredStances(CombatSession session) {
+        for (CombatantState c : session.getCombatants()) {
+            if (c.isDefeated()) continue;
+            String name = c.getCharacter().getName();
+            switch (c.getDeclaredStance()) {
+                case AGGRESSIVE -> {
+                    // +3 Stufen Angriff (via ActiveEffect auf ATTACK_STEP), 1 Schaden sofort, -3 auf Verteidigung
+                    c.setCurrentDamage(c.getCurrentDamage() + 1);
+                    ActiveEffect eff = ActiveEffect.builder()
+                            .combatantState(c)
+                            .name("Aggressiver Angriff")
+                            .description("+3 Angriff, -3 Verteidigung, 1 Schaden")
+                            .sourceType(SourceType.CONDITION)
+                            .remainingRounds(1)
+                            .negative(true)
+                            .modifiers(List.of(
+                                    ModifierEntry.builder().targetStat(StatType.ATTACK_STEP)
+                                            .operation(ModifierOperation.ADD).value(3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(-3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(-3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(-3)
+                                            .triggerContext(TriggerContext.ALWAYS).build()
+                            ))
+                            .build();
+                    c.getActiveEffects().add(eff);
+                    addLog(session, name, null, ActionType.COMBAT_OPTION,
+                            name + " nimmt aggressive Haltung ein (+3 Angriff, -3 Verteidigung, 1 Schaden).", true);
+                }
+                case DEFENSIVE -> {
+                    ActiveEffect eff = ActiveEffect.builder()
+                            .combatantState(c)
+                            .name("Defensive Haltung")
+                            .description("-3 Angriff, +3 Verteidigung")
+                            .sourceType(SourceType.CONDITION)
+                            .remainingRounds(1)
+                            .negative(false)
+                            .modifiers(List.of(
+                                    ModifierEntry.builder().targetStat(StatType.ATTACK_STEP)
+                                            .operation(ModifierOperation.ADD).value(-3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(3)
+                                            .triggerContext(TriggerContext.ALWAYS).build(),
+                                    ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
+                                            .operation(ModifierOperation.ADD).value(3)
+                                            .triggerContext(TriggerContext.ALWAYS).build()
+                            ))
+                            .build();
+                    c.getActiveEffects().add(eff);
+                    addLog(session, name, null, ActionType.COMBAT_OPTION,
+                            name + " nimmt defensive Haltung ein (-3 Angriff, +3 Verteidigung).", true);
+                }
+                case NONE -> { /* keine Modifier */ }
+            }
+        }
     }
 
     public void deleteSession(Long sessionId) {
@@ -420,38 +520,6 @@ public class CombatService {
         }
 
         switch (option) {
-            case "AGGRESSIVE_ATTACK" -> {
-                // +3 auf nächsten Angriffswurf
-                combatant.setPendingAttackBonus(combatant.getPendingAttackBonus() + 3);
-
-                // 1 Schadenspunkt sofort
-                combatant.setCurrentDamage(combatant.getCurrentDamage() + 1);
-
-                // -3 auf alle Verteidigungswerte für diese Runde
-                ActiveEffect penalty = ActiveEffect.builder()
-                        .combatantState(combatant)
-                        .name("Aggressiver Angriff")
-                        .description("-3 auf alle Verteidigungswerte, +3 auf nächsten Angriff")
-                        .sourceType(SourceType.CONDITION)
-                        .remainingRounds(1)
-                        .negative(true)
-                        .modifiers(List.of(
-                                ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(-3)
-                                        .triggerContext(TriggerContext.ALWAYS).build(),
-                                ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(-3)
-                                        .triggerContext(TriggerContext.ALWAYS).build(),
-                                ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(-3)
-                                        .triggerContext(TriggerContext.ALWAYS).build()
-                        ))
-                        .build();
-                combatant.getActiveEffects().add(penalty);
-
-                addLog(session, name, null, ActionType.COMBAT_OPTION,
-                        name + " wählt Aggressiven Angriff: +3 Angriff (nächster Wurf), -3 Verteidigung, 1 Schaden.", true);
-            }
             case "USE_ACTION" -> {
                 if (combatant.isHasActedThisRound()) {
                     throw new IllegalStateException(name + " hat diese Runde bereits gehandelt!");
@@ -460,38 +528,9 @@ public class CombatService {
                 addLog(session, name, null, ActionType.COMBAT_OPTION,
                         name + " nutzt eine Aktion (Zauber / Faden weben / Sonstiges).", true);
             }
-            case "DEFENSIVE_STANCE" -> {
-                // -3 auf nächsten Angriffswurf
-                combatant.setPendingAttackBonus(combatant.getPendingAttackBonus() - 3);
-
-                // +3 auf alle Verteidigungswerte bis zum nächsten Treffer oder Rundenende
-                combatant.setPendingDefenseBonus(combatant.getPendingDefenseBonus() + 3);
-
-                // +3 auf alle Verteidigungswerte als Effekt (für Anzeige)
-                ActiveEffect bonus = ActiveEffect.builder()
-                        .combatantState(combatant)
-                        .name("Defensive Haltung")
-                        .description("+3 auf alle Verteidigungswerte, -3 auf nächsten Angriff")
-                        .sourceType(SourceType.CONDITION)
-                        .remainingRounds(1)
-                        .negative(false)
-                        .modifiers(List.of(
-                                ModifierEntry.builder().targetStat(StatType.PHYSICAL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(3)
-                                        .triggerContext(TriggerContext.ALWAYS).build(),
-                                ModifierEntry.builder().targetStat(StatType.SPELL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(3)
-                                        .triggerContext(TriggerContext.ALWAYS).build(),
-                                ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
-                                        .operation(ModifierOperation.ADD).value(3)
-                                        .triggerContext(TriggerContext.ALWAYS).build()
-                        ))
-                        .build();
-                combatant.getActiveEffects().add(bonus);
-
-                addLog(session, name, null, ActionType.COMBAT_OPTION,
-                        name + " wählt Defensive Haltung: -3 Angriff (nächster Wurf), +3 Verteidigung.", true);
-            }
+            case "AGGRESSIVE_ATTACK", "DEFENSIVE_STANCE" ->
+                    throw new IllegalStateException(
+                            "Aggressive/Defensive Haltung werden in der Ansagephase (Rundenbeginn) gewählt, nicht während der Aktion.");
             default -> throw new IllegalArgumentException("Unbekannte Kampfoption: " + option);
         }
 
@@ -555,10 +594,10 @@ public class CombatService {
         int damageCost = 1;
         defender.setCurrentDamage(defender.getCurrentDamage() + damageCost);
 
-        // Karma
+        // Karma — immer W6 (Stufe 4)
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && defender.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4); // Step 4 = W6
+            karmaRoll = diceService.roll(4);
             defender.setCurrentKarma(Math.max(0, defender.getCurrentKarma() - 1));
         }
 
@@ -707,7 +746,7 @@ public class CombatService {
 
         RollResult karmaRoll = null;
         if (spendKarma && actor.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4);
+            karmaRoll = diceService.roll(4); // W6 = Stufe 4
             actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
         }
 
@@ -771,10 +810,10 @@ public class CombatService {
         int attrValue = getAttributeValue(actor.getCharacter(), talent.getAttribute());
         int rollStep = Math.max(1, diceService.attributeToStep(attrValue) + ct.getRank() + req.getBonusSteps() - actor.getWounds());
 
-        // Karma
+        // Karma — immer W6 (Stufe 4)
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4); // Step 4 = W6
+            karmaRoll = diceService.roll(4);
             actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
         }
 

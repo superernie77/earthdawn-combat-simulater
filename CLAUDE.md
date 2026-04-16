@@ -25,42 +25,79 @@ npx ng serve
 Backend: `http://localhost:8080` | Frontend: `http://localhost:4200`
 
 ## Earthdawn 4 (FASA) Rules Implemented
-- **Step system**: Each step maps to specific dice (Step 1=d4-2, Step 3=d4, Step 5=d8, Step 8=2d6, etc.)
+
+### Core Mechanics
+- **Step system**: Each step maps to specific dice (Step 4=W6, Step 5=W8, Step 8=2W6, Step 12=2W10, etc.)
 - **Exploding dice**: Roll again and add on max value
 - **Attributes = Steps**: In ED4 FASA, attribute value directly equals step number (1:1)
 - **Probe**: Attribut-Step + Talent-Rang vs Schwierigkeitswert. Extra Erfolge: (Ergebnis - SW) / 5
-- **Combat**: Initiative → Angriff → Schaden → Wunde → nächste Runde
-- **Karma**: Spend 1 Karma → roll Karma-Step and add to result
+- **Karma**: Spend 1 Karma → add W6 (Step 4, fixed for all disciplines). ProbeService, CombatService, SpellService all use `diceService.roll(4)`.
+
+### Combat Sequence (per Round)
+1. **Ansagephase (DECLARATION)**: All combatants choose stance (NONE/AGGRESSIVE/DEFENSIVE) + action type (WEAPON/SPELL). Stances apply immediately as ActiveEffects with ATTACK_STEP modifier. Initiative rolls automatically once all have declared.
+2. **Aktionsphase (ACTION)**: Combatants act in initiative order. Attacks, spells, free actions.
+3. **Rundenende**: `nextRound()` clears "Aggressiver Angriff" / "Defensive Haltung" effects, ticks down all other ActiveEffect durations, resets declarations → back to DECLARATION.
+
+**Aggressive stance** (+3 ATTACK_STEP, -3 all defenses, 1 damage to self) and **Defensive stance** (-3 ATTACK_STEP, +3 all defenses) are declared in the DECLARATION phase only — not activatable during an attack.
+
+### Spell System
+- **Fadenweben** (Thread Weaving): PER-Step + Fadenweben-Talent vs. Schwierigkeitswert. Must weave `spell.threads` threads (one action each) before casting.
+- **Spruchzauberei** (Spell Casting): PER-Step + Spruchzauberei-Talent vs. target's spell defense (or fixed difficulty).
+- **Effect types**: DAMAGE (rolls WIL-Step + effectStep - armor), BUFF/DEBUFF (adds ActiveEffect), HEAL (rolls effectStep).
+- Discipline-to-weaving-talent map: Elementarist→Elementarismus, Illusionist→Illusionismus, Magier→Magie, Geisterbeschwörer→Geisterbeschwörung.
+
+### Free Actions (Freie Aktionen)
+- Do not consume `hasActedThisRound` — unlimited per round.
+- Roll: AttributStep + TalentRank + bonusSteps vs target's defense stat.
+- Effect = `extraSuccesses × valuePerSuccess` applied as ActiveEffect.
+- Optional damage cost to the user (e.g. Magische Markierung costs 1 damage).
+
+### Other Combat Actions
+- **Ausweichen**: Defender with Dodge talent can attempt GE-Step + Ausweichen-Rang vs attack total after a hit. Costs 1 damage on attempt.
+- **Aufspringen**: Knocked-down combatant rolls GE-Step vs 6, takes 2 damage. Success = stand up + still act.
+- **Knockdown**: On wound, defender rolls TOU-Step vs damage dealt. Fail = knocked down (−3 on all tests/defenses).
 
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
-- `targetStat`: which stat is modified (PHYSICAL_DEFENSE, ATTACK_STEP, etc.)
+- `targetStat`: which stat is modified (PHYSICAL_DEFENSE, ATTACK_STEP, INITIATIVE_STEP, MYSTIC_ARMOR, etc.)
 - `operation`: ADD | MULTIPLY | OVERRIDE | SET_MIN | SET_MAX
-- `triggerContext`: ALWAYS | ON_MELEE_ATTACK | ON_DEFENSE | etc.
+- `triggerContext`: ALWAYS | ON_MELEE_ATTACK | ON_RANGED_ATTACK | ON_MELEE_DEFENSE | ON_RANGED_DEFENSE | ON_SPELL_DEFENSE | ON_INITIATIVE | ON_DAMAGE_RECEIVED | ON_DAMAGE_DEALT
 - `value`: numeric value
-Talents, spells, conditions, equipment = all stored as `ActiveEffect` with `ModifierEntry` list on `CombatantState`.
+
+Talents, spells, conditions, equipment, stances = all stored as `ActiveEffect` with `ModifierEntry` list on `CombatantState`.
 
 ## Package Structure
 ```
 com.earthdawn
 ├── config/       WebSocketConfig, CorsConfig, JacksonConfig
 ├── controller/   CharacterController, CombatController, DiceController, ReferenceDataController
-├── dto/          RollResult, DieRollDetail, ProbeRequest/Result, AttackActionRequest, CombatActionResult, FieldUpdateRequest, DerivedStats
-├── model/        Character, DisciplineDefinition, TalentDefinition, SkillDefinition,
-│                 CharacterTalent, CharacterSkill, ModifierEntry, ActiveEffect,
+├── dto/          RollResult, DieRollDetail, ProbeRequest/Result,
+│                 AttackActionRequest, CombatActionResult,
+│                 DodgeRequest/Result, StandUpResult, KnockdownResult,
+│                 FreeActionRequest/Result,
+│                 ThreadweaveRequest/Result, SpellCastRequest/Result,
+│                 DerivedStats, FieldUpdateRequest
+├── model/        GameCharacter, DisciplineDefinition, TalentDefinition, SkillDefinition,
+│                 CharacterTalent, CharacterSkill, Equipment,
+│                 ModifierEntry, ActiveEffect,
+│                 SpellDefinition,
 │                 CombatSession, CombatantState, CombatLog
-│   └── enums/    StatType, AttributeType, ModifierOperation, TriggerContext, SourceType, ActionType, CombatStatus
+│   └── enums/    StatType, AttributeType, ModifierOperation, TriggerContext, SourceType,
+│                 ActionType, CombatStatus, CombatPhase,
+│                 DeclaredStance, DeclaredActionType,
+│                 SpellEffectType, FreeActionTarget
 ├── repository/   CharacterRepository, CombatSessionRepository, DisciplineRepository,
-│                 TalentDefinitionRepository, SkillDefinitionRepository
-└── service/      StepRollService, ModifierAggregator, CharacterService, CombatService,
-                  ProbeService, DataInitializer
+│                 TalentDefinitionRepository, SkillDefinitionRepository,
+│                 SpellDefinitionRepository
+└── service/      StepRollService, ModifierAggregator, CharacterService,
+                  CombatService, SpellService, ProbeService, DataInitializer
 ```
 
 ## Frontend Routes
 ```
 /              → redirect to /characters
 /characters    → CharacterListComponent
-/characters/:id → CharacterSheetComponent
+/characters/:id → CharacterSheetComponent (talent tests, dice roller, karma)
 /combat        → CombatListComponent
 /combat/:id    → CombatTrackerComponent (live via WebSocket)
 /dice          → DiceRollerComponent
@@ -79,21 +116,42 @@ POST   /api/characters/{id}/skills       ?skillDefinitionId=&rank=
 GET    /api/reference/disciplines
 GET    /api/reference/talents
 GET    /api/reference/skills
+GET    /api/reference/spells             ?discipline=
+GET    /api/reference/spells/{id}
 
 POST   /api/dice/roll        { step }
-POST   /api/dice/probe       ProbeRequest
+POST   /api/dice/probe       ProbeRequest { characterId, talentId|skillId, targetNumber, bonusSteps, spendKarma }
 
 GET    /api/combat/sessions
-POST   /api/combat/sessions  { name }
+POST   /api/combat/sessions              { name }
 GET    /api/combat/sessions/{id}
-POST   /api/combat/sessions/{id}/combatants       ?characterId=
-POST   /api/combat/sessions/{id}/initiative
-POST   /api/combat/sessions/{id}/attack           AttackActionRequest
-POST   /api/combat/sessions/{id}/next-round
-PATCH  /api/combat/sessions/{id}/combatants/{cId}/value  ?field=&delta=
+DELETE /api/combat/sessions/{id}
+POST   /api/combat/sessions/{id}/combatants         ?characterId=&isNpc=
+DELETE /api/combat/sessions/{id}/combatants/{cId}
+
+POST   /api/combat/sessions/{id}/initiative          → SETUP→ACTIVE, starts round 1 in DECLARATION phase
+POST   /api/combat/sessions/{id}/next-round          → increments round, clears stances, enters DECLARATION
+
+POST   /api/combat/sessions/{id}/combatants/{cId}/declare    ?stance=NONE|AGGRESSIVE|DEFENSIVE&actionType=WEAPON|SPELL
+POST   /api/combat/sessions/{id}/combatants/{cId}/undeclare  → undo declaration (change allowed)
+
+POST   /api/combat/sessions/{id}/attack              AttackActionRequest
+POST   /api/combat/sessions/{id}/dodge               DodgeRequest
+POST   /api/combat/sessions/{id}/free-action         FreeActionRequest
+POST   /api/combat/sessions/{id}/combatants/{cId}/stand-up
+POST   /api/combat/sessions/{id}/combatants/{cId}/aufspringen  ?spendKarma=
+
+PATCH  /api/combat/sessions/{id}/combatants/{cId}/value  ?field=damage|wounds|karma|initiative|defeated&delta=
 POST   /api/combat/sessions/{id}/combatants/{cId}/effects
 DELETE /api/combat/sessions/{id}/combatants/{cId}/effects/{effectId}
+POST   /api/combat/sessions/{id}/combatants/{cId}/combat-option  ?option=USE_ACTION
+
+POST   /api/combat/sessions/{id}/weave-thread        ThreadweaveRequest
+POST   /api/combat/sessions/{id}/cast-spell          SpellCastRequest
+POST   /api/combat/sessions/{id}/combatants/{cId}/cancel-spell
+
 GET    /api/combat/sessions/{id}/log
+POST   /api/combat/sessions/{id}/end
 ```
 
 ## WebSocket
@@ -101,8 +159,20 @@ GET    /api/combat/sessions/{id}/log
 - Topic: `/topic/combat/{sessionId}` — broadcasts full `CombatSession` on every state change
 - Frontend subscribes in `CombatTrackerComponent` via `WebSocketService`
 
-## Reference Data
-Seeded automatically on first start by `DataInitializer`:
-- 8 Disziplinen: Krieger, Pfadsucher, Dieb, Elementarist, Nekromant, Illusionist, Schwertkämpfer, Troubadour
-- 21 Talente: Kampfwaffen, Fernwaffen, Ausweichen, Lufttanz, Schleichen, Zauberspruch, etc.
-- 12 Fertigkeiten: Reiten, Kartenkunde, Geschichte, Alchimie, Schmieden, etc.
+## Reference Data (DataInitializer)
+Seeded automatically (idempotent) on first start:
+
+**Disciplines (12):** Krieger, Pfadsucher, Dieb, Illusionist, Elementarist, Magier, Geisterbeschwörer, Nekromant, Schwertkämpfer, Troubadour, Bogenschütze, Waffenmeister
+
+**Talents** include: Kampfwaffen, Fernwaffen (Projektilwaffen, Wurfwaffen), Ausweichen, Aufspringen, Spruchzauberei, Fadenweben (per discipline: Elementarismus, Illusionismus, Magie, Geisterbeschwörung), Magische Markierung (free action)
+
+**Spells (~105 total):**
+- Illusionist (Circles 1–8): Phantomwaffe, Nebelwand, Illusorische Wand, Verwirren, Phantomschmerz, Unsichtbarkeit, Phantomtier, Blendlicht, Geheimnisvolle Gestalt, Phantomflamme, Phantomblitzschlag, ...
+- Geisterbeschwörer (Circles 1–8): Geisterdolch, Geisterhülle, Geisterrüstung, Astrale Wahrnehmung, Astraler Schild, Geisterpfeil, Geisterwächter, Lebensraub, Geisterzunge, ...
+
+## Key Implementation Notes
+- **Karma die**: Always Step 4 = W6 for all disciplines. `diceService.roll(4)` everywhere. **Do not use** `roll(6)` (that is Step 6 = W10).
+- **Stance effects**: Applied as `ActiveEffect` with `ATTACK_STEP` modifier (not via request flags). Aggressive adds `+3 ATTACK_STEP` + `-3` to all defenses; Defensive adds `-3 ATTACK_STEP` + `+3` to all defenses. Both cleared at round end in `nextRound()`.
+- **CombatPhase**: `DECLARATION` (all declare before initiative) → `ACTION` (fight). Phase stored on `CombatSession`. Auto-transitions to `ACTION` when all non-defeated combatants have declared.
+- **SpellService** uses `ModifierAggregator` for `KARMA_STEP` and spell defense values — same engine as physical combat.
+- **Free actions**: `TalentDefinition.freeAction=true` triggers `performFreeAction()` in `CombatService`. Does not set `hasActedThisRound`.

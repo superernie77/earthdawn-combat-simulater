@@ -2,6 +2,9 @@ import { Character } from './character.model';
 import { RollResult } from './dice.model';
 
 export type CombatStatus = 'SETUP' | 'ACTIVE' | 'FINISHED';
+export type CombatPhase = 'DECLARATION' | 'ACTION';
+export type DeclaredStance = 'NONE' | 'AGGRESSIVE' | 'DEFENSIVE';
+export type DeclaredActionType = 'WEAPON' | 'SPELL';
 export type ActionType =
   | 'MELEE_ATTACK' | 'RANGED_ATTACK' | 'SPELL_ATTACK'
   | 'TALENT_TEST' | 'SKILL_TEST' | 'RECOVERY_TEST'
@@ -61,6 +64,9 @@ export interface CombatantState {
   defeated: boolean;
   npc: boolean;
   hasActedThisRound: boolean;
+  hasDeclared: boolean;
+  declaredStance: DeclaredStance;
+  declaredActionType: DeclaredActionType;
   knockedDown: boolean;
   pendingAttackBonus: number;
   pendingDefenseBonus: number;
@@ -86,6 +92,7 @@ export interface CombatSession {
   name: string;
   round: number;
   status: CombatStatus;
+  phase: CombatPhase;
   createdAt: string;
   combatants: CombatantState[];
   log: CombatLog[];

@@ -77,7 +77,7 @@ public class SpellService {
         // Karma
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && caster.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4);
+            karmaRoll = diceService.roll(4); // W6 = Stufe 4
             caster.setCurrentKarma(Math.max(0, caster.getCurrentKarma() - 1));
         }
 
@@ -159,7 +159,7 @@ public class SpellService {
         // Karma
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && caster.getCurrentKarma() > 0) {
-            karmaRoll = diceService.roll(4);
+            karmaRoll = diceService.roll(4); // W6 = Stufe 4
             caster.setCurrentKarma(Math.max(0, caster.getCurrentKarma() - 1));
         }
 
