@@ -657,21 +657,33 @@ public class CombatService {
     private KnockdownResult performKnockdownCheck(CombatSession session, CombatantState defender, int netDamage, int wt) {
         String name = defender.getCharacter().getName();
         int targetNumber = netDamage - wt;
+
+        // Standhaftigkeit-Talent: STR-Step + Rang statt reiner STR-Step
         int strStep = Math.max(1, diceService.attributeToStep(defender.getCharacter().getStrength()) - defender.getWounds());
-        RollResult roll = diceService.roll(strStep);
+        int standhaftigkeitRank = defender.getCharacter().getTalents().stream()
+                .filter(t -> "Standhaftigkeit".equals(t.getTalentDefinition().getName()))
+                .mapToInt(CharacterTalent::getRank)
+                .findFirst().orElse(0);
+        int rollStep = Math.max(1, strStep + standhaftigkeitRank);
+        boolean usedTalent = standhaftigkeitRank > 0;
+
+        RollResult roll = diceService.roll(rollStep);
         boolean knocked = roll.getTotal() < targetNumber;
+        String talentLabel = usedTalent ? "Standhaftigkeit (STR+" + standhaftigkeitRank + ")" : "STR";
         String desc;
         if (knocked) {
             defender.setKnockedDown(true);
             applyNiedergeschlagenEffect(defender);
-            desc = name + " ist niedergeschlagen! (STR " + roll.getTotal() + " < " + targetNumber + ")";
+            // Akrobatische Verteidigung verliert sofort die Wirkung bei Niedergeschlagen
+            defender.getActiveEffects().removeIf(e -> "Akrobatische Verteidigung".equals(e.getName()));
+            desc = name + " ist niedergeschlagen! (" + talentLabel + " " + roll.getTotal() + " < " + targetNumber + ")";
         } else {
-            desc = name + " bleibt stehen. (STR " + roll.getTotal() + " vs " + targetNumber + ")";
+            desc = name + " bleibt stehen. (" + talentLabel + " " + roll.getTotal() + " vs " + targetNumber + ")";
         }
         addLog(session, name, null, ActionType.VALUE_CHANGED, desc, !knocked);
         return KnockdownResult.builder()
                 .targetName(name)
-                .rollStep(strStep)
+                .rollStep(rollStep)
                 .roll(roll)
                 .targetNumber(targetNumber)
                 .knockedDown(knocked)
@@ -781,6 +793,539 @@ public class CombatService {
                 .success(success)
                 .damageTaken(damageTaken)
                 .stillKnockedDown(stillKnockedDown)
+                .description(desc)
+                .build();
+    }
+
+    // --- Verspotten ---
+
+    public TauntResult performTaunt(Long sessionId, TauntRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated())  throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt und kann nicht handeln.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Aktionen sind nur in der Aktionsphase möglich.");
+        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
+
+        // Verspotten-Talent laden
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> "Verspotten".equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Verspotten' nicht gefunden."));
+
+        // 1 Überanstrengung sofort
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelstufe: CHA-Step + Rang + Bonus - Wunden
+        int chaStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getCharisma()) - actor.getWounds());
+        int rollStep = Math.max(1, chaStep + ct.getRank() + req.getBonusSteps());
+
+        // Karma
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4); // W6
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Soziale Verteidigung des Ziels
+        int socialDef = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
+        boolean success = total > socialDef;
+        int extraSuccesses = success ? (total - socialDef) / 5 : 0;
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+
+        TauntResult.TauntResultBuilder result = TauntResult.builder()
+                .actorName(actorName)
+                .targetName(targetName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .socialDefense(socialDef)
+                .success(success)
+                .extraSuccesses(extraSuccesses);
+
+        actor.setHasActedThisRound(true);
+
+        if (!success) {
+            result.penalty(0).duration(0)
+                  .description(actorName + " versucht " + targetName + " zu verspotten, scheitert aber. (" + total + " vs SV " + socialDef + ")");
+            addLog(session, actorName, targetName, ActionType.TAUNT, result.build().getDescription(), false);
+            sessionRepo.save(session);
+            broadcast(session);
+            return result.build();
+        }
+
+        // Übererfolge × −1 Malus
+        int penalty = extraSuccesses; // wird als negative ADD gespeichert
+        int duration = ct.getRank();
+
+        // Starrsinn-Gegenprobe des Ziels
+        RollResult resistRoll = null;
+        int resistStep = 0;
+        boolean resisted = false;
+
+        java.util.Optional<CharacterTalent> resistTalent = target.getCharacter().getTalents().stream()
+                .filter(t -> "Starrsinn".equals(t.getTalentDefinition().getName()))
+                .findFirst();
+
+        if (resistTalent.isPresent()) {
+            int wilStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower()) - target.getWounds());
+            resistStep = Math.max(1, wilStep + resistTalent.get().getRank());
+            resistRoll = diceService.roll(resistStep);
+            resisted = resistRoll.getTotal() >= total; // Gegenprobe vs Verspotten-Ergebnis
+        }
+
+        result.resistRoll(resistRoll).resistStep(resistStep).resisted(resisted);
+
+        if (!resisted && penalty > 0) {
+            // ActiveEffect auf das Ziel: -penalty auf ATTACK_STEP und SOCIAL_DEFENSE
+            ActiveEffect tauntEffect = ActiveEffect.builder()
+                    .combatantState(target)
+                    .name("Verspottet")
+                    .description("−" + penalty + " auf alle Aktionsproben und Soziale Verteidigung (" + actorName + ")")
+                    .sourceType(SourceType.CONDITION)
+                    .remainingRounds(duration)
+                    .negative(true)
+                    .modifiers(List.of(
+                            ModifierEntry.builder().targetStat(StatType.ATTACK_STEP)
+                                    .operation(ModifierOperation.ADD).value(-penalty)
+                                    .triggerContext(TriggerContext.ALWAYS).build(),
+                            ModifierEntry.builder().targetStat(StatType.SOCIAL_DEFENSE)
+                                    .operation(ModifierOperation.ADD).value(-penalty)
+                                    .triggerContext(TriggerContext.ALWAYS).build()
+                    ))
+                    .build();
+            target.getActiveEffects().add(tauntEffect);
+            result.penalty(penalty).duration(duration);
+        } else {
+            result.penalty(0).duration(0);
+        }
+
+        String desc;
+        if (resisted) {
+            desc = actorName + " verspottet " + targetName + " (" + total + " vs SV " + socialDef
+                 + "), aber " + targetName + " widersteht mit Starrsinn (" + resistRoll.getTotal() + ")!";
+        } else if (penalty > 0) {
+            desc = actorName + " verspottet " + targetName + " erfolgreich! " + extraSuccesses + " Übererfolg(e) → −"
+                 + penalty + " auf Proben/SV für " + duration + " Runden.";
+        } else {
+            desc = actorName + " verspottet " + targetName + " (" + total + " vs SV " + socialDef + "). Knapper Erfolg, kein Malus.";
+        }
+        result.description(desc);
+
+        addLog(session, actorName, targetName, ActionType.TAUNT, desc, success && !resisted);
+        sessionRepo.save(session);
+        broadcast(session);
+        return result.build();
+    }
+
+    // --- Akrobatische Verteidigung ---
+
+    public AcrobaticDefenseResult performAcrobaticDefense(Long sessionId, Long actorCombatantId,
+                                                          int bonusSteps, boolean spendKarma) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
+
+        // Kombination mit Kampfsinn verboten
+        boolean hasCombatSense = actor.getActiveEffects().stream()
+                .anyMatch(e -> e.getName().startsWith("Kampfsinn"));
+        if (hasCombatSense) throw new IllegalStateException(
+                "Akrobatische Verteidigung und Kampfsinn können nicht in derselben Runde kombiniert werden.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> "Akrobatische Verteidigung".equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Akrobatische Verteidigung' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelschritt: GES-Step + Rang + Bonus − Wunden
+        int dexStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getDexterity()) - actor.getWounds());
+        int rollStep = Math.max(1, dexStep + ct.getRank() + bonusSteps);
+
+        RollResult karmaRoll = null;
+        if (spendKarma && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Ziel-TN: höchste KV aller nicht-besiegten Gegner
+        int targetNumber = session.getCombatants().stream()
+                .filter(c -> !c.getId().equals(actor.getId()) && !c.isDefeated())
+                .mapToInt(c -> modifiers.getEffectiveValue(c, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
+                .max().orElse(8);
+
+        boolean success  = total > targetNumber;
+        int extraSucc    = success ? (total - targetNumber) / 5 : 0;
+        int successes    = success ? 1 + extraSucc : 0;
+        int bonusApplied = successes * 2;
+
+        String actorName = actor.getCharacter().getName();
+        actor.setHasActedThisRound(true);
+
+        if (success && bonusApplied > 0) {
+            ActiveEffect effect = ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name("Akrobatische Verteidigung")
+                    .description("+" + bonusApplied + " KV (Akrobatik, bis Rundenende)")
+                    .sourceType(SourceType.TALENT)
+                    .remainingRounds(1)
+                    .negative(false)
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.PHYSICAL_DEFENSE)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(bonusApplied)
+                                    .triggerContext(TriggerContext.ALWAYS)
+                                    .build()
+                    ))
+                    .build();
+            actor.getActiveEffects().add(effect);
+        }
+
+        String desc = success
+                ? actorName + " setzt Akrobatische Verteidigung ein! " + successes + " Erfolg(e) → +" + bonusApplied + " KV bis Rundenende."
+                : actorName + " setzt Akrobatische Verteidigung ein, scheitert. (" + total + " vs KV " + targetNumber + ")";
+
+        addLog(session, actorName, null, ActionType.ACROBATIC_DEFENSE, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return AcrobaticDefenseResult.builder()
+                .actorName(actorName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .targetNumber(targetNumber)
+                .success(success)
+                .successes(successes)
+                .bonusApplied(bonusApplied)
+                .damageTaken(1)
+                .description(desc)
+                .build();
+    }
+
+    // --- Kampfsinn ---
+
+    public CombatSenseResult performCombatSense(Long sessionId, CombatSenseRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
+
+        // Nur gegen Gegner mit niedrigerer Initiative
+        if (actor.getInitiativeOrder() >= target.getInitiativeOrder()) {
+            throw new IllegalStateException("Kampfsinn kann nur gegen Gegner mit niedrigerer Initiative eingesetzt werden.");
+        }
+
+        // Kombination mit Akrobatischer Verteidigung verboten
+        boolean hasAcrobatic = actor.getActiveEffects().stream()
+                .anyMatch(e -> "Akrobatische Verteidigung".equals(e.getName()));
+        if (hasAcrobatic) throw new IllegalStateException(
+                "Kampfsinn und Akrobatische Verteidigung können nicht in derselben Runde kombiniert werden.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> "Kampfsinn".equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Kampfsinn' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelschritt: WAH-Step + Rang + Bonus − Wunden
+        int perStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getPerception()) - actor.getWounds());
+        int rollStep = Math.max(1, perStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Mystische Verteidigung des Ziels
+        int mysticDef  = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ALWAYS);
+        boolean success = total > mysticDef;
+        int extraSucc   = success ? (total - mysticDef) / 5 : 0;
+        int successes   = success ? 1 + extraSucc : 0;
+        int defenseBonus = successes * 2;
+        int attackBonus  = successes * 2;
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+        actor.setHasActedThisRound(true);
+
+        if (success && successes > 0) {
+            // KV-Bonus auf den Anwender (vereinfacht: global, nicht nur vs. dieses Ziel)
+            ActiveEffect defEffect = ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name("Kampfsinn (KV)")
+                    .description("+" + defenseBonus + " KV gegen " + targetName + " (Kampfsinn)")
+                    .sourceType(SourceType.TALENT)
+                    .remainingRounds(1)
+                    .negative(false)
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.PHYSICAL_DEFENSE)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(defenseBonus)
+                                    .triggerContext(TriggerContext.ALWAYS)
+                                    .build()
+                    ))
+                    .build();
+            actor.getActiveEffects().add(defEffect);
+
+            // Angriffsbonus auf den Anwender (für den nächsten Angriff, Nahkampf und Fernkampf)
+            ActiveEffect atkEffect = ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name("Kampfsinn (Angriff)")
+                    .description("+" + attackBonus + " Angriff gegen " + targetName + " (Kampfsinn)")
+                    .sourceType(SourceType.TALENT)
+                    .remainingRounds(1)
+                    .negative(false)
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.ATTACK_STEP)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(attackBonus)
+                                    .triggerContext(TriggerContext.ON_MELEE_ATTACK)
+                                    .build(),
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.ATTACK_STEP)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(attackBonus)
+                                    .triggerContext(TriggerContext.ON_RANGED_ATTACK)
+                                    .build()
+                    ))
+                    .build();
+            actor.getActiveEffects().add(atkEffect);
+        }
+
+        String desc = success
+                ? actorName + " aktiviert Kampfsinn gegen " + targetName + "! " + successes + " Erfolg(e) → +"
+                  + defenseBonus + " KV, +" + attackBonus + " auf Angriff bis Rundenende."
+                : actorName + " setzt Kampfsinn gegen " + targetName + " ein, scheitert. (" + total + " vs MV " + mysticDef + ")";
+
+        addLog(session, actorName, targetName, ActionType.COMBAT_SENSE, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return CombatSenseResult.builder()
+                .actorName(actorName)
+                .targetName(targetName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .mysticDefense(mysticDef)
+                .success(success)
+                .successes(successes)
+                .defenseBonus(defenseBonus)
+                .attackBonus(attackBonus)
+                .damageTaken(1)
+                .description(desc)
+                .build();
+    }
+
+    // --- Ablenken ---
+
+    public DistractResult performDistract(Long sessionId, DistractRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> "Ablenken".equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Ablenken' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelschritt: CHA-Step + Rang + Bonus − Wunden
+        int chaStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getCharisma()) - actor.getWounds());
+        int rollStep = Math.max(1, chaStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Soziale Verteidigung des Ziels
+        int socialDef  = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
+        boolean success = total > socialDef;
+        int extraSucc   = success ? (total - socialDef) / 5 : 0;
+        int successes   = success ? 1 + extraSucc : 0;
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+        actor.setHasActedThisRound(true);
+
+        if (success && successes > 0) {
+            // Anwender: −successes auf eigene KV (ist im Toten Winkel des Ziels)
+            ActiveEffect actorEffect = ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name("Ablenkt (KV−)")
+                    .description("−" + successes + " KV gegen " + targetName + " (Ablenken)")
+                    .sourceType(SourceType.CONDITION)
+                    .remainingRounds(1)
+                    .negative(true)
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.PHYSICAL_DEFENSE)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(-successes)
+                                    .triggerContext(TriggerContext.ALWAYS)
+                                    .build()
+                    ))
+                    .build();
+            actor.getActiveEffects().add(actorEffect);
+
+            // Ziel: −successes auf KV (Toter Winkel für Verbündete)
+            ActiveEffect targetEffect = ActiveEffect.builder()
+                    .combatantState(target)
+                    .name("Abgelenkt")
+                    .description("−" + successes + " KV gegen Verbündete von " + actorName + " (Toter Winkel)")
+                    .sourceType(SourceType.CONDITION)
+                    .remainingRounds(1)
+                    .negative(true)
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.PHYSICAL_DEFENSE)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(-successes)
+                                    .triggerContext(TriggerContext.ALWAYS)
+                                    .build()
+                    ))
+                    .build();
+            target.getActiveEffects().add(targetEffect);
+        }
+
+        String desc = success
+                ? actorName + " lenkt " + targetName + " ab! " + successes + " Erfolg(e) → −" + successes
+                  + " KV für " + actorName + " und " + targetName + " (Toter Winkel für Verbündete)."
+                : actorName + " versucht " + targetName + " abzulenken, scheitert. (" + total + " vs SV " + socialDef + ")";
+
+        addLog(session, actorName, targetName, ActionType.DISTRACT, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return DistractResult.builder()
+                .actorName(actorName)
+                .targetName(targetName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .socialDefense(socialDef)
+                .success(success)
+                .successes(successes)
+                .actorPenalty(success ? successes : 0)
+                .targetPenalty(success ? successes : 0)
+                .damageTaken(1)
+                .description(desc)
+                .build();
+    }
+
+    // --- Eiserner Wille ---
+
+    /**
+     * Freie Aktion: Widerstand gegen einen laufenden Zauber/Talent-Angriff.
+     * Der Anwender würfelt WIL-Step + Rang vs. den Angriffswurf des Zauberers.
+     * Bei Erfolg (≥ attackTotal): aktiver Effekt des Angriffs wird entfernt.
+     *
+     * @param sessionId       Session
+     * @param actorCombatantId  Verteidiger (wer Eiserner Wille einsetzt)
+     * @param attackTotal     Angriffswurf des Zauberers (aus dem UI übergeben)
+     * @param spendKarma      Karma einsetzen?
+     */
+    public IronWillResult performIronWill(Long sessionId, Long actorCombatantId,
+                                          int attackTotal, boolean spendKarma) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> "Eiserner Wille".equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Eiserner Wille' nicht gefunden."));
+
+        // 1 Überanstrengung (freie Aktion — kein hasActedThisRound)
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelschritt: WIL-Step + Rang − Wunden
+        int wilStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower()) - actor.getWounds());
+        int rollStep = Math.max(1, wilStep + ct.getRank());
+
+        RollResult karmaRoll = null;
+        if (spendKarma && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Erfolg wenn Ergebnis ≥ Angriffswurf des Zauberers
+        boolean success      = total >= attackTotal;
+        boolean effectNegated = false;
+        String actorName     = actor.getCharacter().getName();
+
+        // Bei Erfolg: neuester negativer Effekt mit magischer Quelle entfernen
+        if (success) {
+            java.util.Optional<ActiveEffect> toRemove = actor.getActiveEffects().stream()
+                    .filter(e -> e.isNegative() && e.getSourceType() == SourceType.SPELL)
+                    .reduce((a, b) -> b); // letzter (zuletzt hinzugefügt)
+            if (toRemove.isPresent()) {
+                actor.getActiveEffects().remove(toRemove.get());
+                effectNegated = true;
+            }
+        }
+
+        String desc = success
+                ? actorName + " setzt Eisernen Willen ein! (" + total + " vs " + attackTotal + ") "
+                  + (effectNegated ? "Magischer Effekt abgewehrt!" : "Erfolg, aber kein aktiver Effekt zum Abwehren.")
+                : actorName + " setzt Eisernen Willen ein, scheitert. (" + total + " < " + attackTotal + ")";
+
+        addLog(session, actorName, null, ActionType.IRON_WILL, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return IronWillResult.builder()
+                .actorName(actorName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .attackTotal(attackTotal)
+                .success(success)
+                .effectNegated(effectNegated)
+                .damageTaken(1)
                 .description(desc)
                 .build();
     }

@@ -15,10 +15,12 @@ A local combat tracker for the **Earthdawn 4th Edition (FASA)** pen-and-paper RP
 7. [Combat Flow](#combat-flow)
 8. [Spell System](#spell-system)
 9. [Free Actions](#free-actions)
-10. [API Reference](#api-reference)
-11. [WebSocket](#websocket)
-12. [Frontend Structure](#frontend-structure)
-13. [Reference Data](#reference-data)
+10. [Main-Action Combat Talents](#main-action-combat-talents)
+11. [Passive / Reaction Talents](#passive--reaction-talents)
+12. [API Reference](#api-reference)
+13. [WebSocket](#websocket)
+14. [Frontend Structure](#frontend-structure)
+15. [Reference Data](#reference-data)
 
 ---
 
@@ -351,8 +353,10 @@ Effects are stored as `ActiveEffect` (sourceType=CONDITION, remainingRounds=1, n
 ### Knockdown check (`applyDamageToDefender`)
 
 After taking a wound: defender rolls `TOU-Step vs netDamage`. On failure: `knockedDown = true`.
-- **Aufstehen**: main action, no roll needed, clears knockedDown
-- **Aufspringen**: `DEX-Step vs 6`, costs 2 damage; success = stand + still act (hasActedThisRound stays false)
+- **Standhaftigkeit** (passive): If the combatant has this talent, the knockdown roll uses `STR-Step + rank` instead of plain `STR-Step`.
+- **Aufstehen**: main action, no roll needed, clears knockedDown.
+- **Aufspringen**: `DEX-Step vs 6`, costs 2 damage; success = stand + still act (hasActedThisRound stays false).
+- Knockdown immediately removes any **Akrobatische Verteidigung** effect from the defender.
 
 ### Dodge resolution
 
@@ -360,6 +364,78 @@ After taking a wound: defender rolls `TOU-Step vs netDamage`. On failure: `knock
 2. Costs 1 damage to attempt
 3. Success: no damage applied
 4. Failure: netDamage applied with fresh wound/knockdown check
+
+---
+
+## Main-Action Combat Talents
+
+These talents consume `hasActedThisRound = true` and cost **1 Überanstrengung** (damage) to the user.
+
+**Successes formula** (used by all main-action talents):
+```
+successes = 1 + floor((total − TN) / 5)   [on success only]
+```
+
+### Verspotten
+```
+Actor: CHA-Step + Verspotten-Rank + bonusSteps − wounds
+Target: Social Defense (Soziale VK)
+Success: −1/success on all rolls AND social defense of target, for Rank rounds
+         Target may auto-counter with Starrsinn (WIL-Step + Starrsinn-Rank vs roll total)
+         → on Starrsinn success the Verspotten effect is negated
+```
+
+### Ablenken
+```
+Actor: CHA-Step + Ablenken-Rank + bonusSteps − wounds
+Target: Social Defense (Soziale VK)
+Success: actor AND target both receive −successes to Physical Defense for 1 round
+         ("Toter Winkel" — creates an opening for allies)
+```
+
+### Akrobatische Verteidigung
+```
+Actor: DEX-Step + Akrobatische Verteidigung-Rank + bonusSteps − wounds
+TN: highest Physical Defense among all living enemies
+Success: +2/success to actor's Physical Defense for 1 round
+Restrictions:
+  • Cannot combine with Kampfsinn (mutual exclusion — error if Kampfsinn effect active)
+  • Effect is removed immediately if actor gets knocked down
+```
+
+### Kampfsinn
+```
+Actor: PER-Step + Kampfsinn-Rank + bonusSteps − wounds
+Target: target's Mystic Defense (Mystische VK)
+Success: +2/success to actor's Physical Defense AND +2/success to actor's Attack Step for 1 round
+Restrictions:
+  • Actor must have strictly higher initiative than the target
+    (initiativeOrder: 0 = highest; actor.initiativeOrder < target.initiativeOrder)
+  • Cannot combine with Akrobatische Verteidigung (mutual exclusion)
+```
+
+---
+
+## Passive / Reaction Talents
+
+These do not consume a main action (unless noted).
+
+### Standhaftigkeit (passive)
+When a knockdown check is triggered, `STR-Step + Standhaftigkeit-Rank` is used instead of plain `STR-Step`.
+
+### Starrsinn (auto-counter)
+Automatically triggered when the combatant is targeted by **Verspotten**. Rolls `WIL-Step + Starrsinn-Rank vs Verspotten total`. On success, the Verspotten effect is negated.
+
+### Eiserner Wille (free action)
+```
+Actor: WIL-Step + Eiserner Wille-Rank − wounds
+TN: spell roll total (entered manually by the player)
+Success: removes the most recently added negative SPELL-sourced ActiveEffect from the actor
+Cost: 1 damage; does NOT consume hasActedThisRound
+```
+
+### Ausweichen (reaction, after being hit)
+See [Dodge resolution](#dodge-resolution) above.
 
 ---
 
@@ -510,6 +586,15 @@ POST /api/combat/sessions/{id}/attack                   AttackActionRequest
 POST /api/combat/sessions/{id}/dodge                    DodgeRequest
 POST /api/combat/sessions/{id}/free-action              FreeActionRequest
 
+POST /api/combat/sessions/{id}/taunt                    TauntRequest
+POST /api/combat/sessions/{id}/distract                 DistractRequest
+POST /api/combat/sessions/{id}/combat-sense             CombatSenseRequest
+
+POST /api/combat/sessions/{id}/combatants/{cId}/acrobatic-defense
+     ?bonusSteps=&spendKarma=
+POST /api/combat/sessions/{id}/combatants/{cId}/iron-will
+     ?attackTotal=&spendKarma=
+
 POST /api/combat/sessions/{id}/combatants/{cId}/stand-up
 POST /api/combat/sessions/{id}/combatants/{cId}/aufspringen   ?spendKarma=
 
@@ -577,6 +662,11 @@ src/app/
 **ACTION phase** — each combatant card shows:
 - ⚔ Aggressiv / 🛡 Defensiv stance badges (read-only, from declaration)
 - Attack button (opens dialog) — disabled until it's this combatant's turn
+- **Verspotten** button — CHA-based social attack (main action)
+- **Akrobatische Verteidigung** button — DEX-based defensive boost (main action)
+- **Kampfsinn** button — PER-based offense+defense boost (main action)
+- **Ablenken** button — CHA-based mutual defense penalty (main action)
+- **Eiserner Wille** button — WIL-based free action to negate spell effect (no turn restriction)
 - Threadweave / cast spell buttons (magic characters)
 - Free action button (if talent with `freeAction=true` exists)
 - Stand up / Aufspringen (if knocked down)
@@ -592,19 +682,26 @@ Seeded automatically (idempotent — re-running is safe) by `DataInitializer`.
 Krieger, Pfadsucher, Dieb, Schwertkämpfer, Bogenschütze, Waffenmeister, Troubadour, Elementarist, Illusionist, Magier, Geisterbeschwörer, Nekromant
 
 ### Key Talents
-| Talent | Attribute | Notes |
-|---|---|---|
-| Kampfwaffen | DEX | attackTalent |
-| Projektilwaffen | DEX | attackTalent |
-| Wurfwaffen | DEX | attackTalent |
-| Spruchzauberei | PER | attackTalent |
-| Ausweichen | DEX | Enables dodge in combat |
-| Aufspringen | DEX | Stand from knockdown without using main action |
-| Elementarismus | PER | Thread weaving for Elementarist |
-| Illusionismus | PER | Thread weaving for Illusionist |
-| Magie | PER | Thread weaving for Magier |
-| Geisterbeschwörung | PER | Thread weaving for Geisterbeschwörer |
-| Magische Markierung | PER | freeAction; +2/Übererfolg on ranged ATTACK_STEP vs target; costs 1 damage |
+| Talent | Attribute | Type | Notes |
+|---|---|---|---|
+| Nahkampfwaffen | DEX | attackTalent | Melee weapon attacks |
+| Projektilwaffen | DEX | attackTalent | Ranged weapon attacks |
+| Wurfwaffen | DEX | attackTalent | Thrown weapon attacks |
+| Waffenloser Kampf | DEX | attackTalent | Unarmed attacks |
+| Spruchzauberei | PER | attackTalent | Spell casting |
+| Elementarismus | PER | weaving | Thread weaving for Elementarist |
+| Illusionismus | PER | weaving | Thread weaving for Illusionist |
+| Magie | PER | weaving | Thread weaving for Magier |
+| Geisterbeschwörung | PER | weaving | Thread weaving for Geisterbeschwörer |
+| Ausweichen | DEX | reaction | Enables dodge after being hit (costs 1 damage) |
+| Standhaftigkeit | STR | passive | Knockdown check uses STR+rank instead of STR |
+| Starrsinn | WIL | passive | Auto-counter vs Verspotten; WIL+rank vs taunt roll |
+| Eiserner Wille | WIL | free action | WIL+rank vs spell total; negates last negative SPELL effect; costs 1 damage |
+| Verspotten | CHA | main action | CHA+rank vs SV; −1/success to all rolls+SV of target for Rank rounds |
+| Ablenken | CHA | main action | CHA+rank vs SV; −successes KV on actor AND target for 1 round |
+| Akrobatische Verteidigung | DEX | main action | DEX+rank vs highest enemy KV; +2/success KV for 1 round |
+| Kampfsinn | PER | main action | PER+rank vs target MV; +2/success KV+Angriff for 1 round; requires higher initiative |
+| Magische Markierung | PER | free action | freeAction; +2/Übererfolg on ranged ATTACK_STEP vs target; costs 1 damage |
 
 ### Spells (~105 total)
 

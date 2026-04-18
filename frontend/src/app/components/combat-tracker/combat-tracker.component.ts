@@ -19,6 +19,9 @@ import { WebSocketService } from '../../services/websocket.service';
 import {
   CombatSession, CombatantState, AttackActionRequest,
   CombatActionResult, ActiveEffect, FreeActionRequest, FreeActionResult,
+  TauntRequest, TauntResult,
+  AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
+  DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
   SpellCastRequest, SpellCastResult
@@ -206,6 +209,40 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openFreeActionDialog(c)"
                   matTooltip="Freie Kampfaktion einsetzen">
                   <mat-icon>bolt</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTauntTalent(c) && !c.defeated"
+                  class="combat-option-btn taunt-btn"
+                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  (click)="openTauntDialog(c)"
+                  matTooltip="Verspotten (CHA + Rang vs. Soziale VK, kostet 1 Schaden)">
+                  <mat-icon>sentiment_very_dissatisfied</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
+                  class="combat-option-btn acrobatic-btn"
+                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  (click)="openAcrobaticDefenseDialog(c)"
+                  matTooltip="Akrobatische Verteidigung (GES + Rang vs. höchste KV, +2 KV/Erfolg, kostet 1 Schaden)">
+                  <mat-icon>self_improvement</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasCombatSenseTalent(c) && !c.defeated"
+                  class="combat-option-btn combat-sense-btn"
+                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  (click)="openCombatSenseDialog(c)"
+                  matTooltip="Kampfsinn (WAH + Rang vs. MV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Schaden)">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasDistractTalent(c) && !c.defeated"
+                  class="combat-option-btn distract-btn"
+                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  (click)="openDistractDialog(c)"
+                  matTooltip="Ablenken (CHA + Rang vs. Soziale VK, −1 KV/Erfolg für beide, kostet 1 Schaden)">
+                  <mat-icon>record_voice_over</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasIronWillTalent(c) && !c.defeated"
+                  class="combat-option-btn iron-will-btn"
+                  (click)="openIronWillDialog(c)"
+                  matTooltip="Eiserner Wille (WIL + Rang vs. Zauberwurf, freie Aktion, kostet 1 Schaden)">
+                  <mat-icon>psychology</mat-icon>
                 </button>
                 <button mat-icon-button *ngIf="session!.status === 'SETUP'"
                   color="warn" (click)="removeCombatant(c.id)" matTooltip="Entfernen">
@@ -955,6 +992,519 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
+    <!-- Ablenken Dialog -->
+    <div class="attack-dialog" *ngIf="distractDialog.open">
+      <div class="dialog-backdrop" (click)="distractDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ffab91">record_voice_over</mat-icon>Ablenken: {{ distractDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          CHA + Rang vs. Soziale VK · −1 KV/Erfolg für Anwender &amp; Ziel · Toter Winkel für Verbündete
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="distractDialog.targetId">
+            <mat-option *ngFor="let c of distractTargets()" [value]="c.id">
+              {{ c.character.name }} (SV {{ socD(c) }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden · Anwender erhält auch −KV!
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="distractDialog.spendKarma"
+            [class.disabled]="(distractDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(distractDialog.actor?.currentKarma ?? 0) > 0 && (distractDialog.spendKarma = !distractDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(distractDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ distractDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="distractDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performDistract()" [disabled]="!distractDialog.targetId">
+            <mat-icon>record_voice_over</mat-icon> Ablenken
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ablenken Result Modal -->
+    <div class="result-modal" *ngIf="distractModal.open">
+      <div class="dialog-backdrop" (click)="distractModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="distractModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'record_voice_over' : 'close' }}</mat-icon>
+          {{ r.success ? 'ABGELENKT!' : 'FEHLSCHLAG' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Ablenken · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">SV {{ r.socialDefense }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Erfolge</span>
+              <span class="roll-expr">{{ r.successes }}× → −{{ r.targetPenalty }} KV</span>
+              <span class="roll-value extra-success">{{ r.successes }}</span>
+            </div>
+            <div class="distract-effect-row">
+              <div class="distract-effect-badge self">
+                <mat-icon>shield</mat-icon> Anwender −{{ r.actorPenalty }} KV
+              </div>
+              <div class="distract-effect-badge target">
+                <mat-icon>shield</mat-icon> Ziel −{{ r.targetPenalty }} KV (Toter Winkel)
+              </div>
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="distractModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Eiserner Wille Dialog -->
+    <div class="attack-dialog" *ngIf="ironWillDialog.open">
+      <div class="dialog-backdrop" (click)="ironWillDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b0bec5">psychology</mat-icon>Eiserner Wille: {{ ironWillDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WIL + Rang vs. Zauberwurf · Freie Aktion · Kostet 1 Schaden · Magischen Effekt abwehren
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Angriffswurf des Zauberers</mat-label>
+          <input matInput type="number" [(ngModel)]="ironWillDialog.attackTotal" min="1">
+        </mat-form-field>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden (Überanstrengung)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="ironWillDialog.spendKarma"
+            [class.disabled]="(ironWillDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(ironWillDialog.actor?.currentKarma ?? 0) > 0 && (ironWillDialog.spendKarma = !ironWillDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(ironWillDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ ironWillDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="ironWillDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performIronWill()" [disabled]="!ironWillDialog.attackTotal">
+            <mat-icon>psychology</mat-icon> Widerstehen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eiserner Wille Result Modal -->
+    <div class="result-modal" *ngIf="ironWillModal.open">
+      <div class="dialog-backdrop" (click)="ironWillModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="ironWillModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'psychology' : 'close' }}</mat-icon>
+          {{ r.success ? (r.effectNegated ? 'ABGEWEHRT!' : 'ERFOLG') : 'DURCHGEDRUNGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.actorName }}</span>
+          <span style="color:#b0bec5;font-weight:600;margin-left:8px">Eiserner Wille</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Widerstand · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total" [style.color]="r.success ? '#4caf50' : '#ef5350'">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">{{ r.attackTotal }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="taunt-resisted-banner" *ngIf="r.effectNegated">
+              <mat-icon>psychology</mat-icon>
+              Magischer Effekt erfolgreich abgewehrt!
+            </div>
+            <div style="color:#888;font-size:0.82rem;text-align:center;padding:8px" *ngIf="!r.effectNegated">
+              Kein aktiver magischer Effekt zum Abwehren gefunden.
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="ironWillModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Akrobatische Verteidigung Dialog -->
+    <div class="attack-dialog" *ngIf="acrobaticDialog.open">
+      <div class="dialog-backdrop" (click)="acrobaticDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#80cbc4">self_improvement</mat-icon>Akrobatische Verteidigung: {{ acrobaticDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          GES + Rang vs. höchste KV aller Gegner · +2 KV pro Erfolg · Einfache Aktion · Kostet 1 Schaden
+        </div>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden (Überanstrengung)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="acrobaticDialog.spendKarma"
+            [class.disabled]="(acrobaticDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(acrobaticDialog.actor?.currentKarma ?? 0) > 0 && (acrobaticDialog.spendKarma = !acrobaticDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(acrobaticDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ acrobaticDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="acrobaticDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performAcrobaticDefense()">
+            <mat-icon>self_improvement</mat-icon> Würfeln
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Akrobatische Verteidigung Result Modal -->
+    <div class="result-modal" *ngIf="acrobaticModal.open">
+      <div class="dialog-backdrop" (click)="acrobaticModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="acrobaticModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'self_improvement' : 'close' }}</mat-icon>
+          {{ r.success ? '+' + r.bonusApplied + ' KV!' : 'FEHLSCHLAG' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.actorName }}</span>
+          <span style="color:#80cbc4;font-weight:600;margin-left:8px">Akrobatische Verteidigung</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Probe · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">KV {{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Erfolge</span>
+              <span class="roll-expr">{{ r.successes }}× → +{{ r.bonusApplied }} KV</span>
+              <span class="roll-value extra-success">{{ r.successes }}</span>
+            </div>
+            <div class="taunt-effect-banner" style="background:rgba(128,203,196,0.15);border-color:#80cbc4;color:#80cbc4">
+              <mat-icon>shield</mat-icon>
+              +{{ r.bonusApplied }} KV bis Rundenende
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="acrobaticModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Kampfsinn Dialog -->
+    <div class="attack-dialog" *ngIf="combatSenseDialog.open">
+      <div class="dialog-backdrop" (click)="combatSenseDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ffcc80">visibility</mat-icon>Kampfsinn: {{ combatSenseDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WAH + Rang vs. MV des Ziels · +2 KV &amp; +2 Angriff pro Erfolg · Nur gegen Gegner mit niedrigerer Initiative
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel (niedrigere Initiative)</mat-label>
+          <mat-select [(ngModel)]="combatSenseDialog.targetId">
+            <mat-option *ngFor="let c of combatSenseTargets()" [value]="c.id">
+              {{ c.character.name }} (Ini {{ c.initiative }}, MV {{ sd(c) }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden (Überanstrengung)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="combatSenseDialog.spendKarma"
+            [class.disabled]="(combatSenseDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(combatSenseDialog.actor?.currentKarma ?? 0) > 0 && (combatSenseDialog.spendKarma = !combatSenseDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(combatSenseDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ combatSenseDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="combatSenseDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performCombatSense()" [disabled]="!combatSenseDialog.targetId">
+            <mat-icon>visibility</mat-icon> Würfeln
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kampfsinn Result Modal -->
+    <div class="result-modal" *ngIf="combatSenseModal.open">
+      <div class="dialog-backdrop" (click)="combatSenseModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="combatSenseModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'visibility' : 'close' }}</mat-icon>
+          {{ r.success ? 'KAMPFSINN!' : 'FEHLSCHLAG' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Kampfsinn · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">MV {{ r.mysticDefense }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Erfolge</span>
+              <span class="roll-expr">{{ r.successes }}× → +{{ r.defenseBonus }} KV / +{{ r.attackBonus }} Angriff</span>
+              <span class="roll-value extra-success">{{ r.successes }}</span>
+            </div>
+            <div class="combat-sense-effect-row">
+              <div class="combat-sense-effect-badge defense">
+                <mat-icon>shield</mat-icon> +{{ r.defenseBonus }} KV
+              </div>
+              <div class="combat-sense-effect-badge attack">
+                <mat-icon>sports_martial_arts</mat-icon> +{{ r.attackBonus }} Angriff
+              </div>
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="combatSenseModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Taunt (Verspotten) Dialog -->
+    <div class="attack-dialog" *ngIf="tauntDialog.open">
+      <div class="dialog-backdrop" (click)="tauntDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ef9a9a">sentiment_very_dissatisfied</mat-icon>Verspotten: {{ tauntDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          CHA + Rang vs. Soziale VK · Einfache Aktion · Kostet 1 Schaden
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="tauntDialog.targetId">
+            <mat-option *ngFor="let c of tauntTargets()" [value]="c.id">
+              {{ c.character.name }} (SV {{ socD(c) }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden (Überanstrengung)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="tauntDialog.spendKarma"
+            [class.disabled]="(tauntDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(tauntDialog.actor?.currentKarma ?? 0) > 0 && (tauntDialog.spendKarma = !tauntDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(tauntDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ tauntDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="tauntDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performTaunt()" [disabled]="!tauntDialog.targetId">
+            <mat-icon>sentiment_very_dissatisfied</mat-icon> Verspotten
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Taunt Result Modal -->
+    <div class="result-modal" *ngIf="tauntModal.open">
+      <div class="dialog-backdrop" (click)="tauntModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="tauntModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success && !r.resisted" [class.miss]="!r.success || r.resisted">
+          <mat-icon>{{ r.success && !r.resisted ? 'sentiment_very_dissatisfied' : 'close' }}</mat-icon>
+          {{ r.success && !r.resisted ? 'VERSPOTTET!' : (r.resisted ? 'WIDERSTANDEN' : 'VERFEHLT') }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <!-- Main roll -->
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Verspotten · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">SV {{ r.socialDefense }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <!-- Success details -->
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row" *ngIf="r.extraSuccesses > 0">
+              <span class="roll-label">Übererfolge</span>
+              <span class="roll-expr">{{ r.extraSuccesses }}× → −{{ r.penalty }} auf Proben + SV</span>
+              <span class="roll-value extra-success">{{ r.extraSuccesses }}</span>
+            </div>
+            <!-- Starrsinn counter -->
+            <div class="roll-block starrsinn-block" *ngIf="r.resistRoll">
+              <div class="roll-block-header">
+                <span class="roll-block-label">Starrsinn · Step {{ r.resistStep }}</span>
+                <div class="roll-block-totals">
+                  <span class="roll-big-total" [style.color]="r.resisted ? '#4caf50' : '#888'">{{ r.resistRoll.total }}</span>
+                  <span class="roll-big-vs">vs</span>
+                  <span class="roll-big-target" style="font-size:1.2rem;color:#888">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                </div>
+              </div>
+              <div class="dice-breakdown-mini">
+                <div class="die-mini" *ngFor="let d of r.resistRoll.dice" [class.exploded]="d.exploded">
+                  <span class="die-mini-sides">W{{ d.sides }}</span>
+                  <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                  <span *ngIf="d.exploded" class="explode-mini">💥</span>
+                </div>
+              </div>
+            </div>
+            <!-- Effect banner -->
+            <div class="taunt-effect-banner" *ngIf="!r.resisted && r.penalty > 0">
+              <mat-icon>sentiment_very_dissatisfied</mat-icon>
+              −{{ r.penalty }} auf alle Proben + SV für {{ r.duration }} Runden
+            </div>
+            <div class="taunt-resisted-banner" *ngIf="r.resisted">
+              <mat-icon>psychology</mat-icon>
+              Starrsinn! Wirkung negiert.
+            </div>
+          </ng-container>
+          <!-- Actor damage cost -->
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="tauntModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
     <!-- Spell Cast Result Modal -->
     <div class="result-modal" *ngIf="spellCastModal.open">
       <div class="dialog-backdrop" (click)="spellCastModal.open = false"></div>
@@ -1355,6 +1905,47 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.standup-btn:not([disabled]):hover { border-color: #ff9800; background: rgba(255,152,0,0.1); }
     .combat-option-btn.aufspringen-btn { color: #42a5f5; border-color: #1a3050; }
     .combat-option-btn.aufspringen-btn:hover { border-color: #42a5f5; background: rgba(66,165,245,0.1); }
+    .combat-option-btn.taunt-btn { color: #ef9a9a; border-color: #4a1a1a; }
+    .combat-option-btn.taunt-btn:not([disabled]):hover { border-color: #ef9a9a; background: rgba(239,154,154,0.1); }
+    .combat-option-btn.acrobatic-btn { color: #80cbc4; border-color: #1a3a38; }
+    .combat-option-btn.acrobatic-btn:not([disabled]):hover { border-color: #80cbc4; background: rgba(128,203,196,0.1); }
+    .combat-option-btn.combat-sense-btn { color: #ffcc80; border-color: #3a2e10; }
+    .combat-option-btn.combat-sense-btn:not([disabled]):hover { border-color: #ffcc80; background: rgba(255,204,128,0.1); }
+    .combat-option-btn.distract-btn { color: #ffab91; border-color: #3a1a10; }
+    .combat-option-btn.distract-btn:not([disabled]):hover { border-color: #ffab91; background: rgba(255,171,145,0.1); }
+    .combat-option-btn.iron-will-btn { color: #b0bec5; border-color: #2a3038; }
+    .combat-option-btn.iron-will-btn:not([disabled]):hover { border-color: #b0bec5; background: rgba(176,190,197,0.1); }
+    .distract-effect-row { display: flex; gap: 8px; }
+    .distract-effect-badge {
+      flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
+      border-radius: 6px; padding: 8px; font-weight: 700; font-size: 0.85rem;
+      mat-icon { font-size: 16px; height: 16px; width: 16px; }
+      &.self { background: rgba(239,83,80,0.12); border: 1px solid #ef5350; color: #ef9a9a; }
+      &.target { background: rgba(255,171,145,0.12); border: 1px solid #ffab91; color: #ffab91; }
+    }
+    .combat-sense-effect-row { display: flex; gap: 8px; }
+    .combat-sense-effect-badge {
+      flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
+      border-radius: 6px; padding: 8px; font-weight: 700; font-size: 0.9rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+      &.defense { background: rgba(128,203,196,0.15); border: 1px solid #80cbc4; color: #80cbc4; }
+      &.attack { background: rgba(255,204,128,0.15); border: 1px solid #ffcc80; color: #ffcc80; }
+    }
+    .taunt-effect-banner {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: rgba(239,154,154,0.15); border: 1px solid #ef9a9a;
+      border-radius: 6px; padding: 8px; color: #ef9a9a;
+      font-weight: 700; font-size: 0.9rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+    }
+    .taunt-resisted-banner {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: rgba(76,175,80,0.12); border: 1px solid #4caf50;
+      border-radius: 6px; padding: 8px; color: #4caf50;
+      font-weight: 700; font-size: 0.9rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; }
+    }
+    .starrsinn-block { background: #1a1e1a; border: 1px solid #2a3a2a; }
 
     /* Spell badges & buttons */
     .spell-prep-badge {
@@ -1496,6 +2087,51 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   } = { open: false, spendKarma: false };
 
   spellCastModal: { open: boolean; result?: SpellCastResult } = { open: false };
+
+  tauntDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    bonusSteps: number;
+    spendKarma: boolean;
+  } = { open: false, bonusSteps: 0, spendKarma: false };
+
+  tauntModal: { open: boolean; result?: TauntResult } = { open: false };
+
+  acrobaticDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  acrobaticModal: { open: boolean; result?: AcrobaticDefenseResult } = { open: false };
+
+  combatSenseDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  combatSenseModal: { open: boolean; result?: CombatSenseResult } = { open: false };
+
+  distractDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  distractModal: { open: boolean; result?: DistractResult } = { open: false };
+
+  ironWillDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    attackTotal: number;
+    spendKarma: boolean;
+  } = { open: false, attackTotal: 0, spendKarma: false };
+
+  ironWillModal: { open: boolean; result?: IronWillResult } = { open: false };
 
   constructor(
     private route: ActivatedRoute,
@@ -2061,5 +2697,186 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'DEBUFF': return 'GESCHWÄCHT';
       default: return 'ERFOLG';
     }
+  }
+
+  // --- Ablenken ---
+
+  hasDistractTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Ablenken');
+  }
+
+  distractTargets(): CombatantState[] {
+    return (this.session?.combatants ?? []).filter(c =>
+      c.id !== this.distractDialog.actor?.id && !c.defeated
+    );
+  }
+
+  openDistractDialog(actor: CombatantState): void {
+    this.distractDialog = { open: true, actor, targetId: undefined, spendKarma: false };
+  }
+
+  performDistract(): void {
+    if (!this.session || !this.distractDialog.actor || !this.distractDialog.targetId) return;
+    const req: DistractRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.distractDialog.actor.id,
+      targetCombatantId: this.distractDialog.targetId,
+      bonusSteps: 0,
+      spendKarma: this.distractDialog.spendKarma
+    };
+    this.combatService.performDistract(this.session.id, req).subscribe({
+      next: result => {
+        this.distractDialog.open = false;
+        this.distractModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  // --- Eiserner Wille ---
+
+  hasIronWillTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Eiserner Wille');
+  }
+
+  openIronWillDialog(actor: CombatantState): void {
+    this.ironWillDialog = { open: true, actor, attackTotal: 0, spendKarma: false };
+  }
+
+  performIronWill(): void {
+    if (!this.session || !this.ironWillDialog.actor || !this.ironWillDialog.attackTotal) return;
+    this.combatService.performIronWill(
+      this.session.id,
+      this.ironWillDialog.actor.id,
+      this.ironWillDialog.attackTotal,
+      this.ironWillDialog.spendKarma
+    ).subscribe({
+      next: result => {
+        this.ironWillDialog.open = false;
+        this.ironWillModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  // --- Akrobatische Verteidigung ---
+
+  hasAcrobaticDefenseTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Akrobatische Verteidigung');
+  }
+
+  openAcrobaticDefenseDialog(actor: CombatantState): void {
+    this.acrobaticDialog = { open: true, actor, spendKarma: false };
+  }
+
+  performAcrobaticDefense(): void {
+    if (!this.session || !this.acrobaticDialog.actor) return;
+    this.combatService.performAcrobaticDefense(
+      this.session.id,
+      this.acrobaticDialog.actor.id,
+      0,
+      this.acrobaticDialog.spendKarma
+    ).subscribe({
+      next: result => {
+        this.acrobaticDialog.open = false;
+        this.acrobaticModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  // --- Kampfsinn ---
+
+  hasCombatSenseTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Kampfsinn');
+  }
+
+  combatSenseTargets(): CombatantState[] {
+    const actor = this.combatSenseDialog.actor;
+    if (!actor) return [];
+    // Only enemies with strictly lower initiative (higher initiativeOrder)
+    return (this.session?.combatants ?? []).filter(c =>
+      c.id !== actor.id && !c.defeated && c.initiativeOrder > actor.initiativeOrder
+    );
+  }
+
+  openCombatSenseDialog(actor: CombatantState): void {
+    this.combatSenseDialog = { open: true, actor, targetId: undefined, spendKarma: false };
+  }
+
+  performCombatSense(): void {
+    if (!this.session || !this.combatSenseDialog.actor || !this.combatSenseDialog.targetId) return;
+    const req: CombatSenseRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.combatSenseDialog.actor.id,
+      targetCombatantId: this.combatSenseDialog.targetId,
+      bonusSteps: 0,
+      spendKarma: this.combatSenseDialog.spendKarma
+    };
+    this.combatService.performCombatSense(this.session.id, req).subscribe({
+      next: result => {
+        this.combatSenseDialog.open = false;
+        this.combatSenseModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  // --- Verspotten ---
+
+  hasTauntTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Verspotten');
+  }
+
+  tauntTargets(): CombatantState[] {
+    return (this.session?.combatants ?? []).filter(c => c.id !== this.tauntDialog.actor?.id && !c.defeated);
+  }
+
+  openTauntDialog(actor: CombatantState): void {
+    this.tauntDialog = {
+      open: true,
+      actor,
+      targetId: undefined,
+      bonusSteps: 0,
+      spendKarma: false
+    };
+  }
+
+  performTaunt(): void {
+    if (!this.session || !this.tauntDialog.actor || !this.tauntDialog.targetId) return;
+    const req: TauntRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.tauntDialog.actor.id,
+      targetCombatantId: this.tauntDialog.targetId,
+      bonusSteps: this.tauntDialog.bonusSteps,
+      spendKarma: this.tauntDialog.spendKarma
+    };
+    this.combatService.performTaunt(this.session.id, req).subscribe({
+      next: result => {
+        this.tauntDialog.open = false;
+        this.tauntModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
   }
 }

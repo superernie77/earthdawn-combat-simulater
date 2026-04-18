@@ -11,7 +11,9 @@ export type ActionType =
   | 'INITIATIVE' | 'EFFECT_ADDED' | 'EFFECT_REMOVED'
   | 'VALUE_CHANGED' | 'ROUND_CHANGE' | 'FREE_ACTION' | 'DODGE'
   | 'STAND_UP' | 'AUFSPRINGEN'
-  | 'THREADWEAVE' | 'SPELL_CAST';
+  | 'THREADWEAVE' | 'SPELL_CAST' | 'TAUNT'
+  | 'ACROBATIC_DEFENSE' | 'COMBAT_SENSE'
+  | 'DISTRACT' | 'IRON_WILL';
 
 export interface ModifierEntry {
   targetStat: string;
@@ -220,6 +222,102 @@ export interface SpellCastResult {
   effectApplied?: string;
   effectDuration?: number;
   healedAmount?: number;
+  description: string;
+}
+
+export interface DistractRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface DistractResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  socialDefense: number;
+  success: boolean;
+  successes: number;
+  actorPenalty: number;
+  targetPenalty: number;
+  damageTaken: number;
+  description: string;
+}
+
+export interface IronWillResult {
+  actorName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  attackTotal: number;
+  success: boolean;
+  effectNegated: boolean;
+  damageTaken: number;
+  description: string;
+}
+
+export interface AcrobaticDefenseResult {
+  actorName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  targetNumber: number;
+  success: boolean;
+  successes: number;
+  bonusApplied: number;
+  damageTaken: number;
+  description: string;
+}
+
+export interface CombatSenseRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface CombatSenseResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  mysticDefense: number;
+  success: boolean;
+  successes: number;
+  defenseBonus: number;
+  attackBonus: number;
+  damageTaken: number;
+  description: string;
+}
+
+export interface TauntRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface TauntResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  socialDefense: number;
+  success: boolean;
+  extraSuccesses: number;
+  penalty: number;
+  duration: number;
+  resistRoll?: RollResult;
+  resistStep: number;
+  resisted: boolean;
   description: string;
 }
 

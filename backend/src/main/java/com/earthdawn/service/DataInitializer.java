@@ -93,6 +93,100 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Ausweichen' hinzugefügt.");
         }
+
+        if (talentRepo.findByName("Standhaftigkeit").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Standhaftigkeit")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Verbessert die Niederschlagsprobe. Bei einem Treffer, der eine Wunde verursacht, " +
+                            "wird STR-Stufe + Talentrang statt der reinen STR-Stufe gegen (Schaden − Wundschwelle) gewürfelt. " +
+                            "Freie Aktion, keine Kosten.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Standhaftigkeit' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Verspotten").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Verspotten")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Beleidigt und demütigt einen Gegner (CHA + Rang vs. Soziale Verteidigung des Ziels). " +
+                            "Hauptaktion, kostet 1 Überanstrengung. " +
+                            "Erfolg: −1 pro Übererfolg auf alle Proben und Soziale Verteidigung des Ziels für Rang Runden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Verspotten' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Starrsinn").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Starrsinn")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Gegenprobe gegen Verspotten (STU + Rang vs. Verspotten-Ergebnis). " +
+                            "Gelingt die Probe, wird der Effekt des Verspottens vollständig negiert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Starrsinn' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Akrobatische Verteidigung").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Akrobatische Verteidigung")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Akrobatische Manöver im Kampf (GES + Rang vs. höchste KV der Gegner). " +
+                            "Einfache Aktion, kostet 1 Überanstrengung. " +
+                            "Erfolg: +2 KV pro Erfolg bis Rundenende. Bonus erlischt sofort bei Niedergeschlagen. " +
+                            "Kann nicht mit Kampfsinn kombiniert werden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Akrobatische Verteidigung' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Kampfsinn").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Kampfsinn")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Gegnerische Angriffe intuitiv vorhersehen (WAH + Rang vs. MV des Ziels). " +
+                            "Einfache Aktion, kostet 1 Überanstrengung. " +
+                            "Nur gegen Gegner mit niedrigerer Initiative. " +
+                            "Erfolg: +2 KV und +2 auf nächsten Angriff pro Erfolg bis Rundenende. " +
+                            "Kann nicht mit Akrobatischer Verteidigung kombiniert werden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Kampfsinn' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Ablenken").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Ablenken")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Lenkt einen Gegner ab (CHA + Rang vs. Soziale Verteidigung). " +
+                            "Einfache Aktion, kostet 1 Überanstrengung. " +
+                            "Erfolg: −1 KV pro Erfolg für Anwender (Toter Winkel rückwärts) " +
+                            "und −1 KV pro Erfolg für Ziel (Toter Winkel für Verbündete) bis Rundenende.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Ablenken' hinzugefügt.");
+        }
+
+        if (talentRepo.findByName("Eiserner Wille").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Eiserner Wille")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Widerstand gegen magische Angriffe (WIL + Rang vs. Angriffswurf des Zauberers). " +
+                            "Freie Aktion, kostet 1 Überanstrengung. " +
+                            "Bei Erfolg: aktiver magischer Effekt wird abgewehrt.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Eiserner Wille' hinzugefügt.");
+        }
     }
 
     private void migrateKarmaModifier() {

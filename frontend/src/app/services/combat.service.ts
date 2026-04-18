@@ -4,6 +4,9 @@ import { Observable } from 'rxjs';
 import {
   CombatSession, AttackActionRequest, CombatActionResult,
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
+  TauntRequest, TauntResult,
+  AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
+  DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
   SpellCastRequest, SpellCastResult,
@@ -112,6 +115,36 @@ export class CombatService {
 
   performFreeAction(sessionId: number, req: FreeActionRequest): Observable<FreeActionResult> {
     return this.http.post<FreeActionResult>(`${this.base}/sessions/${sessionId}/free-action`, req);
+  }
+
+  performTaunt(sessionId: number, req: TauntRequest): Observable<TauntResult> {
+    return this.http.post<TauntResult>(`${this.base}/sessions/${sessionId}/taunt`, req);
+  }
+
+  performAcrobaticDefense(sessionId: number, combatantId: number,
+                          bonusSteps: number, spendKarma: boolean): Observable<AcrobaticDefenseResult> {
+    return this.http.post<AcrobaticDefenseResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/acrobatic-defense`,
+      null,
+      { params: { bonusSteps, spendKarma } }
+    );
+  }
+
+  performCombatSense(sessionId: number, req: CombatSenseRequest): Observable<CombatSenseResult> {
+    return this.http.post<CombatSenseResult>(`${this.base}/sessions/${sessionId}/combat-sense`, req);
+  }
+
+  performDistract(sessionId: number, req: DistractRequest): Observable<DistractResult> {
+    return this.http.post<DistractResult>(`${this.base}/sessions/${sessionId}/distract`, req);
+  }
+
+  performIronWill(sessionId: number, combatantId: number,
+                  attackTotal: number, spendKarma: boolean): Observable<IronWillResult> {
+    return this.http.post<IronWillResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/iron-will`,
+      null,
+      { params: { attackTotal, spendKarma } }
+    );
   }
 
   resolveDodge(sessionId: number, req: DodgeRequest): Observable<DodgeResult> {

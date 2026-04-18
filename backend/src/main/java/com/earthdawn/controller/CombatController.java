@@ -1,6 +1,8 @@
 package com.earthdawn.controller;
 
 import com.earthdawn.dto.*;
+import com.earthdawn.dto.TauntRequest;
+import com.earthdawn.dto.TauntResult;
 import com.earthdawn.model.ActiveEffect;
 import com.earthdawn.model.CombatLog;
 import com.earthdawn.model.CombatSession;
@@ -71,6 +73,11 @@ public class CombatController {
     @PostMapping("/sessions/{id}/free-action")
     public FreeActionResult performFreeAction(@PathVariable Long id, @RequestBody FreeActionRequest req) {
         return combatService.performFreeAction(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/taunt")
+    public TauntResult performTaunt(@PathVariable Long id, @RequestBody TauntRequest req) {
+        return combatService.performTaunt(id, req);
     }
 
     @PostMapping("/sessions/{id}/dodge")
@@ -167,5 +174,37 @@ public class CombatController {
                                                         @PathVariable Long combatantId) {
         spellService.cancelSpellPreparation(id, combatantId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/acrobatic-defense")
+    public AcrobaticDefenseResult performAcrobaticDefense(
+            @PathVariable Long id,
+            @PathVariable Long combatantId,
+            @RequestParam(defaultValue = "0") int bonusSteps,
+            @RequestParam(defaultValue = "false") boolean spendKarma) {
+        return combatService.performAcrobaticDefense(id, combatantId, bonusSteps, spendKarma);
+    }
+
+    @PostMapping("/sessions/{id}/combat-sense")
+    public CombatSenseResult performCombatSense(@PathVariable Long id,
+                                                @RequestBody CombatSenseRequest req) {
+        req.setSessionId(id);
+        return combatService.performCombatSense(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/distract")
+    public DistractResult performDistract(@PathVariable Long id,
+                                          @RequestBody DistractRequest req) {
+        req.setSessionId(id);
+        return combatService.performDistract(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/iron-will")
+    public IronWillResult performIronWill(
+            @PathVariable Long id,
+            @PathVariable Long combatantId,
+            @RequestParam int attackTotal,
+            @RequestParam(defaultValue = "false") boolean spendKarma) {
+        return combatService.performIronWill(id, combatantId, attackTotal, spendKarma);
     }
 }

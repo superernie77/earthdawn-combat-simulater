@@ -18,5 +18,10 @@ public enum ActionType {
     STAND_UP,
     AUFSPRINGEN,
     THREADWEAVE,
-    SPELL_CAST
+    SPELL_CAST,
+    TAUNT,
+    ACROBATIC_DEFENSE,
+    COMBAT_SENSE,
+    DISTRACT,
+    IRON_WILL
 }
