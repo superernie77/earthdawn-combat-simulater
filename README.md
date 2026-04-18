@@ -45,8 +45,9 @@ A local combat tracker for the **Earthdawn 4th Edition (FASA)** pen-and-paper RP
 
 ### 1. Start the database
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+> ⚠️ Modern Docker installations ship Compose as a plugin — use `docker compose` (no hyphen). The standalone `docker-compose` binary is no longer installed by default.
 
 ### 2. Start the backend
 ```bash
@@ -62,6 +63,21 @@ npm install
 npx ng serve --open
 ```
 Runs on `http://localhost:4200`.
+
+---
+
+## Production Deployment
+
+The app ships with a `docker-compose.prod.yml` that builds backend + frontend images and routes traffic through Traefik.
+
+### Deploy / update on the server
+```bash
+git pull && docker compose -f docker-compose.prod.yml up -d --build
+```
+
+`--build` forces a full image rebuild from source. Omit it to just restart without rebuilding.
+
+> ⚠️ Use `docker compose` (plugin syntax, no hyphen). The old standalone `docker-compose` binary is not installed on modern Docker versions.
 
 ---
 
