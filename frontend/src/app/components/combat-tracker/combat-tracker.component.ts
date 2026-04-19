@@ -226,9 +226,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasCombatSenseTalent(c) && !c.defeated"
                   class="combat-option-btn combat-sense-btn"
-                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
                   (click)="openCombatSenseDialog(c)"
-                  matTooltip="Kampfsinn (WAH + Rang vs. MV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Schaden)">
+                  matTooltip="Kampfsinn · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Schaden)">
                   <mat-icon>visibility</mat-icon>
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasDistractTalent(c) && !c.defeated"

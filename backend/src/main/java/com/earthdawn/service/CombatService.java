@@ -1027,7 +1027,6 @@ public class CombatService {
 
         if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
         if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
-        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
 
         // Nur gegen Gegner mit niedrigerer Initiative
         if (actor.getInitiativeOrder() >= target.getInitiativeOrder()) {
@@ -1071,7 +1070,7 @@ public class CombatService {
 
         String actorName  = actor.getCharacter().getName();
         String targetName = target.getCharacter().getName();
-        actor.setHasActedThisRound(true);
+        // Kampfsinn ist eine freie Aktion — kein hasActedThisRound
 
         if (success && successes > 0) {
             // KV-Bonus auf den Anwender (vereinfacht: global, nicht nur vs. dieses Ziel)

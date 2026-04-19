@@ -62,7 +62,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 | **Verspotten** | CHA | Soziale VK (SV) | −1/Erfolg auf alle Proben+SV des Ziels für Rang Runden. Auto-Starrsinn-Gegenprobe. |
 | **Ablenken** | CHA | Soziale VK (SV) | −successes KV auf Anwender UND Ziel (Toter Winkel für Verbündete). |
 | **Akrobatische Verteidigung** | DEX | Höchste KV aller Gegner | +2 KV/Erfolg für 1 Runde. Erlischt bei Niedergeschlagen. Nicht mit Kampfsinn. |
-| **Kampfsinn** | PER | MV des Ziels | +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
+| **Kampfsinn** | PER | MV des Ziels | **Freie Aktion.** +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
 
 **Successes formula** for all main-action talents: `1 + floor((total − TN) / 5)` on success.
 
