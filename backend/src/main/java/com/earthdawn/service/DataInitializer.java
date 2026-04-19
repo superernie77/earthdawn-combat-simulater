@@ -45,6 +45,7 @@ public class DataInitializer {
             seedSpells();
             migrateIllusionistSpells();
             migrateGeisterbeschwoererSpells();
+            cleanupUnimplementedTalents();
             return;
         }
         log.info("Initialisiere Earthdawn Referenzdaten...");
@@ -189,6 +190,64 @@ public class DataInitializer {
         }
     }
 
+    /**
+     * Idempotente Migration: entfernt alle nicht-implementierten Talente aus der DB
+     * und bereinigt die Disziplin-Zugriffslisten entsprechend.
+     */
+    private void cleanupUnimplementedTalents() {
+        java.util.List<String> toRemove = java.util.List.of(
+            "Initiative", "Lufttanz", "Schlossknacken", "Schleichen", "Klettern",
+            "Schwimmen", "Zähigkeit", "Arkane Waffe", "Fadenmagie", "Erste Hilfe",
+            "Tiergespür", "Überzeugung", "Einschüchterung", "Meditation",
+            "Standhalten", "Wissensmagie"
+        );
+
+        for (String name : toRemove) {
+            talentRepo.findByName(name).ifPresent(talent -> {
+                // Zuerst alle CharacterTalent-Einträge entfernen (FK-Constraint)
+                entityManager.createNativeQuery(
+                    "DELETE FROM character_talent WHERE talent_definition_id = :id")
+                    .setParameter("id", talent.getId())
+                    .executeUpdate();
+                // Dann Talentdefinition löschen
+                talentRepo.delete(talent);
+                log.info("Nicht-implementiertes Talent '{}' entfernt.", name);
+            });
+
+            // Aus Disziplin-Zugriffslisten entfernen
+            disciplineRepo.findAll().forEach(d -> {
+                if (d.getAccessTalentNames().remove(name)) {
+                    disciplineRepo.save(d);
+                }
+            });
+        }
+
+        // Disziplin-Zugriffslisten auf implementierte Talente setzen
+        migrateDisciplineAccessLists();
+    }
+
+    private void migrateDisciplineAccessLists() {
+        java.util.Map<String, java.util.List<String>> accessMap = java.util.Map.of(
+            "Krieger",         java.util.List.of("Nahkampfwaffen", "Ausweichen", "Standhaftigkeit", "Verspotten", "Kampfsinn", "Akrobatische Verteidigung"),
+            "Pfadsucher",      java.util.List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung"),
+            "Dieb",            java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Akrobatische Verteidigung", "Ablenken"),
+            "Elementarist",    java.util.List.of("Spruchzauberei", "Elementarismus", "Eiserner Wille", "Standhaftigkeit"),
+            "Nekromant",       java.util.List.of("Spruchzauberei", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"),
+            "Illusionist",     java.util.List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken"),
+            "Schwertkämpfer",  java.util.List.of("Nahkampfwaffen", "Ausweichen", "Kampfsinn", "Akrobatische Verteidigung", "Standhaftigkeit"),
+            "Troubadour",      java.util.List.of("Verspotten", "Ablenken", "Ausweichen", "Magische Markierung")
+        );
+
+        disciplineRepo.findAll().forEach(d -> {
+            java.util.List<String> newList = accessMap.get(d.getName());
+            if (newList != null) {
+                d.setAccessTalentNames(new java.util.ArrayList<>(newList));
+                disciplineRepo.save(d);
+                log.info("Disziplin '{}' Zugriffsliste aktualisiert.", d.getName());
+            }
+        });
+    }
+
     private void migrateKarmaModifier() {
         for (GameCharacter c : characterRepo.findAll()) {
             if (c.getKarmaModifier() == 0) {
@@ -244,29 +303,15 @@ public class DataInitializer {
     }
 
     private void seedTalents() {
+        // Only seed talents that are actually implemented in combat.
+        // Additional talents (weaving, free actions, social/defensive) are added via migrations.
         List<TalentDefinition> talents = List.of(
-            talent("Nahkampfwaffen",    AttributeType.DEXTERITY,  "Angriffe mit Schwertern, Äxten oder Dolchen",                    true,  true),
-            talent("Projektilwaffen",   AttributeType.DEXTERITY,  "Fernkampfangriffe mit Bögen, Armbrüsten oder Blasrohren",         true,  true),
-            talent("Wurfwaffen",        AttributeType.DEXTERITY,  "Steine, Dolche, Speere oder andere Wurfwaffen schleudern",        true,  true),
-            talent("Waffenloser Kampf", AttributeType.DEXTERITY,  "Angriffe mit Händen, Füßen oder anderen Körperteilen",           true,  true),
-            talent("Spruchzauberei",    AttributeType.PERCEPTION, "Magische Angriffe gegen die MV (Mystische Verteidigung) eines Ziels", true,  true),
-            talent("Ausweichen",        AttributeType.DEXTERITY,  "Verteidigung gegen Angriffe",                                    true,  false),
-            talent("Initiative",        AttributeType.DEXTERITY,  "Initiative verbessern",                                          true,  false),
-            talent("Lufttanz",          AttributeType.DEXTERITY,  "+Rang auf KV (passiv)",                                          false, false),
-            talent("Schlossknacken",    AttributeType.DEXTERITY,  "Schlösser öffnen",                                               true,  false),
-            talent("Schleichen",        AttributeType.DEXTERITY,  "Leise bewegen",                                                  true,  false),
-            talent("Klettern",          AttributeType.DEXTERITY,  "Klettern und Kracken",                                           true,  false),
-            talent("Schwimmen",         AttributeType.STRENGTH,   "Schwimmen",                                                      true,  false),
-            talent("Zähigkeit",         AttributeType.TOUGHNESS,  "+Rang auf Schadenstrack (passiv)",                               false, false),
-            talent("Arkane Waffe",      AttributeType.PERCEPTION, "Magieangriff mit Waffe",                                         true,  false),
-            talent("Fadenmagie",        AttributeType.PERCEPTION, "Magische Fäden weben",                                           true,  false),
-            talent("Erste Hilfe",       AttributeType.PERCEPTION, "Wunden behandeln",                                               true,  false),
-            talent("Tiergespür",        AttributeType.PERCEPTION, "Tiere beruhigen",                                                true,  false),
-            talent("Überzeugung",       AttributeType.CHARISMA,   "NPC überzeugen",                                                 true,  false),
-            talent("Einschüchterung",   AttributeType.CHARISMA,   "Gegner einschüchtern",                                           true,  false),
-            talent("Meditation",        AttributeType.WILLPOWER,  "Karma regenerieren",                                             true,  false),
-            talent("Standhalten",       AttributeType.WILLPOWER,  "Geistige Angriffe abwehren",                                     true,  false),
-            talent("Wissensmagie",      AttributeType.WILLPOWER,  "Zauber mit Wissen verknüpfen",                                   true,  false)
+            talent("Nahkampfwaffen",    AttributeType.DEXTERITY,  "Angriffe mit Schwertern, Äxten oder Dolchen",                        true, true),
+            talent("Projektilwaffen",   AttributeType.DEXTERITY,  "Fernkampfangriffe mit Bögen, Armbrüsten oder Blasrohren",             true, true),
+            talent("Wurfwaffen",        AttributeType.DEXTERITY,  "Steine, Dolche, Speere oder andere Wurfwaffen schleudern",            true, true),
+            talent("Waffenloser Kampf", AttributeType.DEXTERITY,  "Angriffe mit Händen, Füßen oder anderen Körperteilen",               true, true),
+            talent("Spruchzauberei",    AttributeType.PERCEPTION, "Magische Angriffe gegen die MV (Mystische Verteidigung) eines Ziels", true, true),
+            talent("Ausweichen",        AttributeType.DEXTERITY,  "Ausweichen nach einem Treffer (kostet 1 Schaden)",                    true, false)
         );
         talentRepo.saveAll(talents);
     }
@@ -293,35 +338,35 @@ public class DataInitializer {
         List<DisciplineDefinition> disciplines = List.of(
             discipline("Krieger", 8,
                 "Meister des direkten Kampfes, zäh und stark.",
-                List.of("Nahkampfwaffen", "Ausweichen", "Zähigkeit", "Initiative", "Standhalten")),
+                List.of("Nahkampfwaffen", "Ausweichen", "Standhaftigkeit", "Verspotten", "Kampfsinn", "Akrobatische Verteidigung")),
 
             discipline("Pfadsucher", 6,
                 "Kundschafter und Überlebenskünstler der Wildnis.",
-                List.of("Projektilwaffen", "Schleichen", "Klettern", "Tiergespür", "Initiative")),
+                List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung")),
 
             discipline("Dieb", 6,
                 "Geschickter Fingerakrobat und Meister der Heimlichkeit.",
-                List.of("Schlossknacken", "Schleichen", "Ausweichen", "Waffenloser Kampf", "Initiative")),
+                List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Akrobatische Verteidigung", "Ablenken")),
 
             discipline("Elementarist", 6,
                 "Magieanwender der vier klassischen Elemente.",
-                List.of("Spruchzauberei", "Fadenmagie", "Wissensmagie", "Meditation", "Überzeugung")),
+                List.of("Spruchzauberei", "Elementarismus", "Eiserner Wille", "Standhaftigkeit")),
 
             discipline("Nekromant", 6,
                 "Meister der Untotmagie und der Astralwelt.",
-                List.of("Spruchzauberei", "Fadenmagie", "Wissensmagie", "Standhalten", "Meditation")),
+                List.of("Spruchzauberei", "Eiserner Wille", "Standhaftigkeit", "Starrsinn")),
 
             discipline("Illusionist", 6,
                 "Meister der Trugbilder und Verblendung.",
-                List.of("Spruchzauberei", "Fadenmagie", "Überzeugung", "Einschüchterung", "Meditation")),
+                List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken")),
 
             discipline("Schwertkämpfer", 8,
                 "Eleganter Krieger, vereint Kampf und Magie.",
-                List.of("Nahkampfwaffen", "Lufttanz", "Ausweichen", "Arkane Waffe", "Initiative")),
+                List.of("Nahkampfwaffen", "Ausweichen", "Kampfsinn", "Akrobatische Verteidigung", "Standhaftigkeit")),
 
             discipline("Troubadour", 6,
                 "Geschichtenerzähler und sozialer Meister.",
-                List.of("Überzeugung", "Einschüchterung", "Erste Hilfe", "Meditation", "Initiative"))
+                List.of("Verspotten", "Ablenken", "Ausweichen", "Magische Markierung"))
         );
         disciplineRepo.saveAll(disciplines);
     }
