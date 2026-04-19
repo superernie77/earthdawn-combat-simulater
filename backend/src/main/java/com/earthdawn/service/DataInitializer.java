@@ -206,7 +206,7 @@ public class DataInitializer {
             talentRepo.findByName(name).ifPresent(talent -> {
                 // Zuerst alle CharacterTalent-Einträge entfernen (FK-Constraint)
                 entityManager.createNativeQuery(
-                    "DELETE FROM character_talent WHERE talent_definition_id = :id")
+                    "DELETE FROM character_talents WHERE talent_definition_id = :id")
                     .setParameter("id", talent.getId())
                     .executeUpdate();
                 // Dann Talentdefinition löschen
