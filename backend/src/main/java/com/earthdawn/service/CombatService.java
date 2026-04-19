@@ -933,7 +933,6 @@ public class CombatService {
 
         if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
         if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
-        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
 
         // Kombination mit Kampfsinn verboten
         boolean hasCombatSense = actor.getActiveEffects().stream()
@@ -974,7 +973,6 @@ public class CombatService {
         int bonusApplied = successes * 2;
 
         String actorName = actor.getCharacter().getName();
-        actor.setHasActedThisRound(true);
 
         if (success && bonusApplied > 0) {
             ActiveEffect effect = ActiveEffect.builder()

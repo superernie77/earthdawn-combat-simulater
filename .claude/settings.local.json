@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose up:*)",
+      "Bash(./mvnw spring-boot:run:*)",
+      "Bash(npx ng serve:*)"
+    ]
+  }
+}

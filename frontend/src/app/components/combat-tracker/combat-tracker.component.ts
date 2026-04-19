@@ -219,9 +219,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
                   class="combat-option-btn acrobatic-btn"
-                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
                   (click)="openAcrobaticDefenseDialog(c)"
-                  matTooltip="Akrobatische Verteidigung (GES + Rang vs. höchste KV, +2 KV/Erfolg, kostet 1 Schaden)">
+                  matTooltip="Akrobatische Verteidigung · Freie Aktion (GES + Rang vs. höchste KV, +2 KV/Erfolg, kostet 1 Schaden)">
                   <mat-icon>self_improvement</mat-icon>
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasCombatSenseTalent(c) && !c.defeated"
@@ -325,13 +324,13 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <!-- Defense Values -->
             <div class="comb-defense-row">
               <span class="def-stat" matTooltip="KV – Körperliche Verteidigung">
-                <mat-icon>shield</mat-icon> KV {{ pd(c) }}
+                <mat-icon>shield</mat-icon> KV {{ pd(c) }}<span *ngIf="effectivePd(c) !== pd(c)" class="def-modified"> ({{ effectivePd(c) }})</span>
               </span>
               <span class="def-stat mystic" matTooltip="MV – Mystische Verteidigung">
-                <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}
+                <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}<span *ngIf="effectiveSd(c) !== sd(c)" class="def-modified"> ({{ effectiveSd(c) }})</span>
               </span>
               <span class="def-stat social" matTooltip="SV – Soziale Verteidigung">
-                <mat-icon>people</mat-icon> SV {{ socD(c) }}
+                <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
               </span>
               <span class="def-stat armor-phys" matTooltip="Körperliche Rüstung" *ngIf="pa(c) > 0">
                 <mat-icon>security</mat-icon> {{ pa(c) }}
@@ -1771,6 +1770,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       &.armor-phys { color: #a5d6a7; }
       &.armor-myst { color: #ce93d8; }
     }
+    .def-modified { color: #ffcc80; font-weight: 700; }
     .effects-row { display: flex; flex-wrap: wrap; gap: 2px; }
 
     .log-panel { display: flex; flex-direction: column; overflow: hidden; }
@@ -2388,6 +2388,16 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   socD(c: CombatantState): number {
     return c.character.socialDefense ?? Math.floor((c.character.charisma + 3) / 2);
   }
+
+  private effectiveDefense(c: CombatantState, stat: string): number {
+    return (c.activeEffects ?? []).flatMap(e => e.modifiers)
+      .filter(m => m.targetStat === stat && m.operation === 'ADD')
+      .reduce((sum, m) => sum + m.value, 0);
+  }
+
+  effectivePd(c: CombatantState): number { return this.pd(c) + this.effectiveDefense(c, 'PHYSICAL_DEFENSE'); }
+  effectiveSd(c: CombatantState): number { return this.sd(c) + this.effectiveDefense(c, 'SPELL_DEFENSE'); }
+  effectiveSocD(c: CombatantState): number { return this.socD(c) + this.effectiveDefense(c, 'SOCIAL_DEFENSE'); }
 
   pa(c: CombatantState): number {
     const equipBonus = (c.character.equipment ?? []).filter(e => e.type === 'ARMOR').reduce((s, e) => s + (e.physicalArmor ?? 0), 0);
