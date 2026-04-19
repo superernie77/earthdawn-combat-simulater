@@ -227,16 +227,19 @@ public class DataInitializer {
     }
 
     private void migrateDisciplineAccessLists() {
-        java.util.Map<String, java.util.List<String>> accessMap = java.util.Map.of(
-            "Krieger",         java.util.List.of("Nahkampfwaffen", "Ausweichen", "Standhaftigkeit", "Verspotten", "Kampfsinn", "Akrobatische Verteidigung"),
-            "Pfadsucher",      java.util.List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung"),
-            "Dieb",            java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Akrobatische Verteidigung", "Ablenken"),
-            "Elementarist",    java.util.List.of("Spruchzauberei", "Elementarismus", "Eiserner Wille", "Standhaftigkeit"),
-            "Nekromant",       java.util.List.of("Spruchzauberei", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"),
-            "Illusionist",     java.util.List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken"),
-            "Schwertkämpfer",  java.util.List.of("Nahkampfwaffen", "Ausweichen", "Kampfsinn", "Akrobatische Verteidigung", "Standhaftigkeit"),
-            "Troubadour",      java.util.List.of("Verspotten", "Ablenken", "Ausweichen", "Magische Markierung")
-        );
+        // Hinweis: Disziplin-Namen wie sie nach migrateDisciplineBonuses() in der DB stehen
+        java.util.Map<String, java.util.List<String>> accessMap = new java.util.HashMap<>();
+        accessMap.put("Krieger",        java.util.List.of("Nahkampfwaffen", "Ausweichen", "Standhaftigkeit", "Verspotten", "Kampfsinn", "Akrobatische Verteidigung"));
+        accessMap.put("Kundschafter",   java.util.List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung"));
+        accessMap.put("Dieb",           java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Akrobatische Verteidigung", "Ablenken"));
+        accessMap.put("Elementarist",   java.util.List.of("Spruchzauberei", "Elementarismus", "Eiserner Wille", "Standhaftigkeit"));
+        accessMap.put("Magier",         java.util.List.of("Spruchzauberei", "Magie", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"));
+        accessMap.put("Illusionist",    java.util.List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken"));
+        accessMap.put("Schwertmeister", java.util.List.of("Nahkampfwaffen", "Ausweichen", "Kampfsinn", "Akrobatische Verteidigung", "Standhaftigkeit"));
+        accessMap.put("Troubadour",     java.util.List.of("Verspotten", "Ablenken", "Ausweichen", "Magische Markierung"));
+        accessMap.put("Geisterbeschwörer", java.util.List.of("Spruchzauberei", "Geisterbeschwörung", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"));
+        accessMap.put("Bogenschütze",   java.util.List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung"));
+        accessMap.put("Waffenmeister",  java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Standhaftigkeit", "Kampfsinn"));
 
         disciplineRepo.findAll().forEach(d -> {
             java.util.List<String> newList = accessMap.get(d.getName());
