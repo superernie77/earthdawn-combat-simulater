@@ -917,7 +917,8 @@ public class DataInitializer {
                 "'TALENT_TEST','SKILL_TEST','RECOVERY_TEST','INITIATIVE'," +
                 "'EFFECT_ADDED','EFFECT_REMOVED','VALUE_CHANGED','ROUND_CHANGE'," +
                 "'COMBAT_OPTION','FREE_ACTION','DODGE','STAND_UP','AUFSPRINGEN'," +
-                "'THREADWEAVE','SPELL_CAST'))"
+                "'THREADWEAVE','SPELL_CAST','TAUNT','DISTRACT'," +
+                "'ACROBATIC_DEFENSE','COMBAT_SENSE','IRON_WILL'))"
             ).executeUpdate();
             log.info("action_type CHECK-Constraint aktualisiert.");
         } catch (Exception e) {
