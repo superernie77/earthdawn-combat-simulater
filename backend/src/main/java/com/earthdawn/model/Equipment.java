@@ -55,4 +55,12 @@ public class Equipment {
     /** Schild: Bonus auf Mystische Verteidigung (MV) */
     @Builder.Default
     private int mysticDefenseBonus = 0;
+
+    /** Trank: Anzahl im Besitz */
+    @Builder.Default
+    private int quantity = 1;
+
+    /** Trank: Heilungsstufe-Bonus (wird zur Zähigkeitsstufe addiert; z.B. 7 für Heiltrank) */
+    @Builder.Default
+    private int healStep = 0;
 }

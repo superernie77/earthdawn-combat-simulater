@@ -455,6 +455,80 @@ import { ProbeResult } from '../../models/dice.model';
           </div>
         </mat-tab>
 
+        <!-- Tränke -->
+        <mat-tab label="Tränke">
+          <div class="tab-content">
+            <div class="section-title" style="margin-bottom:12px">Tränke &amp; Verbrauchsgegenstände</div>
+
+            <div class="potion-list">
+              <div class="potion-item" *ngFor="let p of potions()">
+                <div class="potion-info">
+                  <mat-icon class="potion-icon">local_drink</mat-icon>
+                  <div>
+                    <div class="potion-name">{{ p.name }}</div>
+                    <div class="potion-formula">Zähigkeitsstufe + {{ p.healStep }} Stufen → heilt LP</div>
+                    <div class="potion-desc" *ngIf="p.description">{{ p.description }}</div>
+                  </div>
+                </div>
+                <div class="potion-qty">
+                  <button mat-icon-button (click)="adjustPotionQty(p, -1)" [disabled]="p.quantity <= 0"><mat-icon>remove</mat-icon></button>
+                  <span class="qty-val">{{ p.quantity }}×</span>
+                  <button mat-icon-button (click)="adjustPotionQty(p, 1)"><mat-icon>add</mat-icon></button>
+                </div>
+                <button mat-raised-button color="accent"
+                  [disabled]="p.quantity <= 0"
+                  (click)="drinkPotion(p)"
+                  matTooltip="Trank trinken: würfelt Heilung und reduziert Schaden">
+                  <mat-icon>healing</mat-icon> Trinken
+                </button>
+                <button mat-icon-button color="warn" (click)="removeEquipment(p)" matTooltip="Entfernen">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              <div class="equip-empty" *ngIf="!potions().length">Keine Tränke im Inventar</div>
+            </div>
+
+            <!-- Letztes Heilungsergebnis -->
+            <div class="heal-result" *ngIf="lastHeal">
+              <mat-icon style="color:#66bb6a">healing</mat-icon>
+              <div>
+                <div class="heal-name">{{ lastHeal.potionName }}</div>
+                <div class="heal-detail">
+                  Stufe {{ lastHeal.step }} ({{ lastHeal.diceExpression }}) → <strong class="heal-amount">{{ lastHeal.amount }} LP geheilt</strong>
+                  <span *ngIf="lastHeal.remaining > 0"> · {{ lastHeal.remaining }} LP verbleibend</span>
+                  <span *ngIf="lastHeal.remaining === 0"> · Vollständig geheilt!</span>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider style="margin:20px 0"></mat-divider>
+
+            <!-- Neuen Trank hinzufügen -->
+            <div class="section-title" style="margin-bottom:8px">Trank hinzufügen</div>
+            <div class="equip-add-form">
+              <mat-form-field appearance="fill" style="flex:2">
+                <mat-label>Name</mat-label>
+                <input matInput [(ngModel)]="newPotion.name" placeholder="z.B. Heiltrank">
+              </mat-form-field>
+              <mat-form-field appearance="fill" style="width:130px" matTooltip="Wird zur Zähigkeitsstufe addiert (Heiltrank = 7)">
+                <mat-label>Heilungsstufen-Bonus</mat-label>
+                <input matInput type="number" [(ngModel)]="newPotion.healStep" min="0">
+              </mat-form-field>
+              <mat-form-field appearance="fill" style="width:90px">
+                <mat-label>Anzahl</mat-label>
+                <input matInput type="number" [(ngModel)]="newPotion.quantity" min="1">
+              </mat-form-field>
+              <mat-form-field appearance="fill" style="flex:3">
+                <mat-label>Beschreibung (optional)</mat-label>
+                <input matInput [(ngModel)]="newPotion.description">
+              </mat-form-field>
+              <button mat-stroked-button [disabled]="!newPotion.name.trim()" (click)="addPotion()">
+                <mat-icon>add</mat-icon> Hinzufügen
+              </button>
+            </div>
+          </div>
+        </mat-tab>
+
         <!-- Notizen -->
         <mat-tab label="Notizen">
           <div class="tab-content">
@@ -609,6 +683,29 @@ import { ProbeResult } from '../../models/dice.model';
     }
     .spell-threads { font-size: 0.78rem; color: #ab47bc; }
     .spell-effect { font-size: 0.78rem; color: #888; font-style: italic; }
+
+    .potion-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .potion-item {
+      display: flex; align-items: center; gap: 12px;
+      background: #1e1a16; border: 1px solid #3a3028; border-radius: 8px; padding: 10px 14px;
+    }
+    .potion-info { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .potion-icon { color: #66bb6a; font-size: 1.8rem; height: 1.8rem; width: 1.8rem; }
+    .potion-name { font-weight: 600; color: #e0d5c0; font-size: 0.95rem; }
+    .potion-formula { font-size: 0.78rem; color: #9c7b3c; }
+    .potion-desc { font-size: 0.75rem; color: #666; font-style: italic; margin-top: 2px; }
+    .potion-qty { display: flex; align-items: center; gap: 4px; }
+    .qty-val { min-width: 28px; text-align: center; font-weight: bold; color: #c9a84c; font-size: 1rem; }
+
+    .heal-result {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(102,187,106,0.08); border: 1px solid rgba(102,187,106,0.3);
+      border-radius: 8px; padding: 12px 16px; margin-top: 12px;
+      mat-icon { font-size: 1.8rem; height: 1.8rem; width: 1.8rem; }
+    }
+    .heal-name { font-weight: 600; color: #e0d5c0; font-size: 0.9rem; }
+    .heal-detail { font-size: 0.85rem; color: #999; margin-top: 2px; }
+    .heal-amount { color: #66bb6a; font-size: 1rem; }
   `]
 })
 export class CharacterSheetComponent implements OnInit {
@@ -627,6 +724,8 @@ export class CharacterSheetComponent implements OnInit {
   newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
+  newPotion: { name: string; healStep: number; quantity: number; description: string } = { name: 'Heiltrank', healStep: 7, quantity: 1, description: '' };
+  lastHeal?: { potionName: string; step: number; diceExpression: string; amount: number; remaining: number };
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
   attributeFields = [
@@ -883,6 +982,10 @@ export class CharacterSheetComponent implements OnInit {
     return (this.character?.equipment ?? []).filter(e => e.type === 'SHIELD');
   }
 
+  potions(): Equipment[] {
+    return (this.character?.equipment ?? []).filter(e => e.type === 'POTION');
+  }
+
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
     const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, description: this.newWeapon.description };
@@ -899,6 +1002,55 @@ export class CharacterSheetComponent implements OnInit {
       this.character = c;
       this.newArmor = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
       this.loadDerived();
+    });
+  }
+
+  addPotion(): void {
+    if (!this.character?.id || !this.newPotion.name.trim()) return;
+    const eq: Equipment = {
+      name: this.newPotion.name.trim(), type: 'POTION',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0,
+      initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0,
+      quantity: this.newPotion.quantity, healStep: this.newPotion.healStep,
+      description: this.newPotion.description
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
+      this.character = c;
+      this.newPotion = { name: 'Heiltrank', healStep: 7, quantity: 1, description: '' };
+    });
+  }
+
+  drinkPotion(potion: Equipment): void {
+    if (!this.character?.id || potion.quantity <= 0) return;
+    const toughnessStep = this.attrToStep(this.character.toughness);
+    const rollStep = toughnessStep + potion.healStep;
+    this.diceService.roll(rollStep).subscribe(result => {
+      const healed = result.total;
+      const before = this.character!.currentDamage;
+      const after = Math.max(0, before - healed);
+      const actualHealed = before - after;
+      this.lastHeal = {
+        potionName: potion.name,
+        step: rollStep,
+        diceExpression: result.diceExpression,
+        amount: actualHealed,
+        remaining: after
+      };
+      // Schaden reduzieren
+      this.characterService.updateField(this.character!.id!, 'damage', -healed).subscribe(c => {
+        this.character = c;
+      });
+      // Anzahl dekrementieren
+      this.adjustPotionQty(potion, -1);
+      this.snack.open(`${potion.name}: ${actualHealed} LP geheilt (Wurf: ${result.total})`, 'OK', { duration: 3000 });
+    });
+  }
+
+  adjustPotionQty(potion: Equipment, delta: number): void {
+    if (!this.character?.id || !potion.id) return;
+    const newQty = Math.max(0, potion.quantity + delta);
+    this.characterService.updateEquipmentQuantity(this.character.id, potion.id, newQty).subscribe(c => {
+      this.character = c;
     });
   }
 
