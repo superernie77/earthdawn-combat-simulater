@@ -204,13 +204,16 @@ public class DataInitializer {
 
         for (String name : toRemove) {
             talentRepo.findByName(name).ifPresent(talent -> {
-                // Zuerst alle CharacterTalent-Einträge entfernen (FK-Constraint)
+                Long id = talent.getId();
+                // Alles nativ löschen — Hibernate-Cascade komplett umgehen
                 entityManager.createNativeQuery(
                     "DELETE FROM character_talents WHERE talent_definition_id = :id")
-                    .setParameter("id", talent.getId())
-                    .executeUpdate();
-                // Dann Talentdefinition löschen
-                talentRepo.delete(talent);
+                    .setParameter("id", id).executeUpdate();
+                entityManager.createNativeQuery(
+                    "DELETE FROM talent_definitions WHERE id = :id")
+                    .setParameter("id", id).executeUpdate();
+                entityManager.flush();
+                entityManager.clear();
                 log.info("Nicht-implementiertes Talent '{}' entfernt.", name);
             });
 
