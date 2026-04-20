@@ -157,6 +157,18 @@ import { ProbeResult } from '../../models/dice.model';
                   <span class="derived-label">{{ d.label }}</span>
                   <span class="derived-val">{{ getDerived(d.key) }}</span>
                 </div>
+
+                <div class="section-title" style="margin-top:14px">Verteidigungs-Boni</div>
+                <div class="defense-bonus-row" *ngFor="let b of defenseBonusFields">
+                  <span class="derived-label">{{ b.label }}</span>
+                  <div class="ctrl-btns">
+                    <button mat-icon-button (click)="adjustField(b.field, -1)"><mat-icon>remove</mat-icon></button>
+                    <span class="bonus-val" [class.positive]="getDefenseBonus(b.field) > 0" [class.negative]="getDefenseBonus(b.field) < 0">
+                      {{ getDefenseBonus(b.field) >= 0 ? '+' : '' }}{{ getDefenseBonus(b.field) }}
+                    </span>
+                    <button mat-icon-button (click)="adjustField(b.field, 1)"><mat-icon>add</mat-icon></button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -317,6 +329,7 @@ import { ProbeResult } from '../../models/dice.model';
                   <div class="equip-stats">
                     <span class="equip-badge armor-phys" matTooltip="Physische Rüstung">{{ e.physicalArmor }} phys.</span>
                     <span class="equip-badge armor-myst" matTooltip="Mystische Rüstung (gegen Zauber)">{{ e.mysticalArmor }} myst.</span>
+                    <span class="equip-badge armor-init" *ngIf="e.initiativePenalty > 0" matTooltip="Initiativemalus der Rüstung">−{{ e.initiativePenalty }} Init.</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
                   <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
@@ -337,6 +350,10 @@ import { ProbeResult } from '../../models/dice.model';
                 <mat-form-field appearance="fill" style="width:130px">
                   <mat-label>Myst. Rüstung</mat-label>
                   <input matInput type="number" [(ngModel)]="newArmor.mysticalArmor" min="0">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:130px" matTooltip="Wird von der Initiativestufe abgezogen">
+                  <mat-label>Init.-Malus</mat-label>
+                  <input matInput type="number" [(ngModel)]="newArmor.initiativePenalty" min="0">
                 </mat-form-field>
                 <mat-form-field appearance="fill" style="flex:3">
                   <mat-label>Beschreibung (optional)</mat-label>
@@ -509,6 +526,17 @@ import { ProbeResult } from '../../models/dice.model';
       &.weapon { background: rgba(255,112,67,0.15); color: #ff7043; }
       &.armor-phys { background: rgba(66,165,245,0.15); color: #42a5f5; }
       &.armor-myst { background: rgba(171,71,188,0.15); color: #ab47bc; }
+      &.armor-init { background: rgba(255,167,38,0.15); color: #ffa726; }
+    }
+
+    .defense-bonus-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 3px 0; border-bottom: 1px solid #2a2520;
+    }
+    .bonus-val {
+      min-width: 36px; text-align: center; font-size: 0.95rem; font-weight: bold; color: #888;
+      &.positive { color: #66bb6a; }
+      &.negative { color: #ef5350; }
     }
     .equip-desc { font-size: 0.78rem; color: #666; font-style: italic; }
     .equip-empty { color: #555; font-size: 0.82rem; font-style: italic; padding: 4px 0 8px; }
@@ -548,7 +576,7 @@ export class CharacterSheetComponent implements OnInit {
   availableSpells: SpellDefinition[] = [];
 
   newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
-  newArmor: { name: string; physicalArmor: number; mysticalArmor: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, description: '' };
+  newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
   attributeFields = [
@@ -571,6 +599,12 @@ export class CharacterSheetComponent implements OnInit {
     { key: 'deathRating', label: 'Todesschwelle' },
     { key: 'initiativeStep', label: 'Initiativestufe' },
     { key: 'recoveryStep', label: 'Erholungsstufe' },
+  ];
+
+  defenseBonusFields = [
+    { field: 'physicalDefenseBonus', label: 'KV-Bonus' },
+    { field: 'spellDefenseBonus',    label: 'MV-Bonus' },
+    { field: 'socialDefenseBonus',   label: 'SV-Bonus' },
   ];
 
   currencies = [
@@ -641,6 +675,9 @@ export class CharacterSheetComponent implements OnInit {
     if (!this.character?.id) return;
     this.characterService.updateField(this.character.id, field, delta).subscribe(c => {
       this.character = c;
+      if (field.endsWith('Bonus') || field === 'dexterity' || field === 'perception' || field === 'charisma') {
+        this.loadDerived();
+      }
     });
   }
 
@@ -676,6 +713,10 @@ export class CharacterSheetComponent implements OnInit {
 
   getDerived(key: string): number {
     return (this.derived as any)?.[key] ?? 0;
+  }
+
+  getDefenseBonus(field: string): number {
+    return (this.character as any)?.[field] ?? 0;
   }
 
   getCurrencyValue(field: string): number {
@@ -790,7 +831,7 @@ export class CharacterSheetComponent implements OnInit {
 
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
-    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, description: this.newWeapon.description };
+    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: this.newWeapon.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
       this.newWeapon = { name: '', damageBonus: 0, description: '' };
@@ -799,10 +840,10 @@ export class CharacterSheetComponent implements OnInit {
 
   addArmor(): void {
     if (!this.character?.id || !this.newArmor.name.trim()) return;
-    const eq: Equipment = { name: this.newArmor.name.trim(), type: 'ARMOR', damageBonus: 0, physicalArmor: this.newArmor.physicalArmor, mysticalArmor: this.newArmor.mysticalArmor, description: this.newArmor.description };
+    const eq: Equipment = { name: this.newArmor.name.trim(), type: 'ARMOR', damageBonus: 0, physicalArmor: this.newArmor.physicalArmor, mysticalArmor: this.newArmor.mysticalArmor, initiativePenalty: this.newArmor.initiativePenalty, description: this.newArmor.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newArmor = { name: '', physicalArmor: 0, mysticalArmor: 0, description: '' };
+      this.newArmor = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
     });
   }
 

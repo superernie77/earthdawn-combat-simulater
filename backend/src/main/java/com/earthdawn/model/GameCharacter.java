@@ -42,6 +42,14 @@ public class GameCharacter {
     private Integer spellDefense;
     private Integer socialDefense;
     private Integer woundThreshold;
+
+    // --- Konfigurierbarer Bonus (addiert auf berechneten/Override-Wert) ---
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int physicalDefenseBonus = 0;
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int spellDefenseBonus = 0;
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int socialDefenseBonus = 0;
     private Integer unconsciousnessRating;
     private Integer deathRating;
     private Integer physicalArmor;

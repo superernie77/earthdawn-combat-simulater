@@ -53,6 +53,9 @@ public class CharacterService {
         existing.setPhysicalDefense(updated.getPhysicalDefense());
         existing.setSpellDefense(updated.getSpellDefense());
         existing.setSocialDefense(updated.getSocialDefense());
+        existing.setPhysicalDefenseBonus(updated.getPhysicalDefenseBonus());
+        existing.setSpellDefenseBonus(updated.getSpellDefenseBonus());
+        existing.setSocialDefenseBonus(updated.getSocialDefenseBonus());
         existing.setWoundThreshold(updated.getWoundThreshold());
         existing.setUnconsciousnessRating(updated.getUnconsciousnessRating());
         existing.setDeathRating(updated.getDeathRating());
@@ -97,14 +100,17 @@ public class CharacterService {
             case "karmaMax"      -> c.getKarmaMax();
             case "damage"        -> c.getCurrentDamage();
             case "wounds"        -> c.getWounds();
-            case "circle"        -> c.getCircle();
-            case "dexterity"     -> c.getDexterity();
-            case "strength"      -> c.getStrength();
-            case "toughness"     -> c.getToughness();
-            case "perception"    -> c.getPerception();
-            case "willpower"     -> c.getWillpower();
-            case "charisma"      -> c.getCharisma();
-            default              -> 0;
+            case "circle"                -> c.getCircle();
+            case "dexterity"             -> c.getDexterity();
+            case "strength"              -> c.getStrength();
+            case "toughness"             -> c.getToughness();
+            case "perception"            -> c.getPerception();
+            case "willpower"             -> c.getWillpower();
+            case "charisma"              -> c.getCharisma();
+            case "physicalDefenseBonus"  -> c.getPhysicalDefenseBonus();
+            case "spellDefenseBonus"     -> c.getSpellDefenseBonus();
+            case "socialDefenseBonus"    -> c.getSocialDefenseBonus();
+            default                      -> 0;
         };
     }
 
@@ -118,13 +124,16 @@ public class CharacterService {
             case "damage"        -> c.setCurrentDamage(Math.max(0, value));
             case "wounds"        -> c.setWounds(Math.max(0, value));
             case "circle"        -> c.setCircle(Math.max(1, value));
-            case "dexterity"     -> c.setDexterity(Math.max(1, value));
-            case "strength"      -> c.setStrength(Math.max(1, value));
-            case "toughness"     -> c.setToughness(Math.max(1, value));
-            case "perception"    -> c.setPerception(Math.max(1, value));
-            case "willpower"     -> c.setWillpower(Math.max(1, value));
-            case "charisma"      -> c.setCharisma(Math.max(1, value));
-            case "notes"         -> {} // notes werden als String separat behandelt
+            case "dexterity"             -> c.setDexterity(Math.max(1, value));
+            case "strength"              -> c.setStrength(Math.max(1, value));
+            case "toughness"             -> c.setToughness(Math.max(1, value));
+            case "perception"            -> c.setPerception(Math.max(1, value));
+            case "willpower"             -> c.setWillpower(Math.max(1, value));
+            case "charisma"              -> c.setCharisma(Math.max(1, value));
+            case "physicalDefenseBonus"  -> c.setPhysicalDefenseBonus(value);
+            case "spellDefenseBonus"     -> c.setSpellDefenseBonus(value);
+            case "socialDefenseBonus"    -> c.setSocialDefenseBonus(value);
+            case "notes"                 -> {} // notes werden als String separat behandelt
         }
     }
 

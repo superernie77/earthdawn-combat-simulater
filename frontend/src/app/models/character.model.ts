@@ -50,6 +50,7 @@ export interface Equipment {
   damageBonus: number;
   physicalArmor: number;
   mysticalArmor: number;
+  initiativePenalty: number;
 }
 
 export interface SpellDefinition {
@@ -102,6 +103,11 @@ export interface Character {
   deathRating?: number;
   physicalArmor?: number;
   mysticArmor?: number;
+
+  // Konfigurierbarer Bonus auf Verteidigungswerte
+  physicalDefenseBonus: number;
+  spellDefenseBonus: number;
+  socialDefenseBonus: number;
 
   // Waffe
   weaponName: string;
@@ -166,6 +172,9 @@ export function emptyCharacter(): Character {
     currentDamage: 0,
     wounds: 0,
     notes: '',
+    physicalDefenseBonus: 0,
+    spellDefenseBonus: 0,
+    socialDefenseBonus: 0,
     talents: [],
     skills: [],
     equipment: [],

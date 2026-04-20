@@ -43,4 +43,8 @@ public class Equipment {
     /** Rüstung: Mystische Rüstung (gegen Zauber) */
     @Builder.Default
     private int mysticalArmor = 0;
+
+    /** Rüstung: Initiativemalus (schwere Rüstungen verlangsamen den Träger) */
+    @Builder.Default
+    private int initiativePenalty = 0;
 }

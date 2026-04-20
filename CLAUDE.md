@@ -72,6 +72,10 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 - **Eiserner Wille**: Freie Aktion. WIL-Step + Rang vs. Zauberwurf des Angreifers (manuell eingegeben). Bei Erfolg: jüngster negativer Zaubereffekt entfernt.
 - **Ausweichen**: Nach Treffer. DEX-Step + Rang vs. Angriffswurf. Kostet 1 Schaden.
 
+## Character Sheet — Configurable Bonuses
+- **Defense bonuses**: `physicalDefenseBonus`, `spellDefenseBonus`, `socialDefenseBonus` (int, default 0) on `GameCharacter` — added on top of the formula/override value in `ModifierAggregator`. Editable via +/− steppers in the "Verteidigungs-Boni" section on the Attribute tab.
+- **Armor initiative penalty**: `initiativePenalty` field on `Equipment` (int, default 0) — automatically subtracted from `INITIATIVE_STEP` in `ModifierAggregator`. Entered when adding armor; shown as orange badge.
+
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
 - `targetStat`: which stat is modified (PHYSICAL_DEFENSE, ATTACK_STEP, INITIATIVE_STEP, MYSTIC_ARMOR, etc.)

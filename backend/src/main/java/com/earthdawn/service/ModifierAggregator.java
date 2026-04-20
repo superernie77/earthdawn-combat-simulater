@@ -65,14 +65,15 @@ public class ModifierAggregator {
     public int getBaseValue(CombatantState combatant, StatType stat) {
         GameCharacter c = combatant.getCharacter();
         return switch (stat) {
-            case PHYSICAL_DEFENSE     -> computeOrOverride(c.getPhysicalDefense(),     (c.getDexterity() + 3) / 2);
-            case SPELL_DEFENSE        -> computeOrOverride(c.getSpellDefense(),        (c.getPerception() + 3) / 2);
-            case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2);
+            case PHYSICAL_DEFENSE     -> computeOrOverride(c.getPhysicalDefense(),     (c.getDexterity() + 3) / 2) + c.getPhysicalDefenseBonus();
+            case SPELL_DEFENSE        -> computeOrOverride(c.getSpellDefense(),        (c.getPerception() + 3) / 2) + c.getSpellDefenseBonus();
+            case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2) + c.getSocialDefenseBonus();
             case PHYSICAL_ARMOR       -> computeOrOverride(c.getPhysicalArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getPhysicalArmor).sum();
             case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getMysticalArmor).sum();
-            case INITIATIVE_STEP      -> Math.max(1, stepRoll.attributeToStep(c.getDexterity()) - combatant.getWounds());
+            case INITIATIVE_STEP      -> Math.max(1, stepRoll.attributeToStep(c.getDexterity()) - combatant.getWounds()
+                    - c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getInitiativePenalty).sum());
             case ATTACK_STEP          -> Math.max(1, stepRoll.attributeToStep(c.getDexterity()) - combatant.getWounds());
             case DAMAGE_STEP          -> Math.max(1, stepRoll.attributeToStep(c.getStrength())  - combatant.getWounds());
             case WOUND_THRESHOLD      -> computeOrOverride(c.getWoundThreshold(),      (c.getToughness() / 2) + 4);
@@ -87,14 +88,15 @@ public class ModifierAggregator {
     /** Berechnet DerivedStats direkt vom Charakter (ohne CombatantState). */
     public int getBaseValueFromCharacter(GameCharacter c, StatType stat) {
         return switch (stat) {
-            case PHYSICAL_DEFENSE     -> computeOrOverride(c.getPhysicalDefense(),     (c.getDexterity() + 3) / 2);
-            case SPELL_DEFENSE        -> computeOrOverride(c.getSpellDefense(),        (c.getPerception() + 3) / 2);
-            case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2);
+            case PHYSICAL_DEFENSE     -> computeOrOverride(c.getPhysicalDefense(),     (c.getDexterity() + 3) / 2) + c.getPhysicalDefenseBonus();
+            case SPELL_DEFENSE        -> computeOrOverride(c.getSpellDefense(),        (c.getPerception() + 3) / 2) + c.getSpellDefenseBonus();
+            case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2) + c.getSocialDefenseBonus();
             case PHYSICAL_ARMOR       -> computeOrOverride(c.getPhysicalArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getPhysicalArmor).sum();
             case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getMysticalArmor).sum();
-            case INITIATIVE_STEP      -> stepRoll.attributeToStep(c.getDexterity());
+            case INITIATIVE_STEP      -> Math.max(1, stepRoll.attributeToStep(c.getDexterity())
+                    - c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getInitiativePenalty).sum());
             case ATTACK_STEP          -> stepRoll.attributeToStep(c.getDexterity());
             case DAMAGE_STEP          -> stepRoll.attributeToStep(c.getStrength());
             case WOUND_THRESHOLD      -> computeOrOverride(c.getWoundThreshold(),      (c.getToughness() / 2) + 4);
