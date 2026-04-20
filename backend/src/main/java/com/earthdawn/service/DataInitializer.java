@@ -46,6 +46,7 @@ public class DataInitializer {
             migrateIllusionistSpells();
             migrateGeisterbeschwoererSpells();
             cleanupUnimplementedTalents();
+            migrateExtraSuccessEffects();
             return;
         }
         log.info("Initialisiere Earthdawn Referenzdaten...");
@@ -188,6 +189,52 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Eiserner Wille' hinzugefügt.");
         }
+    }
+
+    /**
+     * Idempotente Migration: setzt extraSuccessEffect für alle Zauber gemäß Spreadsheet.
+     * DAMAGE  = +2 Schadensstufe pro Übererfolg
+     * DURATION = Dauer verlängert sich (wird nur im Log angezeigt)
+     * TARGET   = zusätzliches Ziel (nicht mechanisch umgesetzt)
+     * NONE     = kein Effekt
+     */
+    private void migrateExtraSuccessEffects() {
+        // Schadenszauber MIT Schaden+2 pro Übererfolg
+        java.util.List<String> damageExtra = java.util.List.of(
+            "Blitz", "Phantomflamme", "Phantomfeuerball",
+            "Echte Geschosse", "Illusionäre Geschosse", "Vorgezeichneter Weg",
+            // Elementarist / Geisterbeschwörer — direkte Schadenszauber
+            "Flammenpfeil", "Eisnadeln", "Feuerball", "Erdbeben",
+            "Geisterdolch", "Geisterpfeil", "Lebensraub", "Todeshauch",
+            "Astralspeer", "Knochensplitter", "Astralmaul", "Knochenbrechung",
+            "Astralfeuer", "Astralsturm", "Gewichtslosigkeit"
+        );
+        // Schadenszauber mit Dauer-Übererfolg (kein Damage-Bonus)
+        java.util.List<String> durationExtra = java.util.List.of(
+            "Illusionärer Blitz", "Ersticken", "Suggestive Stimme",
+            "Tanzender Drache", "Gedächtnisnotiz", "Band der Verschwiegenheit",
+            "Halt, Stehenbleiben", "Gedankennebel", "Rebellische Gliedmaße",
+            "Astralkettenblitz", "Geistersturm", "Astrallanze"
+        );
+        // Schadenszauber mit Zusätzliches-Ziel-Übererfolg
+        java.util.List<String> targetExtra = java.util.List.of("Phantomblitzschlag");
+
+        for (String name : damageExtra) {
+            spellRepo.findAll().stream()
+                .filter(s -> s.getName().equals(name) && !"DAMAGE".equals(s.getExtraSuccessEffect()))
+                .forEach(s -> { s.setExtraSuccessEffect("DAMAGE"); spellRepo.save(s); });
+        }
+        for (String name : durationExtra) {
+            spellRepo.findAll().stream()
+                .filter(s -> s.getName().equals(name) && !"DURATION".equals(s.getExtraSuccessEffect()))
+                .forEach(s -> { s.setExtraSuccessEffect("DURATION"); spellRepo.save(s); });
+        }
+        for (String name : targetExtra) {
+            spellRepo.findAll().stream()
+                .filter(s -> s.getName().equals(name) && !"TARGET".equals(s.getExtraSuccessEffect()))
+                .forEach(s -> { s.setExtraSuccessEffect("TARGET"); spellRepo.save(s); });
+        }
+        log.info("extraSuccessEffect für Zauber migriert.");
     }
 
     /**

@@ -245,7 +245,8 @@ public class SpellService {
         if (target == null) throw new IllegalStateException("Schadenszauber benötigt ein Ziel.");
 
         int wilStep = Math.max(1, diceService.attributeToStep(caster.getCharacter().getWillpower()) - caster.getWounds());
-        int damageStep = spell.getEffectStep() + wilStep + extraSuccesses * 2;
+        int damageBonus = "DAMAGE".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
+        int damageStep = spell.getEffectStep() + wilStep + damageBonus;
         RollResult damageRoll = diceService.roll(damageStep);
 
         StatType armorStat = spell.isUseMysticArmor() ? StatType.MYSTIC_ARMOR : StatType.PHYSICAL_ARMOR;

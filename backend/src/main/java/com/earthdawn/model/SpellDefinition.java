@@ -75,4 +75,15 @@ public class SpellDefinition {
     /** Kurzbeschreibung des Effekts für Kampflog */
     @Column(length = 200)
     private String effectDescription;
+
+    /**
+     * Was passiert bei Übererfolgen?
+     * "DAMAGE"   → +2 Schadensstufe pro Übererfolg (Standard für Schadenszauber)
+     * "DURATION" → Dauer verlängert sich (2 Runden/Min pro Übererfolg — wird im Log angezeigt)
+     * "TARGET"   → zusätzliches Ziel pro Übererfolg (nicht mechanisch umgesetzt)
+     * "NONE"     → kein Bonus
+     */
+    @Builder.Default
+    @Column(length = 20)
+    private String extraSuccessEffect = "NONE";
 }
