@@ -199,22 +199,24 @@ public class DataInitializer {
      * NONE     = kein Effekt
      */
     private void migrateExtraSuccessEffects() {
-        // Schadenszauber MIT Schaden+2 pro Übererfolg
+        // Schadenszauber MIT Schaden+2 pro Übererfolg (Wirkungsstufe +2 laut Tabelle)
         java.util.List<String> damageExtra = java.util.List.of(
+            // Illusionist
             "Blitz", "Phantomflamme", "Phantomfeuerball",
             "Echte Geschosse", "Illusionäre Geschosse", "Vorgezeichneter Weg",
-            // Elementarist / Geisterbeschwörer — direkte Schadenszauber
+            // Elementarist (keine Tabelle vorhanden — Standardannahme für reine Schadenszauber)
             "Flammenpfeil", "Eisnadeln", "Feuerball", "Erdbeben",
-            "Geisterdolch", "Geisterpfeil", "Lebensraub", "Todeshauch",
-            "Astralspeer", "Knochensplitter", "Astralmaul", "Knochenbrechung",
-            "Astralfeuer", "Astralsturm", "Gewichtslosigkeit"
+            // Geisterbeschwörer laut Tabelle (Wirkungsstufe +2)
+            "Astralspeer", "Augenblick des Todes", "Staub zu Staub", "Verdorren"
         );
         // Schadenszauber mit Dauer-Übererfolg (kein Damage-Bonus)
         java.util.List<String> durationExtra = java.util.List.of(
+            // Illusionist
             "Illusionärer Blitz", "Ersticken", "Suggestive Stimme",
             "Tanzender Drache", "Gedächtnisnotiz", "Band der Verschwiegenheit",
             "Halt, Stehenbleiben", "Gedankennebel", "Rebellische Gliedmaße",
-            "Astralkettenblitz", "Geistersturm", "Astrallanze"
+            // Geisterbeschwörer laut Tabelle (Wirkungsdauer verlängern)
+            "Kreis der Kälte", "Astralschlund", "Herzbeklemmung", "Üble Dämpfe"
         );
         // Schadenszauber mit Zusätzliches-Ziel-Übererfolg
         java.util.List<String> targetExtra = java.util.List.of("Phantomblitzschlag");
