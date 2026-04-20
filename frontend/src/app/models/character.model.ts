@@ -40,7 +40,7 @@ export interface CharacterSkill {
   rank: number;
 }
 
-export type EquipmentType = 'WEAPON' | 'ARMOR';
+export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD';
 
 export interface Equipment {
   id?: number;
@@ -51,6 +51,8 @@ export interface Equipment {
   physicalArmor: number;
   mysticalArmor: number;
   initiativePenalty: number;
+  physicalDefenseBonus: number;
+  mysticDefenseBonus: number;
 }
 
 export interface SpellDefinition {

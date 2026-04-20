@@ -44,7 +44,15 @@ public class Equipment {
     @Builder.Default
     private int mysticalArmor = 0;
 
-    /** Rüstung: Initiativemalus (schwere Rüstungen verlangsamen den Träger) */
+    /** Rüstung/Schild: Initiativemalus */
     @Builder.Default
     private int initiativePenalty = 0;
+
+    /** Schild: Bonus auf Körperliche Verteidigung (KV) */
+    @Builder.Default
+    private int physicalDefenseBonus = 0;
+
+    /** Schild: Bonus auf Mystische Verteidigung (MV) */
+    @Builder.Default
+    private int mysticDefenseBonus = 0;
 }
