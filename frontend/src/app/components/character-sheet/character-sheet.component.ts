@@ -988,7 +988,7 @@ export class CharacterSheetComponent implements OnInit {
 
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
-    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, description: this.newWeapon.description };
+    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, description: this.newWeapon.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
       this.newWeapon = { name: '', damageBonus: 0, description: '' };
@@ -997,7 +997,7 @@ export class CharacterSheetComponent implements OnInit {
 
   addArmor(): void {
     if (!this.character?.id || !this.newArmor.name.trim()) return;
-    const eq: Equipment = { name: this.newArmor.name.trim(), type: 'ARMOR', damageBonus: 0, physicalArmor: this.newArmor.physicalArmor, mysticalArmor: this.newArmor.mysticalArmor, initiativePenalty: this.newArmor.initiativePenalty, physicalDefenseBonus: 0, mysticDefenseBonus: 0, description: this.newArmor.description };
+    const eq: Equipment = { name: this.newArmor.name.trim(), type: 'ARMOR', damageBonus: 0, physicalArmor: this.newArmor.physicalArmor, mysticalArmor: this.newArmor.mysticalArmor, initiativePenalty: this.newArmor.initiativePenalty, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, description: this.newArmor.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
       this.newArmor = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
@@ -1056,7 +1056,7 @@ export class CharacterSheetComponent implements OnInit {
 
   addShield(): void {
     if (!this.character?.id || !this.newShield.name.trim()) return;
-    const eq: Equipment = { name: this.newShield.name.trim(), type: 'SHIELD', damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: this.newShield.initiativePenalty, physicalDefenseBonus: this.newShield.physicalDefenseBonus, mysticDefenseBonus: this.newShield.mysticDefenseBonus, description: this.newShield.description };
+    const eq: Equipment = { name: this.newShield.name.trim(), type: 'SHIELD', damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: this.newShield.initiativePenalty, physicalDefenseBonus: this.newShield.physicalDefenseBonus, mysticDefenseBonus: this.newShield.mysticDefenseBonus, quantity: 1, healStep: 0, description: this.newShield.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
       this.newShield = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
