@@ -21,7 +21,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://earthdawn-db:5432/earthdawn
       SPRING_DATASOURCE_USERNAME: earthdawn
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "1"
       SERVER_PORT: 8081
     depends_on:
       - earthdawn-db
