@@ -204,11 +204,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Aktion benutzen (Sonstiges)">
                   <mat-icon>auto_awesome</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && freeActionTalentsOf(c).length > 0"
-                  class="combat-option-btn free-action" [disabled]="c.defeated"
-                  (click)="openFreeActionDialog(c)"
-                  matTooltip="Freie Kampfaktion einsetzen">
-                  <mat-icon>bolt</mat-icon>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasMagischeMarkierungTalent(c) && !c.defeated"
+                  class="combat-option-btn magische-markierung-btn"
+                  (click)="openMagischeMarkierungDialog(c)"
+                  matTooltip="Magische Markierung · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 Angriff/Übererfolg für Fernkampf, kostet 1 Schaden)">
+                  <mat-icon>gps_fixed</mat-icon>
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTauntTalent(c) && !c.defeated"
                   class="combat-option-btn taunt-btn"
@@ -684,62 +684,57 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
-    <!-- Free Action Dialog -->
-    <div class="attack-dialog" *ngIf="freeActionDialog.open">
-      <div class="dialog-backdrop" (click)="freeActionDialog.open = false"></div>
+    <!-- Magische Markierung Dialog -->
+    <div class="attack-dialog" *ngIf="magischeMarkierungDialog.open">
+      <div class="dialog-backdrop" (click)="magischeMarkierungDialog.open = false"></div>
       <div class="dialog-box">
-        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#c9a84c">bolt</mat-icon>Freie Aktion: {{ freeActionDialog.actor?.character?.name }}</h3>
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ce93d8">gps_fixed</mat-icon>Magische Markierung: {{ magischeMarkierungDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WAH + Rang vs. MV des Ziels · +2 Fernkampf-Angriff/Übererfolg (auf Anwender) · Freie Aktion
+        </div>
         <mat-form-field appearance="fill" style="width:100%">
-          <mat-label>Talent</mat-label>
-          <mat-select [(ngModel)]="freeActionDialog.talentId" (ngModelChange)="onFreeActionTalentChange()">
-            <mat-option *ngFor="let t of freeActionTalentsOf(freeActionDialog.actor)" [value]="t.talentDefinition.id">
-              {{ t.talentDefinition.name }} (Rang {{ t.rank }})
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="fill" style="width:100%" *ngIf="freeActionNeedsTarget()">
           <mat-label>Ziel</mat-label>
-          <mat-select [(ngModel)]="freeActionDialog.targetId">
-            <mat-option *ngFor="let c of freeActionTargets()" [value]="c.id">
-              {{ c.character.name }}
+          <mat-select [(ngModel)]="magischeMarkierungDialog.targetId">
+            <mat-option *ngFor="let c of magischeMarkierungTargets()" [value]="c.id">
+              {{ c.character.name }} (MV {{ sd(c) }})
             </mat-option>
           </mat-select>
         </mat-form-field>
-        <div class="fa-cost-badge" *ngIf="freeActionDamageCost() > 0">
-          <mat-icon>warning</mat-icon> Kostet {{ freeActionDamageCost() }} Schaden
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
           <label class="karma-toggle"
-            [class.active]="freeActionDialog.spendKarma"
-            [class.disabled]="(freeActionDialog.actor?.currentKarma ?? 0) <= 0"
-            (click)="(freeActionDialog.actor?.currentKarma ?? 0) > 0 && (freeActionDialog.spendKarma = !freeActionDialog.spendKarma)">
+            [class.active]="magischeMarkierungDialog.spendKarma"
+            [class.disabled]="(magischeMarkierungDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(magischeMarkierungDialog.actor?.currentKarma ?? 0) > 0 && (magischeMarkierungDialog.spendKarma = !magischeMarkierungDialog.spendKarma)">
             <mat-icon>auto_awesome</mat-icon>
             Karma
-            <span class="karma-count-badge" [class.empty]="(freeActionDialog.actor?.currentKarma ?? 0) <= 0">
-              {{ freeActionDialog.actor?.currentKarma ?? 0 }}
+            <span class="karma-count-badge" [class.empty]="(magischeMarkierungDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ magischeMarkierungDialog.actor?.currentKarma ?? 0 }}
             </span>
           </label>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
-          <button mat-stroked-button (click)="freeActionDialog.open = false">Abbrechen</button>
-          <button mat-raised-button color="warn" (click)="performFreeAction()" [disabled]="!freeActionDialog.talentId">
-            <mat-icon>bolt</mat-icon> Ausführen
+          <button mat-stroked-button (click)="magischeMarkierungDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performMagischeMarkierung()" [disabled]="!magischeMarkierungDialog.targetId">
+            <mat-icon>gps_fixed</mat-icon> Markieren
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Free Action Result Modal -->
-    <div class="result-modal" *ngIf="freeActionModal.open">
-      <div class="dialog-backdrop" (click)="freeActionModal.open = false"></div>
-      <div class="dialog-box result-box" *ngIf="freeActionModal.result as r">
+    <!-- Magische Markierung Result Modal -->
+    <div class="result-modal" *ngIf="magischeMarkierungModal.open">
+      <div class="dialog-backdrop" (click)="magischeMarkierungModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="magischeMarkierungModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
-          <mat-icon>{{ r.success ? 'auto_fix_high' : 'close' }}</mat-icon>
-          {{ r.success ? 'ERFOLG' : 'FEHLSCHLAG' }}
+          <mat-icon>{{ r.success ? 'gps_fixed' : 'close' }}</mat-icon>
+          {{ r.success ? 'MARKIERT' : 'FEHLSCHLAG' }}
         </div>
         <div class="result-names">
           <span class="result-actor">{{ r.actorName }}</span>
-          <span style="color:#c9a84c;font-weight:600;margin:0 6px">{{ r.talentName }}</span>
+          <span style="color:#ce93d8;font-weight:600;margin:0 6px">Magische Markierung</span>
           <ng-container *ngIf="r.targetName">
             <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
             <span class="result-target">{{ r.targetName }}</span>
@@ -751,10 +746,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               <span class="roll-block-label">Probe · Step {{ r.rollStep }}</span>
               <div class="roll-block-totals">
                 <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
-                <ng-container *ngIf="r.defenseValue > 0">
-                  <span class="roll-big-vs">vs</span>
-                  <span class="roll-big-target">KV {{ r.defenseValue }}</span>
-                </ng-container>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">MV {{ r.defenseValue }}</span>
               </div>
             </div>
             <div class="dice-breakdown-mini">
@@ -773,11 +766,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="roll-divider"></div>
             <div class="roll-row extra-success-row" *ngIf="r.extraSuccesses > 0">
               <span class="roll-label">Übererfolge</span>
-              <span class="roll-expr">{{ r.extraSuccesses }}×</span>
+              <span class="roll-expr">{{ r.extraSuccesses }}× → +{{ r.extraSuccesses * 2 }} Fernkampf-Angriff</span>
               <span class="roll-value extra-success">{{ r.extraSuccesses }}</span>
             </div>
-            <div class="wound-banner" *ngIf="r.effectApplied">
-              <mat-icon>auto_fix_high</mat-icon> Effekt angewandt!
+            <div class="taunt-effect-banner" style="background:rgba(206,147,216,0.12);border-color:#ce93d8;color:#ce93d8" *ngIf="r.effectApplied">
+              <mat-icon>gps_fixed</mat-icon>
+              +{{ r.extraSuccesses * 2 }} Fernkampf-Angriff bis Rundenende
             </div>
           </ng-container>
           <div class="roll-row" *ngIf="r.damageTaken > 0" style="background:rgba(239,83,80,0.08);margin-top:8px">
@@ -786,7 +780,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="freeActionModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="magischeMarkierungModal.open = false">
           Schließen
         </button>
       </div>
@@ -1720,8 +1714,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       mat-icon { font-size: 16px; height: 16px; width: 16px; }
       &.aggressive.active { border-color: #ff7043; color: #ff7043; background: rgba(255,112,67,0.1); }
       &.defensive.active { border-color: #42a5f5; color: #42a5f5; background: rgba(66,165,245,0.1); }
-      &.free-action { border-color: #3a3028; color: #c9a84c; }
-      &.free-action:not([disabled]):hover { border-color: #c9a84c; background: rgba(201,168,76,0.1); }
+      &.magische-markierung-btn { border-color: #3a1a40; color: #ce93d8; }
+      &.magische-markierung-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
       &.active { border-color: #ff6d00; color: #ff6d00; background: rgba(255,109,0,0.1); }
       &:hover { border-color: #ff6d00; color: #ff6d00; }
     }
@@ -2040,16 +2034,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     negative: boolean;
   } = { open: false, name: '', description: '', rounds: -1, negative: false };
 
-  freeActionDialog: {
+  magischeMarkierungDialog: {
     open: boolean;
     actor?: CombatantState;
-    talentId?: number;
     targetId?: number;
-    bonusSteps: number;
     spendKarma: boolean;
-  } = { open: false, bonusSteps: 0, spendKarma: false };
+  } = { open: false, spendKarma: false };
 
-  freeActionModal: { open: boolean; result?: FreeActionResult } = { open: false };
+  magischeMarkierungModal: { open: boolean; result?: FreeActionResult } = { open: false };
 
   dodgeDialog: {
     open: boolean;
@@ -2301,10 +2293,6 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return (this.session?.combatants ?? []).filter(c => c.id !== this.attackDialog.attacker?.id && !c.defeated);
   }
 
-  freeActionTargets(): CombatantState[] {
-    return (this.session?.combatants ?? []).filter(c => c.id !== this.freeActionDialog.actor?.id && !c.defeated);
-  }
-
   attackTalentsOf(c?: CombatantState) {
     return (c?.character.talents ?? []).filter(t => t.talentDefinition.attackTalent).sort((a, b) => b.rank - a.rank);
   }
@@ -2378,15 +2366,24 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   pd(c: CombatantState): number {
-    return c.character.physicalDefense ?? Math.floor((c.character.dexterity + 3) / 2);
+    const base = c.character.physicalDefense ?? Math.floor((c.character.dexterity + 3) / 2);
+    const shieldBonus = (c.character.equipment ?? [])
+      .filter(e => e.type === 'SHIELD')
+      .reduce((sum, e) => sum + (e.physicalDefenseBonus ?? 0), 0);
+    return base + (c.character.physicalDefenseBonus ?? 0) + shieldBonus;
   }
 
   sd(c: CombatantState): number {
-    return c.character.spellDefense ?? Math.floor((c.character.perception + 3) / 2);
+    const base = c.character.spellDefense ?? Math.floor((c.character.perception + 3) / 2);
+    const shieldBonus = (c.character.equipment ?? [])
+      .filter(e => e.type === 'SHIELD')
+      .reduce((sum, e) => sum + (e.mysticDefenseBonus ?? 0), 0);
+    return base + (c.character.spellDefenseBonus ?? 0) + shieldBonus;
   }
 
   socD(c: CombatantState): number {
-    return c.character.socialDefense ?? Math.floor((c.character.charisma + 3) / 2);
+    return (c.character.socialDefense ?? Math.floor((c.character.charisma + 3) / 2))
+      + (c.character.socialDefenseBonus ?? 0);
   }
 
   private effectiveDefense(c: CombatantState, stat: string): number {
@@ -2483,57 +2480,37 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     });
   }
 
-  freeActionTalentsOf(c?: CombatantState) {
-    return (c?.character.talents ?? []).filter(t => t.talentDefinition.freeAction);
+  hasMagischeMarkierungTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Magische Markierung');
   }
 
-  openFreeActionDialog(actor: CombatantState): void {
-    const firstTalent = this.freeActionTalentsOf(actor)[0];
-    this.freeActionDialog = {
-      open: true,
-      actor,
-      talentId: firstTalent?.talentDefinition.id,
-      targetId: undefined,
-      bonusSteps: 0,
-      spendKarma: false
-    };
+  magischeMarkierungTargets(): CombatantState[] {
+    return (this.session?.combatants ?? [])
+      .filter(c => c.id !== this.magischeMarkierungDialog.actor?.id && !c.defeated);
   }
 
-  onFreeActionTalentChange(): void {
-    // Reset target when talent changes, since new talent may have different target type
-    this.freeActionDialog.targetId = undefined;
+  openMagischeMarkierungDialog(actor: CombatantState): void {
+    this.magischeMarkierungDialog = { open: true, actor, targetId: undefined, spendKarma: false };
   }
 
-  private selectedFreeActionTalent() {
-    if (!this.freeActionDialog.actor || !this.freeActionDialog.talentId) return undefined;
-    return this.freeActionTalentsOf(this.freeActionDialog.actor)
-      .find(t => t.talentDefinition.id === this.freeActionDialog.talentId)
-      ?.talentDefinition;
-  }
-
-  freeActionNeedsTarget(): boolean {
-    const td = this.selectedFreeActionTalent();
-    return td != null && !!td.freeActionTestStat;
-  }
-
-  freeActionDamageCost(): number {
-    return this.selectedFreeActionTalent()?.freeActionDamageCost ?? 0;
-  }
-
-  performFreeAction(): void {
-    if (!this.session || !this.freeActionDialog.actor || !this.freeActionDialog.talentId) return;
+  performMagischeMarkierung(): void {
+    const actor = this.magischeMarkierungDialog.actor;
+    if (!this.session || !actor || !this.magischeMarkierungDialog.targetId) return;
+    const talent = (actor.character.talents ?? [])
+      .find(t => t.talentDefinition.name === 'Magische Markierung');
+    if (!talent) return;
     const req: FreeActionRequest = {
       sessionId: this.session.id,
-      actorCombatantId: this.freeActionDialog.actor.id,
-      targetCombatantId: this.freeActionDialog.targetId,
-      talentId: this.freeActionDialog.talentId,
-      bonusSteps: this.freeActionDialog.bonusSteps,
-      spendKarma: this.freeActionDialog.spendKarma
+      actorCombatantId: actor.id,
+      targetCombatantId: this.magischeMarkierungDialog.targetId,
+      talentId: talent.talentDefinition.id,
+      bonusSteps: 0,
+      spendKarma: this.magischeMarkierungDialog.spendKarma
     };
     this.combatService.performFreeAction(this.session.id, req).subscribe({
       next: result => {
-        this.freeActionDialog.open = false;
-        this.freeActionModal = { open: true, result };
+        this.magischeMarkierungDialog.open = false;
+        this.magischeMarkierungModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },
       error: err => {
