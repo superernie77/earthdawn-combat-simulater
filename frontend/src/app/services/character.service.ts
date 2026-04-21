@@ -93,6 +93,14 @@ export class CharacterService {
     return this.http.delete<Character>(`${this.base}/${characterId}/equipment/${equipmentId}`);
   }
 
+  updateEquipmentQuantity(characterId: number, equipmentId: number, quantity: number): Observable<Character> {
+    return this.http.patch<Character>(
+      `${this.base}/${characterId}/equipment/${equipmentId}`,
+      null,
+      { params: { quantity } }
+    );
+  }
+
   // --- Zauber ---
 
   getSpells(discipline?: string): Observable<SpellDefinition[]> {

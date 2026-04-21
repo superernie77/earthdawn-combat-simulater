@@ -250,6 +250,15 @@ public class CharacterService {
         return characterRepo.save(c);
     }
 
+    public GameCharacter updateEquipmentQuantity(Long characterId, Long equipmentId, int quantity) {
+        GameCharacter c = findById(characterId);
+        c.getEquipment().stream()
+                .filter(e -> e.getId().equals(equipmentId))
+                .findFirst()
+                .ifPresent(e -> e.setQuantity(Math.max(0, quantity)));
+        return characterRepo.save(c);
+    }
+
     // --- Zauber ---
 
     public GameCharacter addSpell(Long characterId, Long spellDefinitionId) {

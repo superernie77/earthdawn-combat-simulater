@@ -76,6 +76,28 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 - **Defense bonuses**: `physicalDefenseBonus`, `spellDefenseBonus`, `socialDefenseBonus` (int, default 0) on `GameCharacter` — added on top of the formula/override value in `ModifierAggregator`. Editable via +/− steppers in the "Verteidigungs-Boni" section on the Attribute tab.
 - **Armor initiative penalty**: `initiativePenalty` field on `Equipment` (int, default 0) — automatically subtracted from `INITIATIVE_STEP` in `ModifierAggregator`. Entered when adding armor; shown as orange badge.
 
+## Equipment System
+
+Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION`.
+
+| Type | Relevant fields | Effect |
+|---|---|---|
+| WEAPON | `damageBonus` | Shown on character sheet; used manually in combat |
+| ARMOR | `physicalArmor`, `mysticalArmor`, `initiativePenalty` | `initiativePenalty` subtracted from `INITIATIVE_STEP` via `ModifierAggregator` |
+| SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty` | Bonuses added to defenses via `ModifierAggregator` |
+| POTION | `quantity`, `healStep` | See Healing Potions below |
+
+The "Ausrüstung" tab on the character sheet has separate sections per type. The "Tränke" section is a distinct sub-tab.
+
+**API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
+
+### Healing Potions (Heiltränke)
+- **Mechanic**: Roll `Zähigkeitsstufe + healStep` steps → result reduces `currentDamage`.
+- **Default Heiltrank**: `healStep = 7`, so roll = TOUGHNESSstep + 7 (matches ED4 standard healing potion).
+- **Quantity**: Decrements by 1 on use via `PATCH .../equipment/{id}?quantity=N`. Trinken-button disabled at 0.
+- **Frontend**: `drinkPotion()` in `CharacterSheetComponent` rolls dice, applies damage reduction, decrements quantity, shows result in `lastHeal` display panel.
+- **`healStep`** is the bonus on top of the character's toughness step, not a fixed value — potions with `healStep=0` heal pure toughness step only.
+
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
 - `targetStat`: which stat is modified (PHYSICAL_DEFENSE, ATTACK_STEP, INITIATIVE_STEP, MYSTIC_ARMOR, etc.)
@@ -134,6 +156,9 @@ GET    /api/characters/{id}/derived
 POST   /api/characters/{id}/recalculate
 POST   /api/characters/{id}/talents      ?talentDefinitionId=&rank=
 POST   /api/characters/{id}/skills       ?skillDefinitionId=&rank=
+POST   /api/characters/{id}/equipment    Equipment body
+PATCH  /api/characters/{id}/equipment/{equipmentId}  ?quantity=N
+DELETE /api/characters/{id}/equipment/{equipmentId}
 
 GET    /api/reference/disciplines
 GET    /api/reference/talents
