@@ -1,7 +1,7 @@
 -- Flyway baseline: vollständiges Schema (läuft nur auf frischen Datenbanken)
 -- Bestehende Prod-DBs werden per baseline-on-migrate auf V1 gesetzt ohne dieses Skript auszuführen.
 
-CREATE TABLE discipline_definitions (
+CREATE TABLE IF NOT EXISTS discipline_definitions (
     id                  BIGSERIAL PRIMARY KEY,
     name                VARCHAR(255) NOT NULL UNIQUE,
     karma_step          INTEGER,
@@ -10,12 +10,12 @@ CREATE TABLE discipline_definitions (
     description         VARCHAR(1000)
 );
 
-CREATE TABLE discipline_access_talent_names (
+CREATE TABLE IF NOT EXISTS discipline_access_talent_names (
     discipline_id BIGINT NOT NULL REFERENCES discipline_definitions(id),
     talent_name   VARCHAR(255)
 );
 
-CREATE TABLE talent_definitions (
+CREATE TABLE IF NOT EXISTS talent_definitions (
     id                           BIGSERIAL PRIMARY KEY,
     name                         VARCHAR(255) NOT NULL UNIQUE,
     attribute                    VARCHAR(50),
@@ -33,7 +33,7 @@ CREATE TABLE talent_definitions (
     free_action_damage_cost      INTEGER DEFAULT 0
 );
 
-CREATE TABLE talent_passive_modifiers (
+CREATE TABLE IF NOT EXISTS talent_passive_modifiers (
     talent_id       BIGINT NOT NULL REFERENCES talent_definitions(id),
     target_stat     VARCHAR(50),
     mod_operation   VARCHAR(50),
@@ -42,7 +42,7 @@ CREATE TABLE talent_passive_modifiers (
     mod_description VARCHAR(255)
 );
 
-CREATE TABLE skill_definitions (
+CREATE TABLE IF NOT EXISTS skill_definitions (
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(255) NOT NULL UNIQUE,
     attribute   VARCHAR(50),
@@ -50,7 +50,7 @@ CREATE TABLE skill_definitions (
     category    VARCHAR(255)
 );
 
-CREATE TABLE spell_definitions (
+CREATE TABLE IF NOT EXISTS spell_definitions (
     id                   BIGSERIAL PRIMARY KEY,
     name                 VARCHAR(255) NOT NULL,
     discipline           VARCHAR(255),
@@ -71,7 +71,7 @@ CREATE TABLE spell_definitions (
     extra_success_effect VARCHAR(20) DEFAULT 'NONE'
 );
 
-CREATE TABLE characters (
+CREATE TABLE IF NOT EXISTS characters (
     id                    BIGSERIAL PRIMARY KEY,
     name                  VARCHAR(255) NOT NULL,
     player_name           VARCHAR(255),
@@ -108,21 +108,21 @@ CREATE TABLE characters (
     notes                 VARCHAR(4000)
 );
 
-CREATE TABLE character_talents (
+CREATE TABLE IF NOT EXISTS character_talents (
     id                   BIGSERIAL PRIMARY KEY,
     character_id         BIGINT NOT NULL REFERENCES characters(id),
     talent_definition_id BIGINT NOT NULL REFERENCES talent_definitions(id),
     rank                 INTEGER
 );
 
-CREATE TABLE character_skills (
+CREATE TABLE IF NOT EXISTS character_skills (
     id                  BIGSERIAL PRIMARY KEY,
     character_id        BIGINT NOT NULL REFERENCES characters(id),
     skill_definition_id BIGINT NOT NULL REFERENCES skill_definitions(id),
     rank                INTEGER
 );
 
-CREATE TABLE character_equipment (
+CREATE TABLE IF NOT EXISTS character_equipment (
     id                    BIGSERIAL PRIMARY KEY,
     character_id          BIGINT NOT NULL REFERENCES characters(id),
     name                  VARCHAR(255) NOT NULL,
@@ -138,13 +138,13 @@ CREATE TABLE character_equipment (
     heal_step             INTEGER DEFAULT 0
 );
 
-CREATE TABLE character_spells (
+CREATE TABLE IF NOT EXISTS character_spells (
     id                  BIGSERIAL PRIMARY KEY,
     character_id        BIGINT REFERENCES characters(id),
     spell_definition_id BIGINT REFERENCES spell_definitions(id)
 );
 
-CREATE TABLE combat_sessions (
+CREATE TABLE IF NOT EXISTS combat_sessions (
     id         BIGSERIAL PRIMARY KEY,
     name       VARCHAR(255) NOT NULL,
     round      INTEGER DEFAULT 0,
@@ -153,7 +153,7 @@ CREATE TABLE combat_sessions (
     created_at TIMESTAMP
 );
 
-CREATE TABLE combatant_states (
+CREATE TABLE IF NOT EXISTS combatant_states (
     id                      BIGSERIAL PRIMARY KEY,
     combat_session_id       BIGINT REFERENCES combat_sessions(id),
     character_id            BIGINT REFERENCES characters(id),
@@ -181,7 +181,7 @@ CREATE TABLE combatant_states (
     declared_action_type    VARCHAR(20) DEFAULT 'WEAPON'
 );
 
-CREATE TABLE active_effects (
+CREATE TABLE IF NOT EXISTS active_effects (
     id                 BIGSERIAL PRIMARY KEY,
     combatant_state_id BIGINT REFERENCES combatant_states(id),
     name               VARCHAR(255) NOT NULL,
@@ -192,7 +192,7 @@ CREATE TABLE active_effects (
     negative           BOOLEAN DEFAULT FALSE
 );
 
-CREATE TABLE active_effect_modifiers (
+CREATE TABLE IF NOT EXISTS active_effect_modifiers (
     effect_id       BIGINT NOT NULL REFERENCES active_effects(id),
     target_stat     VARCHAR(50),
     mod_operation   VARCHAR(50),
@@ -201,7 +201,7 @@ CREATE TABLE active_effect_modifiers (
     mod_description VARCHAR(255)
 );
 
-CREATE TABLE combat_logs (
+CREATE TABLE IF NOT EXISTS combat_logs (
     id                BIGSERIAL PRIMARY KEY,
     combat_session_id BIGINT REFERENCES combat_sessions(id),
     round             INTEGER,
