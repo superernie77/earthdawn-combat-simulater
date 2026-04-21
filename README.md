@@ -79,6 +79,16 @@ git pull && docker compose -f docker-compose.prod.yml up -d --build
 
 > ⚠️ Use `docker compose` (plugin syntax, no hyphen). The old standalone `docker-compose` binary is not installed on modern Docker versions.
 
+### View backend logs
+```bash
+docker compose -f docker-compose.prod.yml logs -f earthdawn-backend
+```
+
+Add `--tail 100` to start from only the last 100 lines:
+```bash
+docker compose -f docker-compose.prod.yml logs -f --tail 100 earthdawn-backend
+```
+
 ---
 
 ## Architecture Overview
