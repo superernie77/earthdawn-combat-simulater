@@ -1053,14 +1053,14 @@ public class CombatService {
         }
 
         // Can't target the same opponent twice per round
-        String targetName = target.getCharacter().getName();
+        String targetNameCheck = target.getCharacter().getName();
         boolean alreadyTargeted = actor.getActiveEffects().stream()
                 .anyMatch(e -> "Kampfsinn (KV)".equals(e.getName())
                         && e.getDescription() != null
-                        && e.getDescription().contains("gegen " + targetName + " (Kampfsinn)"));
+                        && e.getDescription().contains("gegen " + targetNameCheck + " (Kampfsinn)"));
         if (alreadyTargeted) {
             throw new IllegalStateException(
-                "Kampfsinn wurde in dieser Runde bereits gegen " + targetName + " eingesetzt.");
+                "Kampfsinn wurde in dieser Runde bereits gegen " + targetNameCheck + " eingesetzt.");
         }
 
         // 1 Überanstrengung
