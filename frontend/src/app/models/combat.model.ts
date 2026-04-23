@@ -57,6 +57,7 @@ export interface StandUpResult {
 
 export interface CombatantState {
   id: number;
+  displayName?: string;
   character: Character;
   initiative: number;
   initiativeOrder: number;

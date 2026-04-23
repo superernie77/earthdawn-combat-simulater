@@ -55,9 +55,16 @@ public class CombatService {
         GameCharacter character = characterRepo.findById(characterId)
                 .orElseThrow(() -> new EntityNotFoundException("Charakter nicht gefunden: " + characterId));
 
+        String baseName = character.getName();
+        long sameNameCount = session.getCombatants().stream()
+                .filter(c -> baseName.equals(c.getCharacter().getName()))
+                .count();
+        String displayName = sameNameCount == 0 ? null : baseName + " " + (sameNameCount + 1);
+
         CombatantState combatant = CombatantState.builder()
                 .combatSession(session)
                 .character(character)
+                .displayName(displayName)
                 .currentDamage(character.getCurrentDamage())
                 .wounds(character.getWounds())
                 .currentKarma(character.getKarmaCurrent())

@@ -30,6 +30,9 @@ public class CombatantState {
     @JoinColumn(name = "character_id")
     private GameCharacter character;
 
+    /** Anzeigename — überschreibt character.name wenn gesetzt (z.B. bei Duplikaten: "Goblin 2") */
+    private String displayName;
+
     // --- Kampfzustand (unabhängig vom persistierten Charakter) ---
     private int initiative;
     private int initiativeOrder;
