@@ -389,9 +389,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.hit ? 'TREFFER' : 'VERFEHLT' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-          <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
         </div>
         <div class="aggressive-active-badge" *ngIf="r.aggressiveAttack">
           <mat-icon>whatshot</mat-icon> Aggressiver Angriff
@@ -529,7 +529,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? 'AUSGEWICHEN' : 'NICHT AUSGEWICHEN' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.defenderName)">{{ r.defenderName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.defenderName)">{{ r.defenderName }}</span>
           <span style="color:#888;margin:0 6px;font-size:0.85rem">vs Angriff {{ r.attackTotal }}</span>
         </div>
         <div class="result-rolls">
@@ -743,11 +743,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? 'MARKIERT' : 'FEHLSCHLAG' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <span style="color:#ce93d8;font-weight:600;margin:0 6px">Magische Markierung</span>
           <ng-container *ngIf="r.targetName">
             <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-            <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+            <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
           </ng-container>
         </div>
         <div class="result-rolls">
@@ -822,7 +822,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.stillKnockedDown ? 'FEHLGESCHLAGEN' : (r.simpleStandUp ? 'AUFGESTANDEN' : 'AUFGESPRUNGEN') }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
         </div>
         <div class="result-rolls" *ngIf="!r.simpleStandUp && r.roll">
           <div class="roll-block">
@@ -905,7 +905,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? 'FADEN GEWOBEN' : 'FEHLGESCHLAGEN' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.casterName)">{{ r.casterName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.casterName)">{{ r.casterName }}</span>
           <span style="color:#b39ddb;font-weight:600;margin:0 6px">{{ r.spellName }}</span>
         </div>
         <div class="result-rolls">
@@ -1043,9 +1043,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? 'ABGELENKT!' : 'FEHLSCHLAG' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-          <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
         </div>
         <div class="result-rolls">
           <div class="roll-block">
@@ -1142,7 +1142,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? (r.effectNegated ? 'ABGEWEHRT!' : 'ERFOLG') : 'DURCHGEDRUNGEN' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <span style="color:#b0bec5;font-weight:600;margin-left:8px">Eiserner Wille</span>
         </div>
         <div class="result-rolls">
@@ -1230,7 +1230,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? '+' + r.bonusApplied + ' KV!' : 'FEHLSCHLAG' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <span style="color:#80cbc4;font-weight:600;margin-left:8px">Akrobatische Verteidigung</span>
         </div>
         <div class="result-rolls">
@@ -1328,9 +1328,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? 'KAMPFSINN!' : 'FEHLSCHLAG' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-          <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
         </div>
         <div class="result-rolls">
           <div class="roll-block">
@@ -1431,9 +1431,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success && !r.resisted ? 'VERSPOTTET!' : (r.resisted ? 'WIDERSTANDEN' : 'VERFEHLT') }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.actorName)">{{ r.actorName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
           <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-          <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
         </div>
         <div class="result-rolls">
           <!-- Main roll -->
@@ -1516,11 +1516,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           {{ r.success ? spellOutcomeLabel(r) : 'FEHLGESCHLAGEN' }}
         </div>
         <div class="result-names">
-          <span class="result-actor" [ngClass]="nameClass(r.casterName)">{{ r.casterName }}</span>
+          <span class="result-actor" [style.color]="nameColor(r.casterName)">{{ r.casterName }}</span>
           <span style="color:#ce93d8;font-weight:600;margin:0 6px">{{ r.spellName }}</span>
           <ng-container *ngIf="r.targetName">
             <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
-            <span class="result-target" [ngClass]="nameClass(r.targetName)">{{ r.targetName }}</span>
+            <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
           </ng-container>
         </div>
         <div class="result-rolls">
@@ -1813,8 +1813,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     }
     .result-actor { font-weight: 600; }
     .result-target { font-weight: 600; }
-    .name-hero { color: #a5d6a7; }
-    .name-npc  { color: #ef9a9a; }
+
     .result-rolls { display: flex; flex-direction: column; gap: 6px; }
     .roll-row {
       display: grid; grid-template-columns: 70px 1fr auto auto;
@@ -2222,14 +2221,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return c.displayName ?? c.character.name;
   }
 
-  isNpcName(name: string): boolean {
-    return (this.session?.combatants ?? []).some(
-      c => (c.displayName ?? c.character.name) === name && c.npc
+  nameColor(name: string): string {
+    const isNpc = (this.session?.combatants ?? []).some(
+      c => c.character.name === name && c.npc
     );
-  }
-
-  nameClass(name: string): string {
-    return this.isNpcName(name) ? 'name-npc' : 'name-hero';
+    return isNpc ? '#ef9a9a' : '#a5d6a7';
   }
 
   heroes(): CombatantState[] {
