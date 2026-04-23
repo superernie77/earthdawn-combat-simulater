@@ -2222,10 +2222,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   nameColor(name: string): string {
-    const isNpc = (this.session?.combatants ?? []).some(
-      c => c.character.name === name && c.npc
-    );
-    return isNpc ? '#ef9a9a' : '#a5d6a7';
+    const isHero = this.heroes().some(c => c.character.name === name);
+    return isHero ? '#a5d6a7' : '#ef9a9a';
   }
 
   heroes(): CombatantState[] {
