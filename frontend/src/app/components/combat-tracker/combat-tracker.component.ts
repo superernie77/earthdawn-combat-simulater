@@ -364,8 +364,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         <div class="log-panel">
 
           <!-- Combat Log -->
-          <div class="section-title" style="margin-top:16px">Kampfprotokoll</div>
-          <div class="log-scroll">
+          <div class="section-title" style="margin-top:16px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px"
+               (click)="logOpen = !logOpen">
+            <mat-icon style="font-size:18px;width:18px;height:18px">{{ logOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+            Kampfprotokoll
+          </div>
+          <div class="log-scroll" *ngIf="logOpen">
             <div
               *ngFor="let entry of logEntries"
               [class]="'combat-log-entry ' + (entry.success ? 'success' : isSystem(entry.actionType) ? 'system' : 'failure')">
@@ -2010,6 +2014,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   loadError?: string;
   allCharacters: Character[] = [];
   logEntries: any[] = [];
+  logOpen = true;
   lastResult?: CombatActionResult;
   resultModal: { open: boolean; result?: CombatActionResult } = { open: false };
   selectedCharId?: number;
