@@ -2984,8 +2984,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         c => !c.defeated && !c.hasDeclared && this.autofightCombatants.has(c.id)
       );
       if (undeclared) {
-        const stance = this.autofightStance(undeclared);
         const actionType = this.autofightDeclareType(undeclared);
+        const stance = actionType === 'SPELL' ? 'NONE' : this.autofightStance(undeclared);
         this.combatService.declareAction(sessionId, undeclared.id, stance, actionType).subscribe({
           next: s => { this.session = s; this.logEntries = s.log ?? []; this.scheduleAutofight(); },
           error: err => this.snack.open('Autofight (Ansage): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
