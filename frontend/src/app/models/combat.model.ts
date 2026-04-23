@@ -210,6 +210,7 @@ export interface SpellCastResult {
   success: boolean;
   extraSuccesses: number;
   damageStep?: number;
+  damageStepBonus?: number;
   damageRoll?: RollResult;
   armorValue?: number;
   netDamage?: number;

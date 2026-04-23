@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
-import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, SpellDefinition } from '../../models/character.model';
+import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -36,7 +36,7 @@ import { ProbeResult } from '../../models/dice.model';
             <mat-icon>arrow_back</mat-icon>
           </button>
           <span class="char-name">{{ character.name }}</span>
-          <span class="char-sub">{{ character.playerName }} · {{ character.discipline?.name }} Kreis {{ character.circle }}</span>
+          <span class="char-sub">{{ character.playerName }} · {{ raceLabel(character.race) }}{{ character.race ? ' · ' : '' }}{{ character.discipline?.name }} Kreis {{ character.circle }}</span>
         </div>
         <div class="header-actions">
           <button mat-stroked-button (click)="recalculate()" matTooltip="Abgeleitete Werte neu berechnen">
@@ -87,23 +87,28 @@ import { ProbeResult } from '../../models/dice.model';
         <!-- Karma -->
         <div class="status-block">
           <div class="status-label">Karma</div>
-          <div class="ctrl-btns" style="margin-top:4px">
-            <button mat-icon-button (click)="adjustField('karma', -1)"><mat-icon>remove</mat-icon></button>
-            <span style="min-width:40px;text-align:center">{{ character.karmaCurrent }}/{{ character.karmaMax }}</span>
-            <button mat-icon-button (click)="adjustField('karma', 1)"><mat-icon>add</mat-icon></button>
-          </div>
-          <div class="karma-modifier-row">
-            <span class="karma-mod-label">Modifikator</span>
-            <input type="number" class="karma-mod-input" [(ngModel)]="character.karmaModifier"
-              (change)="saveKarmaModifier()" min="1" max="20">
-            <span class="karma-mod-hint">× Kreis {{ character.circle }} = {{ character.karmaModifier * character.circle }} Max</span>
-          </div>
-          <button mat-stroked-button class="ritual-btn"
-            (click)="karmaRitual()"
-            [disabled]="character.karmaCurrent >= character.karmaMax"
-            matTooltip="Karmaritual: Karma auf Maximum auffüllen">
-            <mat-icon>auto_awesome</mat-icon> Karmaritual
-          </button>
+          <ng-container *ngIf="!hasNoKarma(); else noKarmaBlock">
+            <div class="ctrl-btns" style="margin-top:4px">
+              <button mat-icon-button (click)="adjustField('karma', -1)"><mat-icon>remove</mat-icon></button>
+              <span style="min-width:40px;text-align:center">{{ character.karmaCurrent }}/{{ character.karmaMax }}</span>
+              <button mat-icon-button (click)="adjustField('karma', 1)"><mat-icon>add</mat-icon></button>
+            </div>
+            <div class="karma-modifier-row">
+              <span class="karma-mod-label">Modifikator</span>
+              <input type="number" class="karma-mod-input" [(ngModel)]="character.karmaModifier"
+                (change)="saveKarmaModifier()" min="1" max="20">
+              <span class="karma-mod-hint">× Kreis {{ character.circle }} = {{ character.karmaModifier * character.circle }} Max</span>
+            </div>
+            <button mat-stroked-button class="ritual-btn"
+              (click)="karmaRitual()"
+              [disabled]="character.karmaCurrent >= character.karmaMax"
+              matTooltip="Karmaritual: Karma auf Maximum auffüllen">
+              <mat-icon>auto_awesome</mat-icon> Karmaritual
+            </button>
+          </ng-container>
+          <ng-template #noKarmaBlock>
+            <span style="font-size:12px;color:#555;margin-top:6px;display:block">Kein Karma</span>
+          </ng-template>
         </div>
 
         <!-- Währung -->
@@ -142,6 +147,21 @@ import { ProbeResult } from '../../models/dice.model';
                     <button mat-icon-button (click)="adjustAttr(a.key, 1)"><mat-icon>add</mat-icon></button>
                   </div>
                   <span class="attr-step" matTooltip="Stufe des Attributwerts">Stufe {{ attrToStep(getAttr(a.key)) }}</span>
+                </div>
+                <div class="circle-row">
+                  <span class="derived-label">Disziplin</span>
+                  <mat-select [(ngModel)]="character.discipline" [compareWith]="compareDiscipline"
+                              (ngModelChange)="onDisciplineChange()" style="width:160px" placeholder="Keine">
+                    <mat-option [value]="null">— keine —</mat-option>
+                    <mat-option *ngFor="let d of disciplines" [value]="d">{{ d.name }}</mat-option>
+                  </mat-select>
+                </div>
+                <div class="circle-row">
+                  <span class="derived-label">Rasse</span>
+                  <mat-select [(ngModel)]="character.race" style="width:160px" placeholder="Keine Auswahl">
+                    <mat-option [value]="null">— keine —</mat-option>
+                    <mat-option *ngFor="let r of races" [value]="r.value">{{ r.label }}</mat-option>
+                  </mat-select>
                 </div>
                 <div class="circle-row">
                   <span class="derived-label">Kreis</span>
@@ -738,6 +758,8 @@ export class CharacterSheetComponent implements OnInit {
   ];
 
   circles = Array.from({ length: 15 }, (_, i) => i + 1);
+  races = RACES;
+  disciplines: DisciplineDefinition[] = [];
 
   derivedFields = [
     { key: 'physicalDefense', label: 'KV (Körperliche Verteidigung)' },
@@ -780,6 +802,7 @@ export class CharacterSheetComponent implements OnInit {
     });
     this.refService.getTalents().subscribe(t => this.availableTalents = t);
     this.refService.getSkills().subscribe(s => this.availableSkills = s);
+    this.refService.getDisciplines().subscribe(d => this.disciplines = d);
   }
 
   loadDerived(): void {
@@ -812,6 +835,22 @@ export class CharacterSheetComponent implements OnInit {
     });
   }
 
+  onDisciplineChange(): void {
+    if (!this.character?.id) return;
+    if (this.hasNoKarma()) {
+      this.character.karmaModifier = 0;
+      this.character.karmaMax = 0;
+      this.character.karmaCurrent = 0;
+    } else if (this.character.karmaModifier === 0) {
+      this.character.karmaModifier = 5;
+    }
+    this.characterService.update(this.character.id, this.character).subscribe(c => {
+      this.character = c;
+      this.loadDerived();
+      this.loadAvailableSpells();
+    });
+  }
+
   onCircleChange(): void {
     if (!this.character?.id) return;
     this.characterService.update(this.character.id, this.character).subscribe(c => {
@@ -840,6 +879,18 @@ export class CharacterSheetComponent implements OnInit {
 
   adjustAttr(key: string, delta: number): void {
     this.adjustField(key, delta);
+  }
+
+  raceLabel(race?: string | null): string {
+    return RACES.find(r => r.value === race)?.label ?? '';
+  }
+
+  hasNoKarma(): boolean {
+    return this.character?.discipline?.name === 'Keine Disziplin';
+  }
+
+  compareDiscipline(a: DisciplineDefinition | null, b: DisciplineDefinition | null): boolean {
+    return a?.id === b?.id;
   }
 
   attrToStep(value: number): number {

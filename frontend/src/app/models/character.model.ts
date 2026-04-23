@@ -1,3 +1,19 @@
+export type Race =
+  | 'ZWERGE' | 'ORKS' | 'MENSCHEN' | 'TROLLE'
+  | 'ELFEN' | 'BLUTELFEN' | 'TSKRANG' | 'OBSIDIANER' | 'WINDLINGE';
+
+export const RACES: { value: Race; label: string }[] = [
+  { value: 'ZWERGE',     label: 'Zwerge' },
+  { value: 'ORKS',       label: 'Orks' },
+  { value: 'MENSCHEN',   label: 'Menschen' },
+  { value: 'TROLLE',     label: 'Trolle' },
+  { value: 'ELFEN',      label: 'Elfen' },
+  { value: 'BLUTELFEN',  label: 'Elfen (Blutelfen)' },
+  { value: 'TSKRANG',    label: "T'skrang" },
+  { value: 'OBSIDIANER', label: 'Obsidianer' },
+  { value: 'WINDLINGE',  label: 'Windlinge' },
+];
+
 export interface DisciplineDefinition {
   id: number;
   name: string;
@@ -86,6 +102,7 @@ export interface Character {
   id?: number;
   name: string;
   playerName: string;
+  race?: Race;
   circle: number;
   legendPoints: number;
   discipline?: DisciplineDefinition;

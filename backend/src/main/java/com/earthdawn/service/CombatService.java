@@ -104,7 +104,9 @@ public class CombatService {
             RollResult roll = diceService.roll(initStep);
             combatant.setInitiative(roll.getTotal());
         }
-        session.getCombatants().sort(Comparator.comparingInt(CombatantState::getInitiative).reversed());
+        session.getCombatants().sort(Comparator
+                .comparingInt(CombatantState::getInitiative).reversed()
+                .thenComparingInt(c -> c.isNpc() ? 1 : 0)); // heroes before NPCs on tie
         for (int i = 0; i < session.getCombatants().size(); i++) {
             session.getCombatants().get(i).setInitiativeOrder(i);
         }
@@ -161,7 +163,6 @@ public class CombatService {
         // Boni/Mali sind bereits als ActiveEffect am Angreifer aktiv und fließen über
         // den ModifierAggregator automatisch in attackStep / Verteidigungswerte ein.
         boolean wasAggressive = attacker.getDeclaredStance() == DeclaredStance.AGGRESSIVE;
-        Math.max(1, attackStep); // no-op safeguard
 
         // 2. Karma — immer W6 (Stufe 4)
         RollResult karmaRoll = null;
@@ -186,7 +187,7 @@ public class CombatService {
             defender.setPendingDefenseBonus(0);
         }
 
-        boolean hit = attackTotal > pd;
+        boolean hit = attackTotal >= pd;
 
         CombatActionResult.CombatActionResultBuilder result = CombatActionResult.builder()
                 .actorName(attacker.getCharacter().getName())
@@ -224,14 +225,14 @@ public class CombatService {
 
             // 7. Hat Ziel Ausweichen-Talent? → Schaden zurückhalten
             boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
-                    .anyMatch(t -> "Ausweichen".equals(t.getTalentDefinition().getName()));
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
 
             if (defenderHasDodge) {
                 defender.setPendingDodgeDamage(netDamage);
                 defender.setPendingDodgeAttackTotal(attackTotal);
                 defender.setPendingDamageStep(damageStep);
                 defender.setPendingArmorValue(armor);
-                try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException ignored) {}
+                try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
                 result.hitPendingDodge(true)
                       .dodgeDefenderId(defender.getId())
                       .pendingDodgeDamage(netDamage);
@@ -282,8 +283,8 @@ public class CombatService {
             combatant.setPendingDefenseBonus(0);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
             combatant.getActiveEffects().removeIf(effect ->
-                    "Aggressiver Angriff".equals(effect.getName())
-                 || "Defensive Haltung".equals(effect.getName()));
+                    TalentNames.EFFECT_AGGRESSIVER_ANGRIFF.equals(effect.getName())
+                 || TalentNames.EFFECT_DEFENSIVE_HALTUNG.equals(effect.getName()));
             combatant.getActiveEffects().removeIf(effect -> {
                 if (effect.getRemainingRounds() == -1) return false;
                 effect.setRemainingRounds(effect.getRemainingRounds() - 1);
@@ -378,7 +379,7 @@ public class CombatService {
                     c.setCurrentDamage(c.getCurrentDamage() + 1);
                     ActiveEffect eff = ActiveEffect.builder()
                             .combatantState(c)
-                            .name("Aggressiver Angriff")
+                            .name(TalentNames.EFFECT_AGGRESSIVER_ANGRIFF)
                             .description("+3 Angriff, -3 Verteidigung, 1 Schaden")
                             .sourceType(SourceType.CONDITION)
                             .remainingRounds(1)
@@ -405,7 +406,7 @@ public class CombatService {
                 case DEFENSIVE -> {
                     ActiveEffect eff = ActiveEffect.builder()
                             .combatantState(c)
-                            .name("Defensive Haltung")
+                            .name(TalentNames.EFFECT_DEFENSIVE_HALTUNG)
                             .description("-3 Angriff, +3 Verteidigung")
                             .sourceType(SourceType.CONDITION)
                             .remainingRounds(1)
@@ -554,7 +555,7 @@ public class CombatService {
         try {
             if (defender.getPendingDamageRollJson() != null)
                 pendingDamageRoll = objectMapper.readValue(defender.getPendingDamageRollJson(), RollResult.class);
-        } catch (JsonProcessingException ignored) {}
+        } catch (JsonProcessingException e) { log.error("Fehler beim Deserialisieren des ausstehenden Schadenswurfs", e); }
 
         // Ausstehende Werte zurücksetzen
         defender.setPendingDodgeDamage(0);
@@ -586,7 +587,7 @@ public class CombatService {
 
         // Ausweichen-Probe
         CharacterTalent dodgeTalent = defender.getCharacter().getTalents().stream()
-                .filter(t -> "Ausweichen".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Ausweichen-Talent nicht gefunden"));
 
@@ -661,7 +662,7 @@ public class CombatService {
         // Standhaftigkeit-Talent: STR-Step + Rang statt reiner STR-Step
         int strStep = Math.max(1, diceService.attributeToStep(defender.getCharacter().getStrength()) - defender.getWounds());
         int standhaftigkeitRank = defender.getCharacter().getTalents().stream()
-                .filter(t -> "Standhaftigkeit".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.STANDHAFTIGKEIT.equals(t.getTalentDefinition().getName()))
                 .mapToInt(CharacterTalent::getRank)
                 .findFirst().orElse(0);
         int rollStep = Math.max(1, strStep + standhaftigkeitRank);
@@ -675,7 +676,7 @@ public class CombatService {
             defender.setKnockedDown(true);
             applyNiedergeschlagenEffect(defender);
             // Akrobatische Verteidigung verliert sofort die Wirkung bei Niedergeschlagen
-            defender.getActiveEffects().removeIf(e -> "Akrobatische Verteidigung".equals(e.getName()));
+            defender.getActiveEffects().removeIf(e -> TalentNames.AKROBATISCHE_VERTEIDIGUNG.equals(e.getName()));
             desc = name + " ist niedergeschlagen! (" + talentLabel + " " + roll.getTotal() + " < " + targetNumber + ")";
         } else {
             desc = name + " bleibt stehen. (" + talentLabel + " " + roll.getTotal() + " vs " + targetNumber + ")";
@@ -810,7 +811,7 @@ public class CombatService {
 
         // Verspotten-Talent laden
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
-                .filter(t -> "Verspotten".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.VERSPOTTEN.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Verspotten' nicht gefunden."));
 
@@ -833,7 +834,7 @@ public class CombatService {
 
         // Soziale Verteidigung des Ziels
         int socialDef = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
-        boolean success = total > socialDef;
+        boolean success = total >= socialDef;
         int extraSuccesses = success ? (total - socialDef) / 5 : 0;
 
         String actorName  = actor.getCharacter().getName();
@@ -870,7 +871,7 @@ public class CombatService {
         boolean resisted = false;
 
         java.util.Optional<CharacterTalent> resistTalent = target.getCharacter().getTalents().stream()
-                .filter(t -> "Starrsinn".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.STARRSINN.equals(t.getTalentDefinition().getName()))
                 .findFirst();
 
         if (resistTalent.isPresent()) {
@@ -936,12 +937,12 @@ public class CombatService {
 
         // Kombination mit Kampfsinn verboten
         boolean hasCombatSense = actor.getActiveEffects().stream()
-                .anyMatch(e -> e.getName().startsWith("Kampfsinn"));
+                .anyMatch(e -> e.getName().startsWith(TalentNames.KAMPFSINN));
         if (hasCombatSense) throw new IllegalStateException(
                 "Akrobatische Verteidigung und Kampfsinn können nicht in derselben Runde kombiniert werden.");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
-                .filter(t -> "Akrobatische Verteidigung".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.AKROBATISCHE_VERTEIDIGUNG.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Akrobatische Verteidigung' nicht gefunden."));
 
@@ -967,7 +968,7 @@ public class CombatService {
                 .mapToInt(c -> modifiers.getEffectiveValue(c, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
                 .max().orElse(8);
 
-        boolean success  = total > targetNumber;
+        boolean success  = total >= targetNumber;
         int extraSucc    = success ? (total - targetNumber) / 5 : 0;
         int successes    = success ? 1 + extraSucc : 0;
         int bonusApplied = successes * 2;
@@ -977,7 +978,7 @@ public class CombatService {
         if (success && bonusApplied > 0) {
             ActiveEffect effect = ActiveEffect.builder()
                     .combatantState(actor)
-                    .name("Akrobatische Verteidigung")
+                    .name(TalentNames.AKROBATISCHE_VERTEIDIGUNG)
                     .description("+" + bonusApplied + " KV (Akrobatik, bis Rundenende)")
                     .sourceType(SourceType.TALENT)
                     .remainingRounds(1)
@@ -1033,14 +1034,34 @@ public class CombatService {
 
         // Kombination mit Akrobatischer Verteidigung verboten
         boolean hasAcrobatic = actor.getActiveEffects().stream()
-                .anyMatch(e -> "Akrobatische Verteidigung".equals(e.getName()));
+                .anyMatch(e -> TalentNames.AKROBATISCHE_VERTEIDIGUNG.equals(e.getName()));
         if (hasAcrobatic) throw new IllegalStateException(
                 "Kampfsinn und Akrobatische Verteidigung können nicht in derselben Runde kombiniert werden.");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
-                .filter(t -> "Kampfsinn".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.KAMPFSINN.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Kampfsinn' nicht gefunden."));
+
+        // Max uses per round = talent rank
+        long usesThisRound = actor.getActiveEffects().stream()
+                .filter(e -> "Kampfsinn (KV)".equals(e.getName()))
+                .count();
+        if (usesThisRound >= ct.getRank()) {
+            throw new IllegalStateException(
+                "Kampfsinn kann in dieser Runde nicht öfter als Rang " + ct.getRank() + " mal eingesetzt werden.");
+        }
+
+        // Can't target the same opponent twice per round
+        String targetName = target.getCharacter().getName();
+        boolean alreadyTargeted = actor.getActiveEffects().stream()
+                .anyMatch(e -> "Kampfsinn (KV)".equals(e.getName())
+                        && e.getDescription() != null
+                        && e.getDescription().contains("gegen " + targetName + " (Kampfsinn)"));
+        if (alreadyTargeted) {
+            throw new IllegalStateException(
+                "Kampfsinn wurde in dieser Runde bereits gegen " + targetName + " eingesetzt.");
+        }
 
         // 1 Überanstrengung
         actor.setCurrentDamage(actor.getCurrentDamage() + 1);
@@ -1060,7 +1081,7 @@ public class CombatService {
 
         // Mystische Verteidigung des Ziels
         int mysticDef  = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ALWAYS);
-        boolean success = total > mysticDef;
+        boolean success = total >= mysticDef;
         int extraSucc   = success ? (total - mysticDef) / 5 : 0;
         int successes   = success ? 1 + extraSucc : 0;
         int defenseBonus = successes * 2;
@@ -1153,7 +1174,7 @@ public class CombatService {
         if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
-                .filter(t -> "Ablenken".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.ABLENKEN.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Ablenken' nicht gefunden."));
 
@@ -1175,7 +1196,7 @@ public class CombatService {
 
         // Soziale Verteidigung des Ziels
         int socialDef  = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
-        boolean success = total > socialDef;
+        boolean success = total >= socialDef;
         int extraSucc   = success ? (total - socialDef) / 5 : 0;
         int successes   = success ? 1 + extraSucc : 0;
 
@@ -1269,7 +1290,7 @@ public class CombatService {
         if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
-                .filter(t -> "Eiserner Wille".equals(t.getTalentDefinition().getName()))
+                .filter(t -> TalentNames.EISERNER_WILLE.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Eiserner Wille' nicht gefunden."));
 
@@ -1372,7 +1393,7 @@ public class CombatService {
             defenseValue = modifiers.getEffectiveValue(target, talent.getFreeActionTestStat(), TriggerContext.ALWAYS);
         }
 
-        boolean success = defenseValue == 0 || total > defenseValue;
+        boolean success = defenseValue == 0 || total >= defenseValue;
         int extraSuccesses = success && defenseValue > 0 ? (total - defenseValue) / 5 : (success ? 1 : 0);
         boolean effectApplied = false;
 

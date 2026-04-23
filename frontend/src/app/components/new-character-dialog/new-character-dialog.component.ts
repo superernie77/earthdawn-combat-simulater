@@ -103,6 +103,8 @@ export class NewCharacterDialogComponent implements OnInit {
 
   submit(): void {
     const v = this.form.value;
+    const selectedDiscipline = this.disciplines.find(d => d.id === v.disciplineId);
+    const noKarma = selectedDiscipline?.name === 'Keine Disziplin';
     const character = {
       ...emptyCharacter(),
       name: v.name,
@@ -114,7 +116,10 @@ export class NewCharacterDialogComponent implements OnInit {
       perception: v.perception,
       willpower: v.willpower,
       charisma: v.charisma,
-      discipline: v.disciplineId ? { id: v.disciplineId } : undefined
+      discipline: v.disciplineId ? { id: v.disciplineId } : undefined,
+      karmaModifier: noKarma ? 0 : 5,
+      karmaMax: 0,
+      karmaCurrent: 0,
     };
     this.dialogRef.close(character);
   }

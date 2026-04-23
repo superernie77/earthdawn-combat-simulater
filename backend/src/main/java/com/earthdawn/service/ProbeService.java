@@ -62,7 +62,7 @@ public class ProbeService {
             characterRepo.save(character);
         }
 
-        boolean success = total > req.getTargetNumber();
+        boolean success = total >= req.getTargetNumber();
         int extraSuccesses = success ? Math.max(0, (total - req.getTargetNumber()) / 5) : 0;
 
         return ProbeResult.builder()

@@ -1,5 +1,6 @@
 package com.earthdawn.model;
 
+import com.earthdawn.model.enums.Race;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,6 +25,10 @@ public class GameCharacter {
     private String playerName;
     private int circle;
     private long legendPoints;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Race race;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "discipline_id")

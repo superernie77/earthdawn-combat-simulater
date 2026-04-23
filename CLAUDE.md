@@ -231,8 +231,19 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - **Stance effects**: Applied as `ActiveEffect` with `ATTACK_STEP` modifier (not via request flags). Aggressive adds `+3 ATTACK_STEP` + `-3` to all defenses; Defensive adds `-3 ATTACK_STEP` + `+3` to all defenses. Both cleared at round end in `nextRound()`.
 - **CombatPhase**: `DECLARATION` (all declare before initiative) → `ACTION` (fight). Phase stored on `CombatSession`. Auto-transitions to `ACTION` when all non-defeated combatants have declared.
 - **Successes formula**: `successes = 1 + floor((total − TN) / 5)` when successful. Used for Verspotten, Ablenken, Akrobatische Verteidigung, Kampfsinn.
-- **Knockdown removes Akrobatische Verteidigung**: In `performKnockdownCheck()`, when `knocked = true`, the effect is explicitly removed: `defender.getActiveEffects().removeIf(e -> "Akrobatische Verteidigung".equals(e.getName()))`.
+- **Knockdown removes Akrobatische Verteidigung**: In `performKnockdownCheck()`, when `knocked = true`, the effect is explicitly removed using `TalentNames.AKROBATISCHE_VERTEIDIGUNG`.
 - **Kampfsinn initiative check**: `actor.getInitiativeOrder() < target.getInitiativeOrder()` (lower order = higher initiative, since combatants are sorted descending).
 - **Eiserner Wille removes SPELL-sourced effects**: On success, removes the most recently added `ActiveEffect` with `sourceType == SourceType.SPELL` and `negative == true` from the actor.
 - **SpellService** uses `ModifierAggregator` for `KARMA_STEP` and spell defense values — same engine as physical combat.
 - **Free actions**: `TalentDefinition.freeAction=true` triggers `performFreeAction()` in `CombatService`. Does not set `hasActedThisRound`. Eiserner Wille is a separate endpoint (not via the generic free-action path) because it needs a manual `attackTotal` input.
+- **TalentNames constants**: All hardcoded talent/effect name strings live in `model/TalentNames.java`. Use these constants instead of inline German strings when checking for specific talents or effects.
+
+## Running Tests
+```bash
+# From backend/
+./mvnw test
+```
+Test classes (no Spring context required — plain unit tests with Mockito):
+- `StepRollServiceTest` — dice step table, attribute→step mapping, explosion flag, result invariants (58 cases run in ~160 ms)
+- `ModifierAggregatorTest` — ADD/MULTIPLY/OVERRIDE/SET_MIN/SET_MAX modifiers, trigger context filtering, base value formulas
+- `CombatServiceDamageTest` — `applyDamageToDefender`: damage counter, wound calculation, defeat threshold, knockdown trigger and outcome

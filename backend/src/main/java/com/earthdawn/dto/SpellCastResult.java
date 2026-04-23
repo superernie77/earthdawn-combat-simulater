@@ -21,6 +21,7 @@ public class SpellCastResult {
 
     // Schadenszauber
     private int damageStep;
+    private int damageStepBonus;
     private RollResult damageRoll;
     private int armorValue;
     private int netDamage;

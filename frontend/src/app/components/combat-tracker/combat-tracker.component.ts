@@ -12,6 +12,7 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Subscription } from 'rxjs';
 import { CombatService } from '../../services/combat.service';
 import { CharacterService } from '../../services/character.service';
@@ -24,7 +25,8 @@ import {
   DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
-  SpellCastRequest, SpellCastResult
+  SpellCastRequest, SpellCastResult,
+  DeclaredStance, DeclaredActionType
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -35,7 +37,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     CommonModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule, MatSelectModule,
     MatFormFieldModule, MatInputModule, MatDialogModule,
-    MatSnackBarModule, MatTooltipModule, MatDividerModule
+    MatSnackBarModule, MatTooltipModule, MatDividerModule, MatCheckboxModule
   ],
   template: `
     <div class="loading-state" *ngIf="!session && !loadError">
@@ -150,6 +152,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 </span>
               </div>
               <div class="comb-actions">
+                <mat-checkbox
+                  [checked]="isAutofight(c)"
+                  (change)="toggleAutofight(c, $event.checked)"
+                  color="warn"
+                  matTooltip="Automatisch kämpfen">Auto</mat-checkbox>
                 <span *ngIf="session!.status === 'ACTIVE' && c.hasActedThisRound && !c.defeated" class="acted-badge" matTooltip="Hat diese Runde bereits gehandelt">Gehandelt</span>
                 <span *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.declaredStance === 'AGGRESSIVE' && !c.defeated"
                       class="stance-badge aggressive" matTooltip="Aggressive Haltung: +3 Angriff, -3 Verteidigung">⚔ Aggressiv</span>
@@ -312,7 +319,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <button mat-icon-button color="warn" (click)="updateValue(c, 'wounds', 1)"><mat-icon style="font-size:14px">add</mat-icon></button>
                 </div>
               </div>
-              <div class="comb-stat">
+              <div class="comb-stat" *ngIf="!isNoKarma(c)">
                 <span class="comb-stat-label">Karma</span>
                 <div class="mini-ctrl">
                   <button mat-icon-button (click)="updateValue(c, 'karma', -1)"><mat-icon style="font-size:14px">remove</mat-icon></button>
@@ -372,7 +379,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Result Modal -->
     <div class="result-modal" *ngIf="resultModal.open">
-      <div class="dialog-backdrop" (click)="resultModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(resultModal)"></div>
       <div class="dialog-box result-box" *ngIf="resultModal.result as r">
         <div class="result-outcome" [class.hit]="r.hit" [class.miss]="!r.hit">
           <mat-icon>{{ r.hit ? 'gps_fixed' : 'close' }}</mat-icon>
@@ -474,7 +481,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </button>
         </div>
         <ng-template #closeOnly>
-          <button mat-raised-button style="width:100%;margin-top:16px" (click)="resultModal.open = false">
+          <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(resultModal)">
             Schließen
           </button>
         </ng-template>
@@ -512,7 +519,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Dodge Result Modal -->
     <div class="result-modal" *ngIf="dodgeModal.open">
-      <div class="dialog-backdrop" (click)="dodgeModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(dodgeModal)"></div>
       <div class="dialog-box result-box" *ngIf="dodgeModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'directions_run' : 'close' }}</mat-icon>
@@ -590,7 +597,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </ng-container>
           </ng-container>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dodgeModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(dodgeModal)">
           Schließen
         </button>
       </div>
@@ -805,7 +812,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Stand Up Result Modal -->
     <div class="result-modal" *ngIf="standUpModal.open">
-      <div class="dialog-backdrop" (click)="standUpModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(standUpModal)"></div>
       <div class="dialog-box result-box" *ngIf="standUpModal.result as r">
         <div class="result-outcome" [class.hit]="!r.stillKnockedDown" [class.miss]="r.stillKnockedDown">
           <mat-icon>{{ r.stillKnockedDown ? 'close' : 'accessibility_new' }}</mat-icon>
@@ -842,7 +849,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="standUpModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(standUpModal)">
           Schließen
         </button>
       </div>
@@ -1213,7 +1220,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Akrobatische Verteidigung Result Modal -->
     <div class="result-modal" *ngIf="acrobaticModal.open">
-      <div class="dialog-backdrop" (click)="acrobaticModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(acrobaticModal)"></div>
       <div class="dialog-box result-box" *ngIf="acrobaticModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'self_improvement' : 'close' }}</mat-icon>
@@ -1263,7 +1270,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="acrobaticModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(acrobaticModal)">
           Schließen
         </button>
       </div>
@@ -1311,7 +1318,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Kampfsinn Result Modal -->
     <div class="result-modal" *ngIf="combatSenseModal.open">
-      <div class="dialog-backdrop" (click)="combatSenseModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(combatSenseModal)"></div>
       <div class="dialog-box result-box" *ngIf="combatSenseModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'visibility' : 'close' }}</mat-icon>
@@ -1366,7 +1373,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="combatSenseModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(combatSenseModal)">
           Schließen
         </button>
       </div>
@@ -1499,7 +1506,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Spell Cast Result Modal -->
     <div class="result-modal" *ngIf="spellCastModal.open">
-      <div class="dialog-backdrop" (click)="spellCastModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissAutofightModal(spellCastModal)"></div>
       <div class="dialog-box result-box" *ngIf="spellCastModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'auto_fix_high' : 'close' }}</mat-icon>
@@ -1540,17 +1547,17 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <!-- Damage spells -->
           <ng-container *ngIf="r.success && r.effectType === 'DAMAGE' && r.damageRoll">
             <div class="roll-divider"></div>
-            <div class="roll-row extra-success-row" *ngIf="r.extraSuccesses > 0">
+            <div class="roll-row extra-success-row" *ngIf="r.damageStepBonus && r.damageStepBonus > 0">
               <span class="roll-label">Übererfolge</span>
-              <span class="roll-expr">{{ r.extraSuccesses }}× → +{{ r.extraSuccesses * 2 }} Stufen</span>
-              <span class="roll-value extra-success">+{{ r.extraSuccesses * 2 }}</span>
+              <span class="roll-expr">{{ r.extraSuccesses }}× → +{{ r.damageStepBonus }} Stufen</span>
+              <span class="roll-value extra-success">+{{ r.damageStepBonus }}</span>
             </div>
             <div class="roll-block" style="background:rgba(206,147,216,0.06);border:1px solid #4a2050">
               <div class="roll-block-header">
                 <span class="roll-block-label">
                   Zauberschaden · Step {{ r.damageStep }}
-                  <span class="step-calc" *ngIf="r.extraSuccesses > 0">
-                    ({{ r.damageStep! - r.extraSuccesses * 2 }} + {{ r.extraSuccesses * 2 }} Übererfolge)
+                  <span class="step-calc" *ngIf="r.damageStepBonus && r.damageStepBonus > 0">
+                    ({{ r.damageStep! - r.damageStepBonus }} + {{ r.damageStepBonus }} Übererfolge)
                   </span>
                 </span>
                 <div class="roll-block-totals">
@@ -1605,7 +1612,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </div>
           </ng-container>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="spellCastModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(spellCastModal)">
           Schließen
         </button>
       </div>
@@ -2025,6 +2032,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   /** Letztes Angriffsziel pro Kombattant (combatantId → defenderId) */
   private lastTargetMap = new Map<number, number>();
 
+  private autofightCombatants = new Set<number>();
+  private autofightPending = false;
+
   effectDialog: {
     open: boolean;
     target?: CombatantState;
@@ -2149,10 +2159,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.wsSub = this.wsService.subscribeToSession(id).subscribe(s => {
       this.session = s;
       this.logEntries = s.log ?? [];
+      this.scheduleAutofight();
     });
   }
 
   ngOnDestroy(): void {
+    this.autofightCombatants.clear();
+    const id = this.session?.id ?? +this.route.snapshot.params['id'];
+    this.wsService.unsubscribeFromSession(id);
     this.wsSub?.unsubscribe();
   }
 
@@ -2412,6 +2426,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   woundDots(c: CombatantState): boolean[] {
     return Array.from({ length: 5 }, (_, i) => i < c.wounds);
+  }
+
+  isNoKarma(c: CombatantState): boolean {
+    return c.character.discipline?.name === 'Keine Disziplin';
   }
 
   karmaDots(c: CombatantState): boolean[] {
@@ -2864,5 +2882,277 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
       }
     });
+  }
+
+  // ── Autofight ──────────────────────────────────────────────────────────────
+
+  isAutofight(c: CombatantState): boolean {
+    return this.autofightCombatants.has(c.id);
+  }
+
+  toggleAutofight(c: CombatantState, checked: boolean): void {
+    if (checked) {
+      this.autofightCombatants.add(c.id);
+      this.scheduleAutofight();
+    } else {
+      this.autofightCombatants.delete(c.id);
+    }
+  }
+
+  dismissAutofightModal(modal: { open: boolean }): void {
+    if (!modal.open) return;
+    modal.open = false;
+    this.scheduleAutofight();
+  }
+
+  private autoCloseModal(modal: { open: boolean }): void {
+    setTimeout(() => { this.dismissAutofightModal(modal); }, 4000);
+  }
+
+  private autofightStance(actor: CombatantState): DeclaredStance {
+    return actor.currentDamage < this.ur(actor) * 0.5 ? 'AGGRESSIVE' : 'DEFENSIVE';
+  }
+
+  private autofightDeclareType(actor: CombatantState): DeclaredActionType {
+    if (!this.isMagicCombatant(actor)) return 'WEAPON';
+    const hasSpell = (actor.character.spells ?? []).some(
+      s => s.spellDefinition.threads === 0 &&
+           (s.spellDefinition.effectType === 'DAMAGE' || s.spellDefinition.effectType === 'DEBUFF')
+    );
+    return hasSpell ? 'SPELL' : 'WEAPON';
+  }
+
+  private autofightTarget(actor: CombatantState): CombatantState | undefined {
+    const lastId = this.lastTargetMap.get(actor.id);
+    const preferred = lastId != null
+      ? this.session?.combatants.find(c => c.id === lastId && !c.defeated && c.npc !== actor.npc)
+      : undefined;
+    return preferred ?? this.session?.combatants.find(c => !c.defeated && c.npc !== actor.npc);
+  }
+
+  private canUseCombatSense(actor: CombatantState): boolean {
+    const talent = (actor.character.talents ?? []).find(t => t.talentDefinition.name === 'Kampfsinn');
+    if (!talent) return false;
+    if (actor.activeEffects.some(e => e.name === 'Akrobatische Verteidigung')) return false;
+    const usesThisRound = actor.activeEffects.filter(e => e.name === 'Kampfsinn (KV)').length;
+    return usesThisRound < talent.rank;
+  }
+
+  private combatSenseTarget(actor: CombatantState): CombatantState | undefined {
+    const alreadyTargeted = new Set<string>(
+      actor.activeEffects
+        .filter(e => e.name === 'Kampfsinn (KV)' && e.description)
+        .map(e => { const m = e.description!.match(/gegen (.+) \(Kampfsinn\)/); return m ? m[1] : ''; })
+        .filter(n => n !== '')
+    );
+    return this.session?.combatants.find(
+      c => !c.defeated && c.npc !== actor.npc &&
+           c.initiativeOrder > actor.initiativeOrder &&
+           !alreadyTargeted.has(c.character.name)
+    );
+  }
+
+  private canUseAcrobaticDefense(actor: CombatantState): boolean {
+    if (!(actor.character.talents ?? []).some(t => t.talentDefinition.name === 'Akrobatische Verteidigung')) return false;
+    return !actor.activeEffects.some(
+      e => e.name === 'Kampfsinn' || e.name === 'Akrobatische Verteidigung'
+    );
+  }
+
+  private scheduleAutofight(): void {
+    if (this.autofightCombatants.size === 0 || this.autofightPending) return;
+    if (this.resultModal.open || this.standUpModal.open || this.combatSenseModal.open ||
+        this.acrobaticModal.open || this.spellCastModal.open || this.dodgeModal.open) return;
+    this.autofightPending = true;
+    setTimeout(() => {
+      this.autofightPending = false;
+      if (this.resultModal.open || this.standUpModal.open || this.combatSenseModal.open ||
+          this.acrobaticModal.open || this.spellCastModal.open || this.dodgeModal.open) return;
+      this.runAutofightStep();
+    }, 600);
+  }
+
+  private runAutofightStep(): void {
+    if (!this.session || this.session.status !== 'ACTIVE') return;
+    if (this.autofightCombatants.size === 0) return;
+
+    const sessionId = this.session.id;
+
+    // DECLARATION PHASE
+    if (this.session.phase === 'DECLARATION') {
+      const undeclared = this.session.combatants.find(
+        c => !c.defeated && !c.hasDeclared && this.autofightCombatants.has(c.id)
+      );
+      if (undeclared) {
+        const stance = this.autofightStance(undeclared);
+        const actionType = this.autofightDeclareType(undeclared);
+        this.combatService.declareAction(sessionId, undeclared.id, stance, actionType).subscribe({
+          next: s => { this.session = s; this.logEntries = s.log ?? []; this.scheduleAutofight(); },
+          error: err => this.snack.open('Autofight (Ansage): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+        });
+      }
+      return;
+    }
+
+    // ACTION PHASE
+    if (this.session.phase === 'ACTION') {
+      const active = this.session.combatants.filter(c => !c.defeated);
+      if (active.every(c => c.hasActedThisRound)) return;
+
+      const actor = this.session.combatants.find(c => !c.defeated && !c.hasActedThisRound);
+      if (!actor) return;
+      if (!this.autofightCombatants.has(actor.id)) return;
+
+      // Knocked down → stand up
+      if (actor.knockedDown) {
+        this.combatService.standUp(sessionId, actor.id).subscribe({
+          next: result => {
+            this.standUpModal = { open: true, result };
+            this.autoCloseModal(this.standUpModal);
+            this.combatService.findById(sessionId).subscribe(s => {
+              this.session = s; this.logEntries = s.log ?? [];
+            });
+          },
+          error: err => this.snack.open('Autofight (Aufstehen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+        });
+        return;
+      }
+
+      // No-target check
+      const target = this.autofightTarget(actor);
+      if (!target) {
+        this.combatService.declareCombatOption(sessionId, actor.id, 'USE_ACTION').subscribe({
+          next: s => { this.session = s; this.logEntries = s.log ?? []; this.scheduleAutofight(); },
+          error: err => this.snack.open('Autofight (Überspringen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+        });
+        return;
+      }
+
+      // Free action: Kampfsinn
+      if (this.canUseCombatSense(actor)) {
+        const csTarget = this.combatSenseTarget(actor);
+        if (csTarget) {
+          const req: CombatSenseRequest = {
+            sessionId, actorCombatantId: actor.id, targetCombatantId: csTarget.id,
+            bonusSteps: 0, spendKarma: actor.currentKarma > 0
+          };
+          this.lastTargetMap.set(actor.id, csTarget.id);
+          this.combatService.performCombatSense(sessionId, req).subscribe({
+            next: result => {
+              this.combatSenseModal = { open: true, result };
+              this.autoCloseModal(this.combatSenseModal);
+              this.combatService.findById(sessionId).subscribe(s => {
+                this.session = s; this.logEntries = s.log ?? [];
+              });
+            },
+            error: err => this.snack.open('Autofight (Kampfsinn): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+          });
+          return;
+        }
+      }
+
+      // Free action: Akrobatische Verteidigung
+      if (this.canUseAcrobaticDefense(actor)) {
+        this.combatService.performAcrobaticDefense(sessionId, actor.id, 0, actor.currentKarma > 0).subscribe({
+          next: result => {
+            this.acrobaticModal = { open: true, result };
+            this.autoCloseModal(this.acrobaticModal);
+            this.combatService.findById(sessionId).subscribe(s => {
+              this.session = s; this.logEntries = s.log ?? [];
+            });
+          },
+          error: err => this.snack.open('Autofight (Akrobatik): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+        });
+        return;
+      }
+
+      // Main action: 0-thread spell for magic users
+      if (this.isMagicCombatant(actor)) {
+        const castableSpell = (actor.character.spells ?? []).find(
+          s => s.spellDefinition.threads === 0 &&
+               (s.spellDefinition.effectType === 'DAMAGE' || s.spellDefinition.effectType === 'DEBUFF')
+        );
+        if (castableSpell) {
+          const spellReq: SpellCastRequest = {
+            sessionId, casterCombatantId: actor.id, targetCombatantId: target.id,
+            spellId: castableSpell.spellDefinition.id, spendKarma: actor.currentKarma > 0
+          };
+          this.combatService.castSpell(sessionId, spellReq).subscribe({
+            next: result => {
+              this.spellCastModal = { open: true, result };
+              this.autoCloseModal(this.spellCastModal);
+              this.combatService.findById(sessionId).subscribe(s => {
+                this.session = s; this.logEntries = s.log ?? [];
+              });
+            },
+            error: err => this.snack.open('Autofight (Zauber): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+          });
+          return;
+        }
+      }
+
+      // Main action: physical attack
+      const bestTalent = (actor.character.talents ?? [])
+        .filter(t => t.talentDefinition.attackTalent && t.talentDefinition.name !== 'Spruchzauberei')
+        .sort((a, b) => b.rank - a.rank)[0];
+      const bestWeapon = (actor.character.equipment ?? [])
+        .filter(e => e.type === 'WEAPON')
+        .sort((a, b) => b.damageBonus - a.damageBonus)[0];
+      const talentName = bestTalent?.talentDefinition.name ?? '';
+      const actionType: AttackActionRequest['actionType'] =
+        (talentName === 'Projektilwaffen' || talentName === 'Wurfwaffen') ? 'RANGED_ATTACK' : 'MELEE_ATTACK';
+
+      const req: AttackActionRequest = {
+        sessionId,
+        attackerCombatantId: actor.id,
+        defenderCombatantId: target.id,
+        actionType,
+        talentId: bestTalent?.talentDefinition.id,
+        weaponId: bestWeapon?.id,
+        bonusSteps: 0,
+        spendKarma: actor.currentKarma > 0,
+        aggressiveAttack: false,
+        defensiveStance: false
+      };
+
+      this.combatService.performAttack(req).subscribe({
+        next: result => {
+          this.lastTargetMap.set(actor.id, target.id);
+          this.resultModal = { open: true, result };
+
+          if (result.hitPendingDodge && result.dodgeDefenderId) {
+            const defenderIsAuto = this.autofightCombatants.has(result.dodgeDefenderId);
+            if (defenderIsAuto) {
+              this.autoCloseModal(this.resultModal);
+              const dodgeReq: DodgeRequest = {
+                sessionId, defenderCombatantId: result.dodgeDefenderId,
+                dodgeAttempted: false, bonusSteps: 0, spendKarma: false
+              };
+              this.combatService.resolveDodge(sessionId, dodgeReq).subscribe({
+                next: dodgeResult => {
+                  this.dodgeModal = { open: true, result: dodgeResult };
+                  this.autoCloseModal(this.dodgeModal);
+                  this.combatService.findById(sessionId).subscribe(s => {
+                    this.session = s; this.logEntries = s.log ?? [];
+                  });
+                },
+                error: err => this.snack.open('Autofight (Ausweichen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+              });
+            } else {
+              // Manual defender: keep result modal open; WS update after dodge resolution resumes autofight
+              this.combatService.findById(sessionId).subscribe(s => {
+                this.session = s; this.logEntries = s.log ?? [];
+              });
+            }
+          } else {
+            this.autoCloseModal(this.resultModal);
+            this.combatService.findById(sessionId).subscribe(s => {
+              this.session = s; this.logEntries = s.log ?? [];
+            });
+          }
+        },
+        error: err => this.snack.open('Autofight (Angriff): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
+      });
+    }
   }
 }

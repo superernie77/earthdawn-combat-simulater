@@ -41,6 +41,7 @@ public class CharacterService {
         GameCharacter existing = findById(id);
         existing.setName(updated.getName());
         existing.setPlayerName(updated.getPlayerName());
+        existing.setRace(updated.getRace());
         existing.setCircle(updated.getCircle());
         existing.setLegendPoints(updated.getLegendPoints());
         existing.setDiscipline(updated.getDiscipline());

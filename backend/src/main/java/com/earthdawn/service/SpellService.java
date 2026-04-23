@@ -176,7 +176,7 @@ public class SpellService {
             defenseValue = 0; // Selbstzauber ohne feste Schwierigkeit = auto-Erfolg
         }
 
-        boolean success = defenseValue == 0 || total > defenseValue;
+        boolean success = defenseValue == 0 || total >= defenseValue;
         int extraSuccesses = success && defenseValue > 0 ? (total - defenseValue) / 5 : 0;
 
         String casterName = caster.getCharacter().getName();
@@ -259,6 +259,7 @@ public class SpellService {
         int newWounds = target.getWounds() - prevWounds;
 
         result.damageStep(damageStep)
+              .damageStepBonus(damageBonus)
               .damageRoll(damageRoll)
               .armorValue(armor)
               .netDamage(netDamage)

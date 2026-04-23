@@ -39,9 +39,12 @@ public class DataInitializer {
             migrateFreeActionTalents();
             migrateDodgeTalent();
             migrateDisciplineBonuses();
+            migrateKarmaStepToW6();
             migrateActionTypeConstraint();
             migrateFadenwebenTalents();
             migrateGeisterbeschwoererDiscipline();
+            migrateKeineDisziplin();
+            migrateEd4Disciplines();
             seedSpells();
             migrateIllusionistSpells();
             migrateGeisterbeschwoererSpells();
@@ -55,6 +58,8 @@ public class DataInitializer {
         seedDisciplines();
         migrateFadenwebenTalents();
         migrateGeisterbeschwoererDiscipline();
+        migrateKeineDisziplin();
+        migrateEd4Disciplines();
         seedSpells();
         migrateIllusionistSpells();
         migrateGeisterbeschwoererSpells();
@@ -305,10 +310,18 @@ public class DataInitializer {
 
     private void migrateKarmaModifier() {
         for (GameCharacter c : characterRepo.findAll()) {
-            if (c.getKarmaModifier() == 0) {
-                c.setKarmaModifier(5);
+            boolean hasNoKarma = c.getDiscipline() != null
+                    && "Keine Disziplin".equals(c.getDiscipline().getName());
+            if (hasNoKarma) {
+                c.setKarmaModifier(0);
+                c.setKarmaMax(0);
+                c.setKarmaCurrent(0);
+            } else {
+                if (c.getKarmaModifier() == 0) {
+                    c.setKarmaModifier(5);
+                }
+                c.setKarmaMax(c.getKarmaModifier() * c.getCircle());
             }
-            c.setKarmaMax(c.getKarmaModifier() * c.getCircle());
             characterRepo.save(c);
         }
         log.info("Karma-Modifikator Migration abgeschlossen.");
@@ -508,7 +521,7 @@ public class DataInitializer {
         if (disciplineRepo.findByName("Geisterbeschwörer").isEmpty()) {
             disciplineRepo.save(DisciplineDefinition.builder()
                     .name("Geisterbeschwörer")
-                    .karmaStep(6)
+                    .karmaStep(4)
                     .bwBonusPerCircle(3)
                     .tdBonusPerCircle(4)
                     .description("Meister der Geistermagie und der Verbindung zu den Toten.")
@@ -516,6 +529,55 @@ public class DataInitializer {
                             "Spruchzauberei", "Fadenmagie", "Geisterbeschwörung", "Standhalten", "Meditation")))
                     .build());
             log.info("Disziplin 'Geisterbeschwörer' hinzugefügt.");
+        }
+    }
+
+    private void migrateKeineDisziplin() {
+        if (disciplineRepo.findByName("Keine Disziplin").isEmpty()) {
+            disciplineRepo.save(DisciplineDefinition.builder()
+                    .name("Keine Disziplin")
+                    .karmaStep(0)
+                    .bwBonusPerCircle(0)
+                    .tdBonusPerCircle(0)
+                    .description("Kein Abenteurer einer Disziplin. Kein Karma.")
+                    .accessTalentNames(new java.util.ArrayList<>())
+                    .build());
+            log.info("Disziplin 'Keine Disziplin' hinzugefügt.");
+        }
+    }
+
+    private void migrateKarmaStepToW6() {
+        // ED4 FASA: karma die is always W6 (Step 4) for every discipline except Keine Disziplin
+        disciplineRepo.findAll().forEach(d -> {
+            if (d.getKarmaStep() != 0 && d.getKarmaStep() != 4) {
+                d.setKarmaStep(4);
+                disciplineRepo.save(d);
+            }
+        });
+        log.info("Karma-Step aller Disziplinen auf W6 (Step 4) gesetzt.");
+    }
+
+    private void migrateEd4Disciplines() {
+        record D(String name, int karmaStep, int bw, int td, List<String> talents) {}
+        List<D> toAdd = List.of(
+            new D("Luftpirat",    4, 7, 8, List.of("Nahkampfwaffen", "Projektilwaffen", "Ausweichen", "Standhaftigkeit")),
+            new D("Luftsegler",   4, 5, 6, List.of("Nahkampfwaffen", "Ausweichen", "Verspotten")),
+            new D("Schütze",      4, 5, 6, List.of("Projektilwaffen", "Wurfwaffen", "Magische Markierung", "Ausweichen")),
+            new D("Steppenreiter",4, 7, 8, List.of("Nahkampfwaffen", "Projektilwaffen", "Standhaftigkeit", "Kampfsinn")),
+            new D("Tiermeister",  4, 5, 6, List.of("Ausweichen", "Standhaftigkeit", "Kampfsinn")),
+            new D("Waffenschmied",4, 5, 6, List.of("Nahkampfwaffen", "Standhaftigkeit"))
+        );
+        for (D d : toAdd) {
+            if (disciplineRepo.findByName(d.name()).isEmpty()) {
+                disciplineRepo.save(DisciplineDefinition.builder()
+                        .name(d.name())
+                        .karmaStep(d.karmaStep())
+                        .bwBonusPerCircle(d.bw())
+                        .tdBonusPerCircle(d.td())
+                        .accessTalentNames(new java.util.ArrayList<>(d.talents()))
+                        .build());
+                log.info("Disziplin '{}' hinzugefügt.", d.name());
+            }
         }
     }
 
