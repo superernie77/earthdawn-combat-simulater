@@ -361,20 +361,19 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </ng-template>
 
         <!-- Right: Log -->
-        <div class="log-panel">
-
-          <!-- Combat Log -->
-          <div class="section-title" style="margin-top:16px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px"
-               (click)="logOpen = !logOpen">
-            <mat-icon style="font-size:18px;width:18px;height:18px">{{ logOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
-            Kampfprotokoll
+        <div class="log-panel" [class.collapsed]="!logOpen">
+          <div class="log-toggle" (click)="logOpen = !logOpen" [matTooltip]="logOpen ? 'Protokoll ausblenden' : 'Protokoll einblenden'">
+            {{ logOpen ? '◀' : '▶' }}&nbsp;Protokoll
           </div>
-          <div class="log-scroll" *ngIf="logOpen">
-            <div
-              *ngFor="let entry of logEntries"
-              [class]="'combat-log-entry ' + (entry.success ? 'success' : isSystem(entry.actionType) ? 'system' : 'failure')">
-              <span class="round-badge">R{{ entry.round }}</span>
-              {{ entry.description }}
+          <div class="log-content" *ngIf="logOpen">
+            <div class="section-title" style="margin-top:16px">Kampfprotokoll</div>
+            <div class="log-scroll">
+              <div
+                *ngFor="let entry of logEntries"
+                [class]="'combat-log-entry ' + (entry.success ? 'success' : isSystem(entry.actionType) ? 'system' : 'failure')">
+                <span class="round-badge">R{{ entry.round }}</span>
+                {{ entry.description }}
+              </div>
             </div>
           </div>
         </div>
@@ -1646,9 +1645,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       &.enemy.active { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.1); }
     }
 
-    .tracker-body { display: grid; grid-template-columns: 1fr 380px; gap: 16px; flex: 1; overflow: hidden; }
-
-    .combatants-panel { overflow-y: auto; }
+    .tracker-body { display: flex; gap: 16px; flex: 1; overflow: hidden; }
+    .combatants-panel { flex: 1; min-width: 0; overflow-y: auto; }
     .combatants-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .combatant-group { display: flex; flex-direction: column; gap: 8px; }
     .group-header {
@@ -1778,7 +1776,19 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .def-modified { color: #ffcc80; font-weight: 700; }
     .effects-row { display: flex; flex-wrap: wrap; gap: 2px; }
 
-    .log-panel { display: flex; flex-direction: column; overflow: hidden; }
+    .log-panel {
+      display: flex; flex-direction: row; flex-shrink: 0;
+      width: 380px; transition: width 0.3s ease; overflow: hidden;
+      &.collapsed { width: 28px; }
+    }
+    .log-toggle {
+      width: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; background: #2a2520; border-radius: 4px;
+      writing-mode: vertical-rl; font-size: 0.75rem; color: #aaa; letter-spacing: 1px;
+      user-select: none;
+      &:hover { background: #3a3530; color: #fff; }
+    }
+    .log-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-left: 8px; min-width: 0; }
     .log-scroll { flex: 1; overflow-y: auto; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 4px; }
 
     .result-modal {
