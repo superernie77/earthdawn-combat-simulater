@@ -9,6 +9,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CommonModule } from '@angular/common';
 import { CharacterService } from '../../services/character.service';
 import { ActiveCharacterService } from '../../services/active-character.service';
+import { ActiveUserService } from '../../services/active-user.service';
 import { Character, emptyCharacter } from '../../models/character.model';
 import { NewCharacterDialogComponent } from '../new-character-dialog/new-character-dialog.component';
 
@@ -33,53 +34,71 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
       </div>
 
       <div class="character-grid" *ngIf="characters.length > 0; else empty">
-        <mat-card class="char-card" *ngFor="let c of characters" (click)="openCharacter(c.id!)" [class.active-card]="isActive(c)">
-          <mat-card-header>
-            <mat-card-title>{{ c.name }}</mat-card-title>
-            <mat-card-subtitle>
-              {{ c.playerName }} · {{ c.discipline?.name || 'Keine Disziplin' }} Kreis {{ c.circle }}
-            </mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="attr-row">
-              <span class="attr-chip" title="Geschicklichkeit">GE {{ c.dexterity }}</span>
-              <span class="attr-chip" title="Stärke">ST {{ c.strength }}</span>
-              <span class="attr-chip" title="Zähigkeit">ZÄ {{ c.toughness }}</span>
-              <span class="attr-chip" title="Wahrnehmung">WN {{ c.perception }}</span>
-              <span class="attr-chip" title="Willenskraft">WK {{ c.willpower }}</span>
-              <span class="attr-chip" title="Charisma">CH {{ c.charisma }}</span>
-            </div>
-            <div class="status-row">
-              <span class="status-item">
-                <mat-icon style="font-size:14px;height:14px;width:14px">favorite</mat-icon>
-                {{ c.currentDamage }}/{{ unconsciousnessRating(c) }}
-              </span>
-              <span class="status-item" *ngIf="c.wounds > 0" style="color:#f44336">
-                <mat-icon style="font-size:14px;height:14px;width:14px">warning</mat-icon>
-                {{ c.wounds }} Wunde(n)
-              </span>
-              <span class="status-item" style="color:#c9a84c">
-                <mat-icon style="font-size:14px;height:14px;width:14px">auto_awesome</mat-icon>
-                {{ c.karmaCurrent }}/{{ c.karmaMax }} Karma
-              </span>
-            </div>
-          </mat-card-content>
-          <mat-card-actions>
-            <button mat-button (click)="openCharacter(c.id!); $event.stopPropagation()">
-              <mat-icon>edit</mat-icon> Bearbeiten
-            </button>
-            <button mat-button
-              [color]="isActive(c) ? 'accent' : ''"
-              (click)="activate(c); $event.stopPropagation()"
-              [matTooltip]="isActive(c) ? 'Aktiver Charakter (klicken zum Deaktivieren)' : 'Als aktiven Charakter setzen'">
-              <mat-icon>{{ isActive(c) ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-              {{ isActive(c) ? 'Aktiv' : 'Aktivieren' }}
-            </button>
-            <button mat-button color="warn" (click)="delete(c); $event.stopPropagation()">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </mat-card-actions>
-        </mat-card>
+        <ng-container *ngFor="let c of characters">
+
+          <!-- Normal visible card -->
+          <mat-card *ngIf="isVisible(c)" class="char-card" (click)="openCharacter(c.id!)" [class.active-card]="isActive(c)">
+            <mat-card-header>
+              <mat-card-title>
+                {{ c.name }}
+                <mat-icon *ngIf="c.gmCharacter" class="gm-lock-icon" matTooltip="Spielleiter-Charakter">lock</mat-icon>
+              </mat-card-title>
+              <mat-card-subtitle>
+                {{ c.playerName }} · {{ c.discipline?.name || 'Keine Disziplin' }} Kreis {{ c.circle }}
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="attr-row">
+                <span class="attr-chip" title="Geschicklichkeit">GE {{ c.dexterity }}</span>
+                <span class="attr-chip" title="Stärke">ST {{ c.strength }}</span>
+                <span class="attr-chip" title="Zähigkeit">ZÄ {{ c.toughness }}</span>
+                <span class="attr-chip" title="Wahrnehmung">WN {{ c.perception }}</span>
+                <span class="attr-chip" title="Willenskraft">WK {{ c.willpower }}</span>
+                <span class="attr-chip" title="Charisma">CH {{ c.charisma }}</span>
+              </div>
+              <div class="status-row">
+                <span class="status-item">
+                  <mat-icon style="font-size:14px;height:14px;width:14px">favorite</mat-icon>
+                  {{ c.currentDamage }}/{{ unconsciousnessRating(c) }}
+                </span>
+                <span class="status-item" *ngIf="c.wounds > 0" style="color:#f44336">
+                  <mat-icon style="font-size:14px;height:14px;width:14px">warning</mat-icon>
+                  {{ c.wounds }} Wunde(n)
+                </span>
+                <span class="status-item" style="color:#c9a84c">
+                  <mat-icon style="font-size:14px;height:14px;width:14px">auto_awesome</mat-icon>
+                  {{ c.karmaCurrent }}/{{ c.karmaMax }} Karma
+                </span>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button (click)="openCharacter(c.id!); $event.stopPropagation()">
+                <mat-icon>edit</mat-icon> Bearbeiten
+              </button>
+              <button mat-button
+                [color]="isActive(c) ? 'accent' : ''"
+                (click)="activate(c); $event.stopPropagation()"
+                [matTooltip]="isActive(c) ? 'Aktiver Charakter (klicken zum Deaktivieren)' : 'Als aktiven Charakter setzen'">
+                <mat-icon>{{ isActive(c) ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                {{ isActive(c) ? 'Aktiv' : 'Aktivieren' }}
+              </button>
+              <button mat-button color="warn" (click)="delete(c); $event.stopPropagation()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </mat-card-actions>
+          </mat-card>
+
+          <!-- Redacted card for GM-only characters -->
+          <mat-card *ngIf="!isVisible(c)" class="char-card redacted-card"
+                    matTooltip="Spielleiter-Charakter — nicht zugänglich">
+            <mat-card-content class="redacted-content">
+              <mat-icon class="redacted-lock">lock</mat-icon>
+              <span class="redacted-name">— Verborgen —</span>
+              <span class="redacted-stats">• &nbsp; • &nbsp; • &nbsp; • &nbsp; • &nbsp; •</span>
+            </mat-card-content>
+          </mat-card>
+
+        </ng-container>
       </div>
 
       <ng-template #empty>
@@ -119,6 +138,23 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
       &.active-card { border-color: #c9a84c; box-shadow: 0 0 10px rgba(201,168,76,0.3); }
     }
 
+    .gm-lock-icon {
+      font-size: 1rem; height: 1rem; width: 1rem;
+      color: #c9a84c; vertical-align: middle; margin-left: 6px;
+    }
+
+    .redacted-card {
+      cursor: default; background: #12100e; border: 1px solid #2a2520;
+      &:hover { transform: none; border-color: #2a2520; }
+    }
+    .redacted-content {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 28px 16px; gap: 8px; min-height: 140px;
+    }
+    .redacted-lock { font-size: 2rem; height: 2rem; width: 2rem; color: #3a3028; }
+    .redacted-name { color: #444; font-size: 0.9rem; letter-spacing: 0.1em; }
+    .redacted-stats { color: #333; font-size: 1.2rem; letter-spacing: 0.3em; }
+
     .attr-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
     .attr-chip {
       padding: 2px 8px; border-radius: 10px;
@@ -142,6 +178,7 @@ export class CharacterListComponent implements OnInit {
   constructor(
     private characterService: CharacterService,
     public activeCharService: ActiveCharacterService,
+    private activeUserService: ActiveUserService,
     private router: Router,
     private dialog: MatDialog,
     private snack: MatSnackBar
@@ -154,6 +191,12 @@ export class CharacterListComponent implements OnInit {
 
   loadCharacters(): void {
     this.characterService.findAll().subscribe(list => this.characters = list);
+  }
+
+  /** Returns true if the current user is allowed to see the character's details. */
+  isVisible(c: Character): boolean {
+    if (!c.gmCharacter) return true;
+    return this.activeUserService.activeUser?.gamemaster === true;
   }
 
   openCharacter(id: number): void {

@@ -73,6 +73,7 @@ public class CharacterService {
         existing.setCurrentDamage(updated.getCurrentDamage());
         existing.setWounds(updated.getWounds());
         existing.setNotes(updated.getNotes());
+        existing.setGmCharacter(updated.isGmCharacter());
         return characterRepo.save(existing);
     }
 

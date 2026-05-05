@@ -80,6 +80,12 @@ public class GameCharacter {
     private int currentDamage;
     private int wounds;
 
+    // --- Spielleiter ---
+    /** true = nur für den Spielleiter sichtbar */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean gmCharacter = false;
+
     // --- Notizen ---
     @Column(length = 4000)
     private String notes;

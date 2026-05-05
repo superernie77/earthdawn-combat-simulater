@@ -26,5 +26,10 @@ export const routes: Routes = [
     path: 'dice',
     loadComponent: () => import('./components/dice-roller/dice-roller.component')
       .then(m => m.DiceRollerComponent)
+  },
+  {
+    path: 'accounts',
+    loadComponent: () => import('./components/accounts/accounts.component')
+      .then(m => m.AccountsComponent)
   }
 ];

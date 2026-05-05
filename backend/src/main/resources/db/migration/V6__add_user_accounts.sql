@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS user_accounts (
+    id        BIGSERIAL    PRIMARY KEY,
+    username  VARCHAR(255) NOT NULL UNIQUE,
+    gamemaster BOOLEAN     NOT NULL DEFAULT FALSE
+);
+
+ALTER TABLE characters
+    ADD COLUMN IF NOT EXISTS gm_character BOOLEAN NOT NULL DEFAULT FALSE;

@@ -1,18 +1,22 @@
-import { Component } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, OnInit } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActiveUserService } from './services/active-user.service';
+import { UserAccount } from './models/user-account.model';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
-    RouterOutlet, RouterLink, RouterLinkActive,
+    CommonModule, RouterOutlet, RouterLink, RouterLinkActive,
     MatToolbarModule, MatButtonModule, MatIconModule,
-    MatSidenavModule, MatListModule
+    MatSidenavModule, MatListModule, MatTooltipModule
   ],
   template: `
     <mat-sidenav-container class="app-container">
@@ -34,7 +38,24 @@ import { MatListModule } from '@angular/material/list';
             <mat-icon matListItemIcon>casino</mat-icon>
             <span matListItemTitle>Würfelwurf</span>
           </a>
+          <a mat-list-item routerLink="/accounts" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>manage_accounts</mat-icon>
+            <span matListItemTitle>Konten</span>
+          </a>
         </mat-nav-list>
+
+        <!-- Active user footer -->
+        <div class="user-footer" (click)="router.navigate(['/accounts'])"
+             matTooltip="Spieler wechseln">
+          <mat-icon class="user-icon" [class.gm-icon]="activeUser?.gamemaster">
+            {{ activeUser?.gamemaster ? 'admin_panel_settings' : 'person' }}
+          </mat-icon>
+          <div class="user-info">
+            <span class="user-name">{{ activeUser?.username ?? 'Kein Spieler' }}</span>
+            <span class="user-role" *ngIf="activeUser?.gamemaster">Spielleiter</span>
+            <span class="user-role muted" *ngIf="!activeUser">Klicken zum Anmelden</span>
+          </div>
+        </div>
       </mat-sidenav>
 
       <mat-sidenav-content class="main-content">
@@ -49,6 +70,8 @@ import { MatListModule } from '@angular/material/list';
       width: 200px;
       background: #1e1a16;
       border-right: 1px solid #3a3028;
+      display: flex;
+      flex-direction: column;
     }
 
     .sidenav-header {
@@ -73,6 +96,8 @@ import { MatListModule } from '@angular/material/list';
       text-transform: uppercase;
     }
 
+    mat-nav-list { flex: 1; }
+
     .main-content {
       background: #1a1a1a;
       overflow-y: auto;
@@ -86,6 +111,35 @@ import { MatListModule } from '@angular/material/list';
     ::ng-deep .mat-mdc-nav-list .mat-mdc-list-item {
       color: #c0b090;
     }
+
+    .user-footer {
+      margin-top: auto;
+      padding: 12px 14px;
+      border-top: 1px solid #3a3028;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+      &:hover { background: rgba(201,168,76,0.08); }
+    }
+    .user-icon { color: #555; font-size: 1.6rem; height: 1.6rem; width: 1.6rem; }
+    .gm-icon { color: #c9a84c; }
+    .user-info { display: flex; flex-direction: column; overflow: hidden; }
+    .user-name { font-size: 0.88rem; color: #c0b090; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role { font-size: 0.7rem; color: #c9a84c; }
+    .user-role.muted { color: #555; }
   `]
 })
-export class AppComponent {}
+export class AppComponent implements OnInit {
+  activeUser: UserAccount | null = null;
+
+  constructor(
+    private activeUserService: ActiveUserService,
+    public router: Router
+  ) {}
+
+  ngOnInit(): void {
+    this.activeUserService.activeUser$.subscribe(u => this.activeUser = u);
+  }
+}

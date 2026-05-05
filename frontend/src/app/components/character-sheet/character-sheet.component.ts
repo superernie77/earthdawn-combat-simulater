@@ -15,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
+import { ActiveUserService } from '../../services/active-user.service';
 import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
@@ -39,6 +40,12 @@ import { ProbeResult } from '../../models/dice.model';
           <span class="char-sub">{{ character.playerName }} · {{ raceLabel(character.race) }}{{ character.race ? ' · ' : '' }}{{ character.discipline?.name }} Kreis {{ character.circle }}</span>
         </div>
         <div class="header-actions">
+          <button mat-icon-button *ngIf="isGm()"
+            (click)="toggleGmCharacter()"
+            [matTooltip]="character.gmCharacter ? 'Spielleiter-Charakter (klicken zum Aufheben)' : 'Als Spielleiter-Charakter markieren'"
+            [style.color]="character.gmCharacter ? '#c9a84c' : '#555'">
+            <mat-icon>{{ character.gmCharacter ? 'lock' : 'lock_open' }}</mat-icon>
+          </button>
           <button mat-stroked-button (click)="recalculate()" matTooltip="Abgeleitete Werte neu berechnen">
             <mat-icon>calculate</mat-icon> Neu berechnen
           </button>
@@ -790,12 +797,19 @@ export class CharacterSheetComponent implements OnInit {
     private characterService: CharacterService,
     private refService: ReferenceService,
     private diceService: DiceService,
+    private activeUserService: ActiveUserService,
     private snack: MatSnackBar
   ) {}
 
   ngOnInit(): void {
     const id = +this.route.snapshot.params['id'];
     this.characterService.findById(id).subscribe(c => {
+      // Access guard: non-GM users cannot view GM characters
+      if (c.gmCharacter && !this.activeUserService.activeUser?.gamemaster) {
+        this.router.navigate(['/characters']);
+        this.snack.open('Dieser Charakter ist nicht zugänglich.', 'OK', { duration: 2500 });
+        return;
+      }
       this.character = c;
       this.loadDerived();
       this.loadAvailableSpells();
@@ -803,6 +817,22 @@ export class CharacterSheetComponent implements OnInit {
     this.refService.getTalents().subscribe(t => this.availableTalents = t);
     this.refService.getSkills().subscribe(s => this.availableSkills = s);
     this.refService.getDisciplines().subscribe(d => this.disciplines = d);
+  }
+
+  isGm(): boolean {
+    return this.activeUserService.activeUser?.gamemaster === true;
+  }
+
+  toggleGmCharacter(): void {
+    if (!this.character?.id) return;
+    const updated = { ...this.character, gmCharacter: !this.character.gmCharacter };
+    this.characterService.update(this.character.id, updated as any).subscribe(c => {
+      this.character = c;
+      this.snack.open(
+        c.gmCharacter ? 'Als Spielleiter-Charakter markiert' : 'Spielleiter-Markierung aufgehoben',
+        'OK', { duration: 1500 }
+      );
+    });
   }
 
   loadDerived(): void {

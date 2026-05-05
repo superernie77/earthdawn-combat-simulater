@@ -149,6 +149,9 @@ export interface Character {
   wounds: number;
   notes: string;
 
+  // Spielleiter
+  gmCharacter?: boolean;
+
   talents: CharacterTalent[];
   skills: CharacterSkill[];
   equipment: Equipment[];
@@ -193,6 +196,7 @@ export function emptyCharacter(): Character {
     currentDamage: 0,
     wounds: 0,
     notes: '',
+    gmCharacter: false,
     physicalDefenseBonus: 0,
     spellDefenseBonus: 0,
     socialDefenseBonus: 0,
