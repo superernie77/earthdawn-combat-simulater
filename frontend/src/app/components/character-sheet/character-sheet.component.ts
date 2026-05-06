@@ -960,17 +960,17 @@ export class CharacterSheetComponent implements OnInit {
     return (this.derived as any)?.[key] ?? 0;
   }
 
-  /** Natürliche mystische Rüstung anhand der Wahrnehmung (ED4): min(6, WAH/5). */
+  /** Natürliche mystische Rüstung anhand der Willenskraft (ED4): min(6, WIL/5). */
   naturalMysticArmor(): number {
-    const wah = this.character?.perception ?? 0;
-    return Math.min(6, Math.max(0, Math.floor(wah / 5)));
+    const wil = this.character?.willpower ?? 0;
+    return Math.min(6, Math.max(0, Math.floor(wil / 5)));
   }
 
   /** Kleiner Hinweistext, der unter dem Label angezeigt wird. */
   derivedNote(key: string): string | null {
     if (key === 'mysticArmor') {
       const nat = this.naturalMysticArmor();
-      return nat > 0 ? `+${nat} aus WAH` : null;
+      return nat > 0 ? `+${nat} aus WIL` : null;
     }
     return null;
   }
@@ -978,9 +978,9 @@ export class CharacterSheetComponent implements OnInit {
   /** Tooltip mit ausführlicher Erklärung. */
   derivedTooltip(key: string): string {
     if (key === 'mysticArmor') {
-      const wah = this.character?.perception ?? 0;
+      const wil = this.character?.willpower ?? 0;
       const nat = this.naturalMysticArmor();
-      return `Natürliche mystische Rüstung aus Wahrnehmung ${wah}: ${nat} (Tabelle: 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6). Ausrüstungs-Boni werden zusätzlich addiert.`;
+      return `Natürliche mystische Rüstung aus Willenskraft ${wil}: ${nat} (Tabelle: 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6). Ausrüstungs-Boni werden zusätzlich addiert.`;
     }
     return '';
   }
