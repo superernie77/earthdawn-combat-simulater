@@ -40,7 +40,6 @@ public class DataInitializer {
             migrateDodgeTalent();
             migrateDisciplineBonuses();
             migrateKarmaStepToW6();
-            migrateActionTypeConstraint();
             migrateFadenwebenTalents();
             migrateGeisterbeschwoererDiscipline();
             migrateKeineDisziplin();
@@ -1055,27 +1054,4 @@ public class DataInitializer {
         log.info("50 Geisterbeschwörer-Zauber migriert.");
     }
 
-    /**
-     * Drops and recreates the check constraint on combat_logs.action_type
-     * to include newly added ActionType enum values.
-     */
-    private void migrateActionTypeConstraint() {
-        try {
-            entityManager.createNativeQuery(
-                "ALTER TABLE combat_logs DROP CONSTRAINT IF EXISTS combat_logs_action_type_check"
-            ).executeUpdate();
-            entityManager.createNativeQuery(
-                "ALTER TABLE combat_logs ADD CONSTRAINT combat_logs_action_type_check " +
-                "CHECK (action_type IN ('MELEE_ATTACK','RANGED_ATTACK','SPELL_ATTACK'," +
-                "'TALENT_TEST','SKILL_TEST','RECOVERY_TEST','INITIATIVE'," +
-                "'EFFECT_ADDED','EFFECT_REMOVED','VALUE_CHANGED','ROUND_CHANGE'," +
-                "'COMBAT_OPTION','FREE_ACTION','DODGE','STAND_UP','AUFSPRINGEN'," +
-                "'THREADWEAVE','SPELL_CAST','TAUNT','DISTRACT'," +
-                "'ACROBATIC_DEFENSE','COMBAT_SENSE','IRON_WILL'))"
-            ).executeUpdate();
-            log.info("action_type CHECK-Constraint aktualisiert.");
-        } catch (Exception e) {
-            log.warn("Konnte action_type CHECK-Constraint nicht aktualisieren: {}", e.getMessage());
-        }
-    }
 }
