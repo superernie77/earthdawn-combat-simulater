@@ -214,6 +214,10 @@ Runtime combat state, independent of the persisted `GameCharacter`.
 | preparingSpellId | Long | ID of spell being threaded |
 | threadsWoven / threadsRequired | int | Thread progress |
 | pendingDodgeDamage | int | Damage held until dodge resolved |
+| **pendingRiposteAttackTotal** | int | Attack total awaiting Riposte resolution (−1 = none pending) |
+| **pendingRiposteAttackerId** | Long | ID of the attacker for Riposte counter-attack |
+| **tigersprungUsedThisRound** | boolean | Tigersprung already used this round; reset by `nextRound()` |
+| **zweitWaffeUsedThisRound** | boolean | Zweitwaffe already used this round; reset by `nextRound()` |
 | activeEffects | List\<ActiveEffect\> | All active buffs/debuffs/conditions |
 
 ### ActiveEffect
@@ -440,6 +444,28 @@ Restrictions:
   • Cannot combine with Akrobatische Verteidigung (mutual exclusion)
 ```
 
+### Manövrieren
+```
+Actor: DEX-Step + Manövrieren-Rank + bonusSteps − wounds
+Target: target's Physical Defense (Körperliche VK)
+Success: successes = 1 + floor((total − TN) / 5)
+         +successes×2 to actor's Physical Defense (ON_MELEE_DEFENSE) for 1 round
+         +successes×2 to actor's next melee Attack Step (pendingAttackBonus)
+Cost:    1 damage to actor; consumes hasActedThisRound
+```
+
+### Zweitwaffe
+```
+Actor: DEX-Step + Zweitwaffe-Rank + bonusSteps − wounds
+Target: target's Physical Defense (Körperliche VK)
+Success: full damage roll on hit (same resolution as a normal attack)
+Restriction:
+  • zweitWaffeUsedThisRound = true after use (own once-per-round flag,
+    independent of hasActedThisRound — can be used after a main attack
+    OR as the sole action for the round)
+Cost: 1 damage to actor; sets hasActedThisRound = true
+```
+
 ---
 
 ## Passive / Reaction Talents
@@ -462,6 +488,39 @@ Cost: 1 damage; does NOT consume hasActedThisRound
 
 ### Ausweichen (reaction, after being hit)
 See [Dodge resolution](#dodge-resolution) above.
+
+### Riposte (reaction, after being hit by a melee attack)
+```
+Trigger: a melee attack hits the combatant AND they have the Riposte talent
+         AND no other Riposte is already pending
+Flow:
+  1. performAttack() detects the trigger, stores pendingRiposteAttackTotal and
+     pendingRiposteAttackerId on the defender; returns hitPendingRiposte=true
+     (damage is NOT applied yet)
+  2. Frontend shows the Riposte button (visible only when pendingRiposteAttackTotal ≥ 0)
+  3. Defender chooses: attempt Riposte (riposteAttempted=true) or accept damage
+
+  If riposteAttempted=true:
+    rollStep = DEX-Step + Riposte-Rank + bonusSteps − wounds
+    Roll vs pendingRiposteAttackTotal
+    Success: damage blocked entirely
+    Extra successes (≥ 1): counter-attack with riposteTotal as attack total
+      vs attacker's Physical Defense; damage uses (extraSuccesses − 1) bonus steps
+
+  If riposteAttempted=false: incoming damage applied as normal
+
+Cost: 2 damage to defender regardless of outcome
+Does not consume hasActedThisRound
+```
+
+### Tigersprung (free action, once per round)
+```
+No roll.
+Actor's initiative += Tigersprung-Rank
+Restriction: tigersprungUsedThisRound = true; resets on nextRound()
+Cost: 1 damage to actor
+Does not consume hasActedThisRound
+```
 
 ---
 
@@ -629,6 +688,18 @@ POST /api/combat/sessions/{id}/cast-spell               SpellCastRequest
 POST /api/combat/sessions/{id}/combatants/{cId}/cancel-spell
 
 POST /api/combat/sessions/{id}/combatants/{cId}/combat-option   ?option=USE_ACTION
+
+POST /api/combat/sessions/{id}/riposte                          RiposteRequest
+     { defenderCombatantId, bonusSteps, spendKarma, riposteAttempted }
+
+POST /api/combat/sessions/{id}/manoeuver                        ManoeuverRequest
+     { actorCombatantId, targetCombatantId, bonusSteps, spendKarma }
+
+POST /api/combat/sessions/{id}/combatants/{cId}/tigersprung
+     → no body; adds initiative, costs 1 damage
+
+POST /api/combat/sessions/{id}/zweitwaffe                       ZweitwaffeRequest
+     { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma }
 ```
 
 ### Combat — State Management
@@ -693,6 +764,10 @@ src/app/
 - **Kampfsinn** button — PER-based offense+defense boost (main action)
 - **Ablenken** button — CHA-based mutual defense penalty (main action)
 - **Eiserner Wille** button — WIL-based free action to negate spell effect (no turn restriction)
+- **Manövrieren** button — DEX-based defensive setup (main action, if talent present)
+- **Zweitwaffe** button — additional weapon attack (own once-per-round flag, if talent present)
+- **Tigersprung** button — initiative boost, no roll (once per round, if talent present)
+- **Riposte** button — reactive melee parry; visible **only** when `pendingRiposteAttackTotal ≥ 0` (i.e. an unresolved melee hit is waiting)
 - Threadweave / cast spell buttons (magic characters)
 - Free action button (if talent with `freeAction=true` exists)
 - Stand up / Aufspringen (if knocked down)
@@ -728,6 +803,10 @@ Krieger, Pfadsucher, Dieb, Schwertkämpfer, Bogenschütze, Waffenmeister, Trouba
 | Akrobatische Verteidigung | DEX | main action | DEX+rank vs highest enemy KV; +2/success KV for 1 round |
 | Kampfsinn | PER | main action | PER+rank vs target MV; +2/success KV+Angriff for 1 round; requires higher initiative |
 | Magische Markierung | PER | free action | freeAction; +2/Übererfolg on ranged ATTACK_STEP vs target; costs 1 damage |
+| Manövrieren | DEX | main action | DEX+rank vs target KV; +successes×2 KV+Angriff for 1 round; costs 1 damage |
+| Zweitwaffe | DEX | additional attack | DEX+rank vs target KV; full damage on hit; own once-per-round flag; costs 1 damage |
+| Riposte | DEX | reaction | Intercepts incoming melee hit; DEX+rank vs attack total; blocks damage; extra successes → counter-attack; costs 2 damage |
+| Tigersprung | DEX | free action | No roll; initiative += rank; once per round; costs 1 damage |
 
 ### Spells (~105 total)
 
