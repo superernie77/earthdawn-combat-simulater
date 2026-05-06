@@ -1850,6 +1850,41 @@ public class CombatService {
             int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
             int net = Math.max(0, damageRoll.getTotal() - armor);
 
+            // Reaktionsmöglichkeiten des Verteidigers (Riposte und/oder Ausweichen) — wie bei normalem Nahkampfangriff
+            boolean defenderHasRiposte = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
+                    && defender.getPendingRiposteAttackTotal() < 0;
+            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
+
+            if (defenderHasRiposte || defenderHasDodge) {
+                if (defenderHasRiposte) {
+                    defender.setPendingRiposteAttackTotal(attackTotal);
+                    defender.setPendingRiposteAttackerId(attacker.getId());
+                    result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                }
+                if (defenderHasDodge) {
+                    defender.setPendingDodgeDamage(net);
+                    defender.setPendingDodgeAttackTotal(attackTotal);
+                    defender.setPendingDamageStep(damageStep);
+                    defender.setPendingArmorValue(armor);
+                    try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
+                    result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(net);
+                }
+                result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(net);
+                CombatActionResult actionResult = result.build();
+                actionResult.setDescription(buildDescription(actionResult));
+                String tag = defenderHasRiposte && defenderHasDodge
+                        ? " (Riposte oder Ausweichen möglich!)"
+                        : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
+                addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                        ActionType.ZWEITE_WAFFE, actionResult.getDescription() + tag, hit);
+                sessionRepo.save(session);
+                broadcast(session);
+                return actionResult;
+            }
+
             int prevWounds = defender.getWounds();
             KnockdownResult kdr = applyDamageToDefender(session, defender, net);
             int newWounds = defender.getWounds() - prevWounds;
