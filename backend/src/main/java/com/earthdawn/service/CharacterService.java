@@ -65,6 +65,7 @@ public class CharacterService {
         existing.setMysticArmor(updated.getMysticArmor());
         existing.setWeaponName(updated.getWeaponName());
         existing.setWeaponDamageStep(updated.getWeaponDamageStep());
+        existing.setSecondaryWeaponId(updated.getSecondaryWeaponId());
         existing.setKarmaModifier(updated.getKarmaModifier());
         existing.setKarmaMax(updated.getKarmaMax());
         existing.setKarmaCurrent(updated.getKarmaCurrent());

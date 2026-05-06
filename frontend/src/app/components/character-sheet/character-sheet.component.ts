@@ -318,8 +318,15 @@ import { ProbeResult } from '../../models/dice.model';
                   <div class="equip-name">{{ e.name }}</div>
                   <div class="equip-stats">
                     <span class="equip-badge weapon">+{{ e.damageBonus }} Schaden</span>
+                    <span class="equip-badge secondary-weapon" *ngIf="character.secondaryWeaponId === e.id" matTooltip="Wird als Zweitwaffe verwendet">⚔ Zweitwaffe</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
+                  <button mat-icon-button
+                    [style.color]="character.secondaryWeaponId === e.id ? '#ce93d8' : '#555'"
+                    (click)="toggleSecondaryWeapon(e)"
+                    [matTooltip]="character.secondaryWeaponId === e.id ? 'Als Zweitwaffe abwählen' : 'Als Zweitwaffe festlegen'">
+                    <mat-icon>{{ character.secondaryWeaponId === e.id ? 'join_full' : 'join_inner' }}</mat-icon>
+                  </button>
                   <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
                     <mat-icon>delete</mat-icon>
                   </button>
@@ -672,6 +679,7 @@ import { ProbeResult } from '../../models/dice.model';
     .equip-badge {
       border-radius: 10px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700;
       &.weapon { background: rgba(255,112,67,0.15); color: #ff7043; }
+      &.secondary-weapon { background: rgba(206,147,216,0.15); color: #ce93d8; border-color: #3a1a40; }
       &.armor-phys { background: rgba(66,165,245,0.15); color: #42a5f5; }
       &.armor-myst { background: rgba(171,71,188,0.15); color: #ab47bc; }
       &.armor-init { background: rgba(255,167,38,0.15); color: #ffa726; }
@@ -1152,6 +1160,14 @@ export class CharacterSheetComponent implements OnInit {
     this.characterService.removeEquipment(this.character.id, e.id).subscribe(c => {
       this.character = c;
       this.loadDerived();
+    });
+  }
+
+  toggleSecondaryWeapon(e: Equipment): void {
+    if (!this.character?.id) return;
+    this.character.secondaryWeaponId = this.character.secondaryWeaponId === e.id ? undefined : e.id;
+    this.characterService.update(this.character.id, this.character).subscribe(c => {
+      this.character = c;
     });
   }
 

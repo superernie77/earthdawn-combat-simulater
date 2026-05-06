@@ -65,6 +65,9 @@ public class GameCharacter {
     /** Basis-Schadensstufe der Waffe (vor STR-Bonus) */
     private int weaponDamageStep;
 
+    /** ID des Equipment-Eintrags (Typ WEAPON), der als Zweitwaffe verwendet wird. */
+    private Long secondaryWeaponId;
+
     // --- Karma ---
     @Column(columnDefinition = "integer default 5")
     @Builder.Default private int karmaModifier = 5;

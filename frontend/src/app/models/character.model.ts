@@ -133,6 +133,7 @@ export interface Character {
   // Waffe
   weaponName: string;
   weaponDamageStep: number;
+  secondaryWeaponId?: number;
 
   // Karma
   karmaModifier: number;

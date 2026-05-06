@@ -3583,7 +3583,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openZweitwaffeDialog(actor: CombatantState): void {
-    this.zweitwaffeDialog = { open: true, actor, defenderId: undefined, weaponId: undefined, spendKarma: false };
+    // Pre-select the character's designated secondary weapon, if set and still present
+    const secondaryId = actor.character.secondaryWeaponId;
+    const hasWeapon = secondaryId != null && (actor.character.equipment ?? []).some(e => e.id === secondaryId);
+    this.zweitwaffeDialog = { open: true, actor, defenderId: undefined, weaponId: hasWeapon ? secondaryId : undefined, spendKarma: false };
   }
 
   performZweitwaffe(): void {
