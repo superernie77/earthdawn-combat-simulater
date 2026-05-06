@@ -185,6 +185,14 @@ public class CombatService {
         }
         attackStep += req.getBonusSteps();
 
+        // Ausstehende Angriffsboni (z.B. aus Manövrieren) verbrauchen
+        if (attacker.getPendingAttackBonus() != 0) {
+            int pending = attacker.getPendingAttackBonus();
+            attackStep += pending;
+            attackBonusNotes.add("Manövrieren " + (pending >= 0 ? "+" : "") + pending);
+            attacker.setPendingAttackBonus(0);
+        }
+
         // Aggressive/defensive Haltung werden in der Ansagephase deklariert — die zugehörigen
         // Boni/Mali sind bereits als ActiveEffect am Angreifer aktiv und fließen über
         // den ModifierAggregator automatisch in attackStep / Verteidigungswerte ein.
@@ -1784,6 +1792,11 @@ public class CombatService {
 
         int dexStep = Math.max(1, diceService.attributeToStep(attacker.getCharacter().getDexterity()) - attacker.getWounds());
         int attackStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
+        // Ausstehende Angriffsboni (z.B. Manövrieren) auch hier verbrauchen
+        if (attacker.getPendingAttackBonus() != 0) {
+            attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
+            attacker.setPendingAttackBonus(0);
+        }
 
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
