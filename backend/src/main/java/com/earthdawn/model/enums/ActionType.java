@@ -23,5 +23,9 @@ public enum ActionType {
     ACROBATIC_DEFENSE,
     COMBAT_SENSE,
     DISTRACT,
-    IRON_WILL
+    IRON_WILL,
+    RIPOSTE,
+    MANOEUVER,
+    TIGERSPRUNG,
+    ZWEITE_WAFFE
 }

@@ -230,7 +230,27 @@ public class CombatService {
             int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
             int netDamage = Math.max(0, damageRoll.getTotal() - armor);
 
-            // 7. Hat Ziel Ausweichen-Talent? → Schaden zurückhalten
+            // 7. Hat Ziel Riposte-Talent? → Angriff zurückhalten (kein Schaden, warten auf Reaktion)
+            boolean defenderHasRiposte = req.getActionType() == ActionType.MELEE_ATTACK
+                    && defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
+                    && defender.getPendingRiposteAttackTotal() < 0;
+
+            if (defenderHasRiposte) {
+                defender.setPendingRiposteAttackTotal(attackTotal);
+                defender.setPendingRiposteAttackerId(attacker.getId());
+                attacker.setHasActedThisRound(true);
+                result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                CombatActionResult actionResult = result.build();
+                actionResult.setDescription(buildDescription(actionResult));
+                addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                        req.getActionType(), actionResult.getDescription() + " (Riposte möglich!)", hit);
+                sessionRepo.save(session);
+                broadcast(session);
+                return actionResult;
+            }
+
+            // 8. Hat Ziel Ausweichen-Talent? → Schaden zurückhalten
             boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
                     .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
 
@@ -288,6 +308,10 @@ public class CombatService {
             combatant.setHasActedThisRound(false);
             combatant.setPendingAttackBonus(0);
             combatant.setPendingDefenseBonus(0);
+            combatant.setTigersprungUsedThisRound(false);
+            combatant.setZweitWaffeUsedThisRound(false);
+            combatant.setPendingRiposteAttackTotal(-1);
+            combatant.setPendingRiposteAttackerId(null);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
             combatant.getActiveEffects().removeIf(effect ->
                     TalentNames.EFFECT_AGGRESSIVER_ANGRIFF.equals(effect.getName())
@@ -1476,6 +1500,314 @@ public class CombatService {
         if (success && extraSuccesses > 0) sb.append(" (").append(extraSuccesses).append(" Übererfolge)");
         if (effectApplied) sb.append(". Effekt angewandt.");
         return sb.toString();
+    }
+
+    // --- Riposte ---
+
+    public RiposteResult performRiposte(Long sessionId, RiposteRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState defender = findCombatant(session, req.getDefenderCombatantId());
+
+        int attackTotal = defender.getPendingRiposteAttackTotal();
+        if (attackTotal < 0) throw new IllegalStateException("Kein ausstehender Angriff für Riposte.");
+
+        Long attackerId = defender.getPendingRiposteAttackerId();
+        CombatantState attacker = attackerId != null ? findCombatant(session, attackerId) : null;
+        String attackerName = attacker != null ? attacker.getCharacter().getName() : "Unbekannt";
+        String defenderName = defender.getCharacter().getName();
+
+        // Ausstehenden Angriff immer zurücksetzen
+        defender.setPendingRiposteAttackTotal(-1);
+        defender.setPendingRiposteAttackerId(null);
+
+        if (!req.isRiposteAttempted()) {
+            // Kein Riposte — Angriff annehmen, Schaden anwenden
+            // Wir müssen den Schaden nachberechnen, da wir ihn nicht gespeichert haben.
+            // Stattdessen geben wir 0 Schaden zurück und zeigen eine Meldung.
+            String desc = defenderName + " nimmt den Angriff an (kein Riposte). Schaden wird manuell angewendet.";
+            addLog(session, defenderName, null, ActionType.RIPOSTE, desc, false);
+            sessionRepo.save(session);
+            broadcast(session);
+            return RiposteResult.builder()
+                    .defenderName(defenderName).attackerName(attackerName)
+                    .attackTotal(attackTotal).success(false).riposteAttempted(false).description(desc).build();
+        }
+
+        CharacterTalent ct = defender.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Riposte-Talent nicht gefunden."));
+
+        // 2 Überanstrengung
+        defender.setCurrentDamage(defender.getCurrentDamage() + 2);
+
+        // Würfelschritt: GES-Stufe + Rang + Bonus − Wunden
+        int dexStep = Math.max(1, diceService.attributeToStep(defender.getCharacter().getDexterity()) - defender.getWounds());
+        int riposteStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && defender.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            defender.setCurrentKarma(Math.max(0, defender.getCurrentKarma() - 1));
+        }
+
+        RollResult riposteRoll = diceService.roll(riposteStep);
+        int riposteTotal = riposteRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        boolean success = riposteTotal >= attackTotal;
+        int extraSuccesses = success ? (riposteTotal - attackTotal) / 5 : 0;
+
+        RiposteResult.RiposteResultBuilder result = RiposteResult.builder()
+                .defenderName(defenderName).attackerName(attackerName)
+                .riposteStep(riposteStep).riposteRoll(riposteRoll).karmaRoll(karmaRoll)
+                .attackTotal(attackTotal).success(success).extraSuccesses(extraSuccesses).damageCost(2)
+                .riposteAttempted(true);
+
+        StringBuilder desc = new StringBuilder(defenderName)
+                .append(" setzt Riposte ein: ").append(riposteTotal)
+                .append(" vs Angriff ").append(attackTotal).append(" → ")
+                .append(success ? "Pariert!" : "Fehlgeschlagen — Angriff trifft!");
+
+        if (!success && attacker != null) {
+            // Parieren fehlgeschlagen: Schaden berechnen und anwenden
+            // Wir schätzen den Schaden konservativ (Basisschaden ohne Übererfolge, da wir die
+            // ursprüngliche Angriffsprobe nicht mehr haben). Der SL muss ggf. korrigieren.
+            desc.append(" (Schaden wird manuell angewendet.)");
+        }
+
+        if (success && extraSuccesses > 0 && attacker != null) {
+            // Gegenangriff: Riposte-Ergebnis als Angriffswurf vs KV des Angreifers
+            int attackerPD = modifiers.getEffectiveValue(attacker, StatType.PHYSICAL_DEFENSE, TriggerContext.ON_MELEE_DEFENSE);
+            boolean counterHit = riposteTotal >= attackerPD;
+            result.counterAttack(true).counterAttackTotal(riposteTotal).counterAttackHit(counterHit);
+
+            desc.append(" ").append(extraSuccesses).append(" Übererfolg(e) → Gegenangriff! ")
+                .append(riposteTotal).append(" vs KV ").append(attackerPD)
+                .append(counterHit ? " → TREFFER!" : " → Verfehlt.");
+
+            if (counterHit) {
+                int counterExtraSucc = Math.max(0, (riposteTotal - attackerPD) / 5 - 1); // -1 laut Regel
+                int strStep = diceService.attributeToStep(defender.getCharacter().getStrength());
+                int damageStep = Math.max(1, strStep + defender.getCharacter().getWeaponDamageStep() + counterExtraSucc * 2);
+                RollResult counterDmgRoll = diceService.roll(damageStep);
+                int armor = modifiers.getEffectiveValue(attacker, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+                int net = Math.max(0, counterDmgRoll.getTotal() - armor);
+
+                int wt = modifiers.getEffectiveValue(attacker, StatType.WOUND_THRESHOLD, TriggerContext.ALWAYS);
+                int prevWounds = attacker.getWounds();
+                KnockdownResult kdr = applyDamageToDefender(session, attacker, net);
+                boolean woundDealt = attacker.getWounds() > prevWounds;
+
+                result.counterDamageStep(damageStep).counterDamageRoll(counterDmgRoll)
+                      .counterArmorValue(armor).counterNetDamage(net)
+                      .counterWoundDealt(woundDealt).counterKnockdown(kdr);
+
+                desc.append(" Schaden: ").append(counterDmgRoll.getTotal())
+                    .append(" − ").append(armor).append(" = ").append(net);
+                if (woundDealt) desc.append(" (WUNDE!)");
+            }
+        }
+
+        String description = desc.toString();
+        result.description(description);
+        addLog(session, defenderName, attackerName, ActionType.RIPOSTE, description, success);
+        sessionRepo.save(session);
+        broadcast(session);
+        return result.build();
+    }
+
+    // --- Manövrieren ---
+
+    public ManoeuverResult performManoeuver(Long sessionId, ManoeuverRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt!");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.MANOEUVER.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Manövrieren' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+        actor.setHasActedThisRound(true);
+
+        int dexStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getDexterity()) - actor.getWounds());
+        int rollStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int pd = modifiers.getEffectiveValue(target, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS);
+        boolean success = total >= pd;
+        int extraSucc = success ? (total - pd) / 5 : 0;
+        int successes = success ? 1 + extraSucc : 0;
+        int bonus = successes * 2;
+
+        String actorName = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+
+        if (success && bonus > 0) {
+            // Verteidigungsbonus als ActiveEffect
+            actor.getActiveEffects().add(ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name(TalentNames.EFFECT_MANOEUVER)
+                    .description("+" + bonus + " KV (Manövrieren vs " + targetName + ")")
+                    .sourceType(SourceType.TALENT)
+                    .remainingRounds(1)
+                    .negative(false)
+                    .modifiers(List.of(ModifierEntry.builder()
+                            .targetStat(StatType.PHYSICAL_DEFENSE)
+                            .operation(ModifierOperation.ADD)
+                            .value(bonus)
+                            .triggerContext(TriggerContext.ON_MELEE_DEFENSE)
+                            .build()))
+                    .build());
+            // Angriffsbonus als pendingAttackBonus
+            actor.setPendingAttackBonus(actor.getPendingAttackBonus() + bonus);
+        }
+
+        String desc = success
+                ? actorName + " manövriert gegen " + targetName + ": " + total + " vs KV " + pd
+                  + " → " + successes + " Erfolg(e). +" + bonus + " KV und +" + bonus + " auf nächsten Angriff."
+                : actorName + " manövriert gegen " + targetName + ": " + total + " vs KV " + pd + " → Fehlschlag.";
+
+        addLog(session, actorName, targetName, ActionType.MANOEUVER, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return ManoeuverResult.builder()
+                .actorName(actorName).targetName(targetName)
+                .rollStep(rollStep).roll(roll).karmaRoll(karmaRoll)
+                .defenseValue(pd).success(success).successes(successes)
+                .defenseBonus(bonus).attackBonus(bonus).damageTaken(1)
+                .description(desc).build();
+    }
+
+    // --- Tigersprung ---
+
+    public TigersprungResult performTigersprung(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (actor.isTigersprungUsedThisRound()) throw new IllegalStateException("Tigersprung wurde bereits in dieser Runde eingesetzt.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.TIGERSPRUNG.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Tigersprung' nicht gefunden."));
+
+        int rank = ct.getRank();
+        int newInitiative = actor.getInitiative() + rank;
+
+        // 1 Überanstrengung, kein Würfelwurf
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+        actor.setInitiative(newInitiative);
+        actor.setTigersprungUsedThisRound(true);
+
+        String actorName = actor.getCharacter().getName();
+        String desc = actorName + " aktiviert Tigersprung (Rang " + rank + "): Initiative +" + rank + " → " + newInitiative + ". Kostet 1 Überanstrengung.";
+
+        addLog(session, actorName, null, ActionType.TIGERSPRUNG, desc, true);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return TigersprungResult.builder()
+                .actorName(actorName).rank(rank)
+                .initiativeBonus(rank).newInitiative(newInitiative)
+                .damageTaken(1).description(desc).build();
+    }
+
+    // --- Zweitwaffe ---
+
+    public CombatActionResult performZweitwaffe(Long sessionId, ZweitwaffeRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState attacker = findCombatant(session, req.getActorCombatantId());
+        CombatantState defender = findCombatant(session, req.getDefenderCombatantId());
+
+        if (attacker.isDefeated()) throw new IllegalStateException(attacker.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (attacker.isZweitWaffeUsedThisRound()) throw new IllegalStateException("Zweitwaffe wurde bereits in dieser Runde eingesetzt.");
+
+        CharacterTalent ct = attacker.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.ZWEITWAFFE.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Zweitwaffe' nicht gefunden."));
+
+        // 1 Überanstrengung
+        attacker.setCurrentDamage(attacker.getCurrentDamage() + 1);
+        attacker.setZweitWaffeUsedThisRound(true);
+        // Zweite Aktion setzt auch hasActedThisRound (falls noch nicht geschehen)
+        attacker.setHasActedThisRound(true);
+
+        int dexStep = Math.max(1, diceService.attributeToStep(attacker.getCharacter().getDexterity()) - attacker.getWounds());
+        int attackStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            attacker.setCurrentKarma(Math.max(0, attacker.getCurrentKarma() - 1));
+        }
+
+        RollResult attackRoll = diceService.roll(attackStep);
+        int attackTotal = attackRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int pd = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_DEFENSE, TriggerContext.ON_MELEE_DEFENSE);
+        if (defender.getPendingDefenseBonus() != 0) {
+            pd += defender.getPendingDefenseBonus();
+            defender.setPendingDefenseBonus(0);
+        }
+        boolean hit = attackTotal >= pd;
+
+        CombatActionResult.CombatActionResultBuilder result = CombatActionResult.builder()
+                .actorName(attacker.getCharacter().getName())
+                .targetName(defender.getCharacter().getName())
+                .actionType(ActionType.ZWEITE_WAFFE)
+                .attackStep(attackStep).attackRoll(attackRoll).karmaRoll(karmaRoll)
+                .defenseValue(pd).hit(hit);
+
+        if (hit) {
+            int extraSucc = (attackTotal - pd) / 5;
+            int strStep = diceService.attributeToStep(attacker.getCharacter().getStrength());
+            int weaponBonus = req.getWeaponId() != null
+                    ? attacker.getCharacter().getEquipment().stream()
+                        .filter(e -> e.getId().equals(req.getWeaponId()))
+                        .findFirst().map(com.earthdawn.model.Equipment::getDamageBonus).orElse(0)
+                    : 0;
+            int damageStep = Math.max(1, strStep + weaponBonus + extraSucc * 2);
+            RollResult damageRoll = diceService.roll(damageStep);
+            int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+            int net = Math.max(0, damageRoll.getTotal() - armor);
+
+            int prevWounds = defender.getWounds();
+            KnockdownResult kdr = applyDamageToDefender(session, defender, net);
+            int newWounds = defender.getWounds() - prevWounds;
+
+            result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                  .armorValue(armor).netDamage(net)
+                  .woundDealt(newWounds > 0).newWounds(newWounds)
+                  .totalWounds(defender.getWounds())
+                  .targetDefeated(defender.isDefeated()).knockdownResult(kdr);
+        }
+
+        CombatActionResult actionResult = result.build();
+        actionResult.setDescription(buildDescription(actionResult));
+        addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                ActionType.ZWEITE_WAFFE, actionResult.getDescription(), hit);
+        sessionRepo.save(session);
+        broadcast(session);
+        return actionResult;
     }
 
     CombatantState findCombatant(CombatSession session, Long combatantId) {

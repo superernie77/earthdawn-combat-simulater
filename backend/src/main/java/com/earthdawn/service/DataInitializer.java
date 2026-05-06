@@ -71,6 +71,45 @@ public class DataInitializer {
      * setzt isAttackTalent-Flag und aktualisiert Disziplin-Referenzen.
      */
     private void migrateFreeActionTalents() {
+        if (talentRepo.findByName("Riposte").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Riposte")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Pariert einen Nahkampfangriff und schlägt zurück. GES + Rang vs. Angriffswurf des Gegners. " +
+                            "Freie Aktion, kostet 2 Überanstrengung. " +
+                            "Erfolg: Schaden abgewehrt. Übererfolge: Gegenangriff mit Riposte-Ergebnis als Angriffswurf, Schaden −1 Übererfolg.")
+                    .testable(true).attackTalent(false).build());
+            log.info("Talent 'Riposte' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Manövrieren").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Manövrieren")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Taktische Positionierung im Nahkampf. GES + Rang vs. KV des Ziels. " +
+                            "Einfache Aktion, kostet 1 Überanstrengung. " +
+                            "Pro Erfolg: +2 auf eigene KV (Nahkampf) und +2 auf nächsten Angriff gegen dieses Ziel bis Rundenende.")
+                    .testable(true).attackTalent(false).build());
+            log.info("Talent 'Manövrieren' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Tigersprung").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Tigersprung")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Verbessert die Initiative magisch. Rang wird direkt zur Initiativestufe addiert. " +
+                            "Freie Aktion, kein Würfelwurf, kostet 1 Überanstrengung. Einmal pro Runde.")
+                    .testable(false).attackTalent(false).build());
+            log.info("Talent 'Tigersprung' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Zweitwaffe").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Zweitwaffe")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Führt einen zweiten Nahkampfangriff mit der Nebenhand aus. GES + Rang vs. KV des Ziels. " +
+                            "Einfache Aktion (zusätzlich zur Hauptaktion), kostet 1 Überanstrengung. " +
+                            "Einmal pro Runde. Schaden wie normaler Nahkampfangriff.")
+                    .testable(true).attackTalent(false).build());
+            log.info("Talent 'Zweitwaffe' hinzugefügt.");
+        }
         if (talentRepo.findByName("Magische Markierung").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Magische Markierung")

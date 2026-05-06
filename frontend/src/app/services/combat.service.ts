@@ -10,7 +10,11 @@ import {
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
   SpellCastRequest, SpellCastResult,
-  DeclaredStance, DeclaredActionType
+  DeclaredStance, DeclaredActionType,
+  RiposteRequest, RiposteResult,
+  ManoeuverRequest, ManoeuverResult,
+  TigersprungResult,
+  ZweitwaffeRequest
 } from '../models/combat.model';
 
 @Injectable({ providedIn: 'root' })
@@ -185,5 +189,25 @@ export class CombatService {
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/cancel-spell`,
       {}
     );
+  }
+
+  // --- Neue Talente ---
+
+  performRiposte(sessionId: number, req: RiposteRequest): Observable<RiposteResult> {
+    return this.http.post<RiposteResult>(`${this.base}/sessions/${sessionId}/riposte`, req);
+  }
+
+  performManoeuver(sessionId: number, req: ManoeuverRequest): Observable<ManoeuverResult> {
+    return this.http.post<ManoeuverResult>(`${this.base}/sessions/${sessionId}/manoeuver`, req);
+  }
+
+  performTigersprung(sessionId: number, combatantId: number): Observable<TigersprungResult> {
+    return this.http.post<TigersprungResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/tigersprung`, {}
+    );
+  }
+
+  performZweitwaffe(sessionId: number, req: ZweitwaffeRequest): Observable<CombatActionResult> {
+    return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/zweitwaffe`, req);
   }
 }

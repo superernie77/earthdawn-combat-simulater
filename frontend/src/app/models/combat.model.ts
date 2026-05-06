@@ -73,6 +73,9 @@ export interface CombatantState {
   knockedDown: boolean;
   pendingAttackBonus: number;
   pendingDefenseBonus: number;
+  pendingRiposteAttackTotal: number;
+  tigersprungUsedThisRound: boolean;
+  zweitWaffeUsedThisRound: boolean;
   preparingSpellId?: number;
   threadsWoven: number;
   threadsRequired: number;
@@ -138,6 +141,8 @@ export interface CombatActionResult {
   hitPendingDodge?: boolean;
   dodgeDefenderId?: number;
   pendingDodgeDamage?: number;
+  hitPendingRiposte?: boolean;
+  riposteDefenderId?: number;
   knockdownResult?: KnockdownResult;
   description: string;
 }
@@ -345,4 +350,77 @@ export interface FreeActionResult {
   effectApplied: boolean;
   damageTaken: number;
   description: string;
+}
+
+// --- Riposte ---
+export interface RiposteRequest {
+  sessionId: number;
+  defenderCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+  riposteAttempted: boolean;
+}
+export interface RiposteResult {
+  defenderName: string;
+  attackerName: string;
+  riposteStep: number;
+  riposteRoll?: RollResult;
+  karmaRoll?: RollResult;
+  attackTotal: number;
+  riposteAttempted: boolean;
+  success: boolean;
+  extraSuccesses: number;
+  damageCost: number;
+  counterAttack: boolean;
+  counterAttackTotal: number;
+  counterAttackHit: boolean;
+  counterDamageStep?: number;
+  counterDamageRoll?: RollResult;
+  counterArmorValue?: number;
+  counterNetDamage?: number;
+  counterWoundDealt?: boolean;
+  description: string;
+}
+
+// --- Manövrieren ---
+export interface ManoeuverRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+export interface ManoeuverResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  defenseValue: number;
+  success: boolean;
+  successes: number;
+  defenseBonus: number;
+  attackBonus: number;
+  damageTaken: number;
+  description: string;
+}
+
+// --- Tigersprung ---
+export interface TigersprungResult {
+  actorName: string;
+  rank: number;
+  initiativeBonus: number;
+  newInitiative: number;
+  damageTaken: number;
+  description: string;
+}
+
+// --- Zweitwaffe ---
+export interface ZweitwaffeRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  defenderCombatantId: number;
+  weaponId?: number;
+  bonusSteps: number;
+  spendKarma: boolean;
 }

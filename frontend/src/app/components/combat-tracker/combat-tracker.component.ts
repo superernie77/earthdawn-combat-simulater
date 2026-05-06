@@ -26,7 +26,11 @@ import {
   DodgeRequest, DodgeResult, StandUpResult,
   ThreadweaveRequest, ThreadweaveResult,
   SpellCastRequest, SpellCastResult,
-  DeclaredStance, DeclaredActionType
+  DeclaredStance, DeclaredActionType,
+  RiposteRequest, RiposteResult,
+  ManoeuverRequest, ManoeuverResult,
+  TigersprungResult,
+  ZweitwaffeRequest
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -248,6 +252,37 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openIronWillDialog(c)"
                   matTooltip="Eiserner Wille (WIL + Rang vs. Zauberwurf, freie Aktion, kostet 1 Schaden)">
                   <mat-icon>psychology</mat-icon>
+                </button>
+                <!-- Riposte: nur sichtbar wenn ein Angriff aussteht -->
+                <button mat-raised-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasRiposteTalent(c) && c.pendingRiposteAttackTotal >= 0 && !c.defeated"
+                  class="combat-option-btn riposte-btn"
+                  (click)="openRiposteDialog(c)"
+                  matTooltip="Riposte! Nahkampfangriff parieren und kontern (GES + Rang vs. Angriffswurf, kostet 2 Überanstrengung)">
+                  <mat-icon>sports_martial_arts</mat-icon>
+                </button>
+                <!-- Manövrieren: einfache Aktion -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasManoeuverTalent(c) && !c.defeated"
+                  class="combat-option-btn manoeuver-btn"
+                  [disabled]="c.hasActedThisRound"
+                  (click)="openManoeuverDialog(c)"
+                  matTooltip="Manövrieren (GES + Rang vs. KV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Überanstrengung)">
+                  <mat-icon>swap_horiz</mat-icon>
+                </button>
+                <!-- Tigersprung: freie Aktion, kein Würfelwurf -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTigersprungTalent(c) && !c.defeated"
+                  class="combat-option-btn tigersprung-btn"
+                  [disabled]="c.tigersprungUsedThisRound"
+                  (click)="performTigersprung(c)"
+                  matTooltip="Tigersprung: +Rang auf Initiative, einmal/Runde, kostet 1 Überanstrengung">
+                  <mat-icon>bolt</mat-icon>
+                </button>
+                <!-- Zweitwaffe: zweiter Angriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
+                  class="combat-option-btn zweitwaffe-btn"
+                  [disabled]="c.zweitWaffeUsedThisRound"
+                  (click)="openZweitwaffeDialog(c)"
+                  matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung)">
+                  <mat-icon>join_full</mat-icon>
                 </button>
                 <button mat-icon-button *ngIf="session!.status === 'SETUP'"
                   color="warn" (click)="removeCombatant(c.id)" matTooltip="Entfernen">
@@ -477,12 +512,25 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <mat-icon>directions_run</mat-icon>
           Ziel kann Ausweichen versuchen
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px" *ngIf="r.hitPendingDodge; else closeOnly">
+        <div style="display:flex;gap:8px;margin-top:16px" *ngIf="r.hitPendingDodge; else riposteCheck">
           <button mat-stroked-button style="flex:1" (click)="skipDodge()">Schaden annehmen</button>
           <button mat-raised-button color="primary" style="flex:1" (click)="openDodgeDialog()">
             <mat-icon>directions_run</mat-icon> Ausweichen
           </button>
         </div>
+        <ng-template #riposteCheck>
+        <!-- Riposte prompt -->
+        <div class="dodge-prompt" *ngIf="r.hitPendingRiposte" style="border-color:#ff8a65;color:#ff8a65">
+          <mat-icon>sports_martial_arts</mat-icon>
+          Ziel kann Riposte versuchen (2 Überanstrengung)
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px" *ngIf="r.hitPendingRiposte; else closeOnly">
+          <button mat-stroked-button style="flex:1" (click)="skipRiposte()">Schaden annehmen</button>
+          <button mat-raised-button color="accent" style="flex:1" (click)="openRiposteDialogFromResult()">
+            <mat-icon>sports_martial_arts</mat-icon> Riposte
+          </button>
+        </div>
+        </ng-template>
         <ng-template #closeOnly>
           <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(resultModal)">
             Schließen
@@ -603,6 +651,207 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(dodgeModal)">
           Schließen
         </button>
+      </div>
+    </div>
+
+    <!-- Riposte Dialog -->
+    <div class="attack-dialog" *ngIf="riposteDialog.open">
+      <div class="dialog-backdrop" (click)="riposteDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ff8a65">sports_martial_arts</mat-icon>Riposte: {{ riposteDialog.defender?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          Stufe: GES + Rang vs. Angriff <strong style="color:#fff">{{ riposteDialog.attackTotal }}</strong> · Kostet 2 Überanstrengung
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="riposteDialog.spendKarma"
+            [class.disabled]="(riposteDialog.defender?.currentKarma ?? 0) <= 0"
+            (click)="(riposteDialog.defender?.currentKarma ?? 0) > 0 && (riposteDialog.spendKarma = !riposteDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(riposteDialog.defender?.currentKarma ?? 0) <= 0">{{ riposteDialog.defender?.currentKarma ?? 0 }}</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="riposteDialog.open = false; skipRiposte()">Schaden annehmen</button>
+          <button mat-raised-button color="accent" (click)="performRiposte()">
+            <mat-icon>sports_martial_arts</mat-icon> Riposte würfeln
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riposte Result Modal -->
+    <div class="result-modal" *ngIf="riposteModal.open">
+      <div class="dialog-backdrop" (click)="riposteModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="riposteModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'sports_martial_arts' : 'close' }}</mat-icon>
+          {{ r.success ? (r.counterAttack ? 'PARIERT + GEGENANGRIFF!' : 'PARIERT!') : 'RIPOSTE FEHLGESCHLAGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.defenderName)">{{ r.defenderName }}</span>
+          <span style="color:#888;margin:0 6px;font-size:0.85rem">vs Angriff {{ r.attackTotal }}</span>
+        </div>
+        <div class="result-rolls" *ngIf="r.riposteAttempted && r.riposteRoll">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Riposte · Step {{ r.riposteStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ (r.riposteRoll.total ?? 0) + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">{{ r.attackTotal }}</span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.counterAttack && r.counterAttackHit">
+            <div class="roll-divider"></div>
+            <div class="roll-row" style="background:rgba(255,138,101,0.1)">
+              <span class="roll-label">Gegenangriff</span>
+              <span class="roll-expr">{{ r.counterAttackTotal }} vs KV {{ r.counterArmorValue }}</span>
+              <span class="roll-value" style="color:#ff8a65">−{{ r.counterNetDamage }} Schaden</span>
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−2</span>
+          </div>
+        </div>
+        <div style="color:#aaa;font-size:0.82rem;margin-top:8px">{{ r.description }}</div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="riposteModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Manövrieren Dialog -->
+    <div class="attack-dialog" *ngIf="manoeuverDialog.open">
+      <div class="dialog-backdrop" (click)="manoeuverDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#80deea">swap_horiz</mat-icon>Manövrieren: {{ manoeuverDialog.actor?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="manoeuverDialog.targetId">
+            <mat-option *ngFor="let c of possibleTargets(manoeuverDialog.actor)" [value]="c.id">{{ cn(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">GES + Rang vs. KV — Pro Erfolg: +2 KV &amp; +2 auf nächsten Angriff</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="manoeuverDialog.spendKarma"
+            [class.disabled]="(manoeuverDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(manoeuverDialog.actor?.currentKarma ?? 0) > 0 && (manoeuverDialog.spendKarma = !manoeuverDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(manoeuverDialog.actor?.currentKarma ?? 0) <= 0">{{ manoeuverDialog.actor?.currentKarma ?? 0 }}</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="manoeuverDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" [disabled]="!manoeuverDialog.targetId" (click)="performManoeuver()">
+            <mat-icon>swap_horiz</mat-icon> Würfeln
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manövrieren Result Modal -->
+    <div class="result-modal" *ngIf="manoeuverModal.open">
+      <div class="dialog-backdrop" (click)="manoeuverModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="manoeuverModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'swap_horiz' : 'close' }}</mat-icon>
+          {{ r.success ? 'MANÖVER GELINGT! +' + r.defenseBonus + ' KV / +' + r.attackBonus + ' Angriff' : 'MANÖVER FEHLGESCHLAGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+          <span style="color:#888;margin:0 6px">→</span>
+          <span class="result-actor" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Manövrieren · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ (r.roll?.total ?? 0) + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs KV</span>
+                <span class="roll-big-target">{{ r.defenseValue }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="roll-row" style="background:rgba(128,222,234,0.08)">
+            <span class="roll-label">Erfolge</span>
+            <span class="roll-expr">{{ r.successes }} × +2</span>
+            <span class="roll-value" style="color:#80deea">+{{ r.defenseBonus }} KV / +{{ r.attackBonus }} Ang.</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="manoeuverModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Tigersprung Result Modal -->
+    <div class="result-modal" *ngIf="tigersprungModal.open">
+      <div class="dialog-backdrop" (click)="tigersprungModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="tigersprungModal.result as r">
+        <div class="result-outcome hit">
+          <mat-icon>bolt</mat-icon>
+          TIGERSPRUNG! +{{ r.initiativeBonus }} Initiative
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-row" style="background:rgba(255,204,0,0.08)">
+            <span class="roll-label">Initiative</span>
+            <span class="roll-expr">+{{ r.initiativeBonus }} (Rang {{ r.rank }})</span>
+            <span class="roll-value" style="color:#ffcc00">{{ r.newInitiative }}</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="tigersprungModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Zweitwaffe Dialog -->
+    <div class="attack-dialog" *ngIf="zweitwaffeDialog.open">
+      <div class="dialog-backdrop" (click)="zweitwaffeDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ce93d8">join_full</mat-icon>Zweitwaffe: {{ zweitwaffeDialog.actor?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="zweitwaffeDialog.defenderId">
+            <mat-option *ngFor="let c of possibleTargets(zweitwaffeDialog.actor)" [value]="c.id">{{ cn(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Nebenhand-Waffe (optional)</mat-label>
+          <mat-select [(ngModel)]="zweitwaffeDialog.weaponId">
+            <mat-option [value]="null">Keine Waffe</mat-option>
+            <mat-option *ngFor="let e of weaponsOf(zweitwaffeDialog.actor)" [value]="e.id">{{ e.name }} (+{{ e.damageBonus }})</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">GES + Rang vs. KV — Kostet 1 Überanstrengung, einmal/Runde</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="zweitwaffeDialog.spendKarma"
+            [class.disabled]="(zweitwaffeDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(zweitwaffeDialog.actor?.currentKarma ?? 0) > 0 && (zweitwaffeDialog.spendKarma = !zweitwaffeDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(zweitwaffeDialog.actor?.currentKarma ?? 0) <= 0">{{ zweitwaffeDialog.actor?.currentKarma ?? 0 }}</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="zweitwaffeDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" [disabled]="!zweitwaffeDialog.defenderId" (click)="performZweitwaffe()">
+            <mat-icon>join_full</mat-icon> Angreifen
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1930,6 +2179,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.distract-btn:not([disabled]):hover { border-color: #ffab91; background: rgba(255,171,145,0.1); }
     .combat-option-btn.iron-will-btn { color: #b0bec5; border-color: #2a3038; }
     .combat-option-btn.iron-will-btn:not([disabled]):hover { border-color: #b0bec5; background: rgba(176,190,197,0.1); }
+    .combat-option-btn.riposte-btn { color: #ff8a65; border-color: #4a2010; background: rgba(255,138,101,0.12); }
+    .combat-option-btn.riposte-btn:not([disabled]):hover { border-color: #ff8a65; background: rgba(255,138,101,0.22); }
+    .combat-option-btn.manoeuver-btn { color: #80deea; border-color: #1a3a40; }
+    .combat-option-btn.manoeuver-btn:not([disabled]):hover { border-color: #80deea; background: rgba(128,222,234,0.1); }
+    .combat-option-btn.tigersprung-btn { color: #ffee58; border-color: #3a3010; }
+    .combat-option-btn.tigersprung-btn:not([disabled]):hover { border-color: #ffee58; background: rgba(255,238,88,0.1); }
+    .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
+    .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
     .distract-effect-badge {
       flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
@@ -2078,6 +2335,34 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   } = { open: false, attackTotal: 0, bonusSteps: 0, spendKarma: false };
 
   dodgeModal: { open: boolean; result?: DodgeResult } = { open: false };
+
+  riposteDialog: {
+    open: boolean;
+    defender?: CombatantState;
+    attackTotal: number;
+    spendKarma: boolean;
+  } = { open: false, attackTotal: 0, spendKarma: false };
+
+  riposteModal: { open: boolean; result?: RiposteResult } = { open: false };
+
+  manoeuverDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  manoeuverModal: { open: boolean; result?: ManoeuverResult } = { open: false };
+
+  tigersprungModal: { open: boolean; result?: TigersprungResult } = { open: false };
+
+  zweitwaffeDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    defenderId?: number;
+    weaponId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
 
   aufspringenDialog: {
     open: boolean;
@@ -2328,8 +2613,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
   }
 
-  possibleTargets(): CombatantState[] {
-    return (this.session?.combatants ?? []).filter(c => c.id !== this.attackDialog.attacker?.id && !c.defeated);
+  possibleTargets(actor?: CombatantState): CombatantState[] {
+    const excludeId = actor?.id ?? this.attackDialog.attacker?.id;
+    return (this.session?.combatants ?? []).filter(c => c.id !== excludeId && !c.defeated);
   }
 
   attackTalentsOf(c?: CombatantState) {
@@ -3179,5 +3465,145 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         error: err => this.snack.open('Autofight (Angriff): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
       });
     }
+  }
+
+  // --- Riposte ---
+
+  hasRiposteTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Riposte');
+  }
+
+  openRiposteDialog(c: CombatantState): void {
+    this.riposteDialog = { open: true, defender: c, attackTotal: c.pendingRiposteAttackTotal, spendKarma: false };
+    this.resultModal = { open: false };
+  }
+
+  openRiposteDialogFromResult(): void {
+    if (!this.resultModal.result?.riposteDefenderId) return;
+    const defender = this.session?.combatants.find(c => c.id === this.resultModal.result!.riposteDefenderId);
+    if (!defender) return;
+    this.riposteDialog = {
+      open: true, defender,
+      attackTotal: defender.pendingRiposteAttackTotal,
+      spendKarma: false
+    };
+    this.resultModal = { open: false };
+  }
+
+  skipRiposte(): void {
+    const defenderId = this.resultModal.result?.riposteDefenderId ?? this.riposteDialog.defender?.id;
+    if (!this.session || !defenderId) return;
+    const req: RiposteRequest = {
+      sessionId: this.session.id,
+      defenderCombatantId: defenderId,
+      bonusSteps: 0, spendKarma: false,
+      riposteAttempted: false
+    };
+    this.combatService.performRiposte(this.session.id, req).subscribe({
+      next: result => {
+        this.riposteModal = { open: true, result };
+        this.resultModal = { open: false };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Riposte: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 })
+    });
+  }
+
+  performRiposte(): void {
+    const defender = this.riposteDialog.defender;
+    if (!this.session || !defender) return;
+    const req: RiposteRequest = {
+      sessionId: this.session.id,
+      defenderCombatantId: defender.id,
+      bonusSteps: 0,
+      spendKarma: this.riposteDialog.spendKarma,
+      riposteAttempted: true
+    };
+    this.combatService.performRiposte(this.session.id, req).subscribe({
+      next: result => {
+        this.riposteDialog.open = false;
+        this.riposteModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Manövrieren ---
+
+  hasManoeuverTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Manövrieren');
+  }
+
+  openManoeuverDialog(actor: CombatantState): void {
+    this.manoeuverDialog = { open: true, actor, targetId: undefined, spendKarma: false };
+  }
+
+  performManoeuver(): void {
+    const actor = this.manoeuverDialog.actor;
+    if (!this.session || !actor || !this.manoeuverDialog.targetId) return;
+    const req: ManoeuverRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: actor.id,
+      targetCombatantId: this.manoeuverDialog.targetId,
+      bonusSteps: 0,
+      spendKarma: this.manoeuverDialog.spendKarma
+    };
+    this.combatService.performManoeuver(this.session.id, req).subscribe({
+      next: result => {
+        this.manoeuverDialog.open = false;
+        this.manoeuverModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Tigersprung ---
+
+  hasTigersprungTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Tigersprung');
+  }
+
+  performTigersprung(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.performTigersprung(this.session.id, c.id).subscribe({
+      next: result => {
+        this.tigersprungModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Zweitwaffe ---
+
+  hasZweitwaffeTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Zweitwaffe');
+  }
+
+  openZweitwaffeDialog(actor: CombatantState): void {
+    this.zweitwaffeDialog = { open: true, actor, defenderId: undefined, weaponId: undefined, spendKarma: false };
+  }
+
+  performZweitwaffe(): void {
+    const actor = this.zweitwaffeDialog.actor;
+    if (!this.session || !actor || !this.zweitwaffeDialog.defenderId) return;
+    const req: ZweitwaffeRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: actor.id,
+      defenderCombatantId: this.zweitwaffeDialog.defenderId,
+      weaponId: this.zweitwaffeDialog.weaponId ?? undefined,
+      bonusSteps: 0,
+      spendKarma: this.zweitwaffeDialog.spendKarma
+    };
+    this.combatService.performZweitwaffe(this.session.id, req).subscribe({
+      next: result => {
+        this.zweitwaffeDialog.open = false;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
   }
 }

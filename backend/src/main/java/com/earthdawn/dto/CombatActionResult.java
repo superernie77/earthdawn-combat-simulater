@@ -38,6 +38,10 @@ public class CombatActionResult {
     private Long dodgeDefenderId;
     private int pendingDodgeDamage;
 
+    /** Nahkampf-Treffer — Ziel kann Riposte versuchen (kein Schaden bis Entscheidung). */
+    private boolean hitPendingRiposte;
+    private Long riposteDefenderId;
+
     /** Niedergeschlagen-Probe Ergebnis (wenn Wunde zugefügt). */
     private KnockdownResult knockdownResult;
 

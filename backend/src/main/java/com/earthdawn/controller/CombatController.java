@@ -207,4 +207,27 @@ public class CombatController {
             @RequestParam(defaultValue = "false") boolean spendKarma) {
         return combatService.performIronWill(id, combatantId, attackTotal, spendKarma);
     }
+
+    @PostMapping("/sessions/{id}/riposte")
+    public RiposteResult performRiposte(@PathVariable Long id, @RequestBody RiposteRequest req) {
+        req.setSessionId(id);
+        return combatService.performRiposte(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/manoeuver")
+    public ManoeuverResult performManoeuver(@PathVariable Long id, @RequestBody ManoeuverRequest req) {
+        req.setSessionId(id);
+        return combatService.performManoeuver(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/tigersprung")
+    public TigersprungResult performTigersprung(@PathVariable Long id, @PathVariable Long combatantId) {
+        return combatService.performTigersprung(id, combatantId);
+    }
+
+    @PostMapping("/sessions/{id}/zweitwaffe")
+    public CombatActionResult performZweitwaffe(@PathVariable Long id, @RequestBody ZweitwaffeRequest req) {
+        req.setSessionId(id);
+        return combatService.performZweitwaffe(id, req);
+    }
 }

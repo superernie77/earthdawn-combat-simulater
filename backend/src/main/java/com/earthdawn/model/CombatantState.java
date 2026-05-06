@@ -61,8 +61,24 @@ public class CombatantState {
     @Builder.Default
     private int pendingDefenseBonus = 0;
 
-    /** Ausstehender Schaden aus einem Treffer, der noch nicht angewandt wurde (wartet auf Ausweichen-Auflösung). */
-    @Column(columnDefinition = "integer default 0")
+    /** Angriffswurf der auf Riposte wartet (-1 = keiner ausstehend). */
+    @Column(columnDefinition = "integer default -1")
+    @Builder.Default
+    private int pendingRiposteAttackTotal = -1;
+
+    /** ID des angreifenden Kombattanten (für Riposte-Gegenangriff). */
+    private Long pendingRiposteAttackerId;
+
+    /** Tigersprung bereits in dieser Runde eingesetzt. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean tigersprungUsedThisRound = false;
+
+    /** Zweitwaffe bereits in dieser Runde eingesetzt. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean zweitWaffeUsedThisRound = false;
+
     @Builder.Default
     private int pendingDodgeDamage = 0;
 
