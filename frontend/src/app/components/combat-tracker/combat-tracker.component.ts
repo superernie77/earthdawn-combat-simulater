@@ -376,11 +376,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               <span class="def-stat social" matTooltip="SV – Soziale Verteidigung">
                 <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
               </span>
-              <span class="def-stat armor-phys" matTooltip="Körperliche Rüstung" *ngIf="pa(c) > 0">
-                <mat-icon>security</mat-icon> {{ pa(c) }}
+            </div>
+            <!-- Rüstungs-Chips (gleiche Darstellung wie auf den Charakter-Karten) -->
+            <div class="comb-armor-row" *ngIf="pa(c) > 0 || ma(c) > 0">
+              <span class="armor-chip phys" matTooltip="Physische Rüstung" *ngIf="pa(c) > 0">
+                🛡 {{ pa(c) }} phys.
               </span>
-              <span class="def-stat armor-myst" matTooltip="Mystische Rüstung" *ngIf="ma(c) > 0">
-                <mat-icon>flare</mat-icon> {{ ma(c) }}
+              <span class="armor-chip myst" matTooltip="Mystische Rüstung" *ngIf="ma(c) > 0">
+                ✨ {{ ma(c) }} myst.
               </span>
             </div>
             <!-- Active Effects -->
@@ -2033,6 +2036,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       &.social { color: #80cbc4; }
       &.armor-phys { color: #a5d6a7; }
       &.armor-myst { color: #ce93d8; }
+    }
+    .comb-armor-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .armor-chip {
+      padding: 2px 8px; border-radius: 10px; font-size: 11px;
+      &.phys { background: rgba(66,165,245,0.12); border: 1px solid #1a3a5a; color: #42a5f5; }
+      &.myst { background: rgba(171,71,188,0.12); border: 1px solid #3a1a50; color: #ab47bc; }
     }
     .def-modified { color: #ffcc80; font-weight: 700; }
     .effects-row { display: flex; flex-wrap: wrap; gap: 2px; }
