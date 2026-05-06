@@ -1699,6 +1699,8 @@ public class CombatService {
         CombatantState actor  = findCombatant(session, actorCombatantId);
 
         if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.DECLARATION)
+            throw new IllegalStateException("Tigersprung kann nur in der Ansagephase aktiviert werden.");
         if (actor.isTigersprungUsedThisRound()) throw new IllegalStateException("Tigersprung wurde bereits in dieser Runde eingesetzt.");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
@@ -1713,6 +1715,14 @@ public class CombatService {
         actor.setCurrentDamage(actor.getCurrentDamage() + 1);
         actor.setInitiative(newInitiative);
         actor.setTigersprungUsedThisRound(true);
+
+        // Reihenfolge neu sortieren, damit der neue Initiative-Wert die Action-Phase beeinflusst
+        session.getCombatants().sort(Comparator
+                .comparingInt(CombatantState::getInitiative).reversed()
+                .thenComparingInt(c -> c.isNpc() ? 1 : 0));
+        for (int i = 0; i < session.getCombatants().size(); i++) {
+            session.getCombatants().get(i).setInitiativeOrder(i);
+        }
 
         String actorName = actor.getCharacter().getName();
         String desc = actorName + " aktiviert Tigersprung (Rang " + rank + "): Initiative +" + rank + " → " + newInitiative + ". Kostet 1 Überanstrengung.";

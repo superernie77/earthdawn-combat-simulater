@@ -268,11 +268,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <mat-icon>swap_horiz</mat-icon>
                 </button>
                 <!-- Tigersprung: freie Aktion, kein Würfelwurf -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTigersprungTalent(c) && !c.defeated"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasTigersprungTalent(c) && !c.defeated"
                   class="combat-option-btn tigersprung-btn"
                   [disabled]="c.tigersprungUsedThisRound"
                   (click)="performTigersprung(c)"
-                  matTooltip="Tigersprung: +Rang auf Initiative, einmal/Runde, kostet 1 Überanstrengung">
+                  matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
                   <mat-icon>bolt</mat-icon>
                 </button>
                 <!-- Zweitwaffe: zweiter Angriff -->
