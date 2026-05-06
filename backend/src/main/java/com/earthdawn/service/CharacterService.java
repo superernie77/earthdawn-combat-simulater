@@ -1,17 +1,28 @@
 package com.earthdawn.service;
 
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
-import com.earthdawn.model.*;
-import com.earthdawn.model.enums.EquipmentType;
+import com.earthdawn.model.CharacterSkill;
+import com.earthdawn.model.CharacterSpell;
+import com.earthdawn.model.CharacterTalent;
+import com.earthdawn.model.Equipment;
+import com.earthdawn.model.GameCharacter;
+import com.earthdawn.model.SkillDefinition;
+import com.earthdawn.model.SpellDefinition;
+import com.earthdawn.model.TalentDefinition;
 import com.earthdawn.model.enums.StatType;
-import com.earthdawn.repository.*;
+import com.earthdawn.repository.CharacterRepository;
+import com.earthdawn.repository.SkillDefinitionRepository;
+import com.earthdawn.repository.SpellDefinitionRepository;
+import com.earthdawn.repository.TalentDefinitionRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -174,7 +185,7 @@ public class CharacterService {
         c.setSocialDefense((c.getCharisma() + 3) / 2);
         // Wundenschwelle: (ZÄ + 1) / 2 + 2  (matches ED4 FASA official table)
         c.setWoundThreshold((c.getToughness() + 1) / 2 + 2);
-        int circleBonus = Math.max(0, c.getCircle() - 1);
+        int circleBonus = Math.max(0, c.getCircle());
         int bwBonus = c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() : 5;
         int tdBonus = c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() : 6;
         // Bewusstlosigkeitsschwelle: ZÄ × 2  (+ bwBonus per additional circle)

@@ -72,7 +72,7 @@ public class ModifierAggregator {
             case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2) + c.getSocialDefenseBonus();
             case PHYSICAL_ARMOR       -> computeOrOverride(c.getPhysicalArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getPhysicalArmor).sum();
-            case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), 0)
+            case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), naturalMysticArmor(c.getPerception()))
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getMysticalArmor).sum();
             case INITIATIVE_STEP      -> Math.max(1, stepRoll.attributeToStep(c.getDexterity()) - combatant.getWounds()
                     - c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR || e.getType() == EquipmentType.SHIELD).mapToInt(Equipment::getInitiativePenalty).sum());
@@ -97,7 +97,7 @@ public class ModifierAggregator {
             case SOCIAL_DEFENSE       -> computeOrOverride(c.getSocialDefense(),       (c.getCharisma() + 3) / 2) + c.getSocialDefenseBonus();
             case PHYSICAL_ARMOR       -> computeOrOverride(c.getPhysicalArmor(), 0)
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getPhysicalArmor).sum();
-            case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), 0)
+            case MYSTIC_ARMOR         -> computeOrOverride(c.getMysticArmor(), naturalMysticArmor(c.getPerception()))
                     + c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR).mapToInt(Equipment::getMysticalArmor).sum();
             case INITIATIVE_STEP      -> Math.max(1, stepRoll.attributeToStep(c.getDexterity())
                     - c.getEquipment().stream().filter(e -> e.getType() == EquipmentType.ARMOR || e.getType() == EquipmentType.SHIELD).mapToInt(Equipment::getInitiativePenalty).sum());
@@ -114,5 +114,13 @@ public class ModifierAggregator {
 
     private int computeOrOverride(Integer override, int computed) {
         return override != null ? override : computed;
+    }
+
+    /**
+     * Natürliche mystische Rüstung anhand der Wahrnehmung (ED4-Tabelle):
+     * 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6.
+     */
+    private int naturalMysticArmor(int perception) {
+        return Math.min(6, Math.max(0, perception / 5));
     }
 }
