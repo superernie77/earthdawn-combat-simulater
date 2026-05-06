@@ -260,12 +260,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Riposte! Nahkampfangriff parieren und kontern (GES + Rang vs. Angriffswurf, kostet 2 Überanstrengung)">
                   <mat-icon>sports_martial_arts</mat-icon>
                 </button>
-                <!-- Manövrieren: einfache Aktion -->
+                <!-- Manövrieren: freie Aktion -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasManoeuverTalent(c) && !c.defeated"
                   class="combat-option-btn manoeuver-btn"
-                  [disabled]="c.hasActedThisRound"
                   (click)="openManoeuverDialog(c)"
-                  matTooltip="Manövrieren (GES + Rang vs. KV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Überanstrengung)">
+                  matTooltip="Manövrieren (GES + Rang vs. KV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Überanstrengung) — freie Aktion">
                   <mat-icon>swap_horiz</mat-icon>
                 </button>
                 <!-- Tigersprung: freie Aktion, kein Würfelwurf -->

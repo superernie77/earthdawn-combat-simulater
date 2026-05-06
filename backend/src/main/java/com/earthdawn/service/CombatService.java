@@ -1625,16 +1625,14 @@ public class CombatService {
 
         if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
         if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
-        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt!");
 
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
                 .filter(t -> TalentNames.MANOEUVER.equals(t.getTalentDefinition().getName()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Manövrieren' nicht gefunden."));
 
-        // 1 Überanstrengung
+        // 1 Überanstrengung — Manövrieren ist eine freie Aktion (verbraucht die Handlung nicht)
         actor.setCurrentDamage(actor.getCurrentDamage() + 1);
-        actor.setHasActedThisRound(true);
 
         int dexStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getDexterity()) - actor.getWounds());
         int rollStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
