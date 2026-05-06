@@ -47,10 +47,14 @@ public class CombatService {
     private void enrichTransientFields(CombatSession session) {
         for (CombatantState c : session.getCombatants()) {
             try {
+                c.setBaseInitiativeStep(
+                    modifiers.getEffectiveValue(c, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS)
+                );
                 c.setCurrentInitiativeStep(
                     modifiers.getEffectiveValue(c, StatType.INITIATIVE_STEP, TriggerContext.ON_INITIATIVE)
                 );
             } catch (Exception e) {
+                c.setBaseInitiativeStep(0);
                 c.setCurrentInitiativeStep(0);
             }
         }

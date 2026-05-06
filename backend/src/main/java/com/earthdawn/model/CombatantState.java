@@ -144,7 +144,11 @@ public class CombatantState {
     @Builder.Default
     private List<ActiveEffect> activeEffects = new ArrayList<>();
 
-    /** Berechneter Initiative-Step (für Anzeige in der Ansagephase). Nicht persistiert. */
+    /** Berechneter Initiative-Step inkl. ON_INITIATIVE-Effekte (z.B. Tigersprung). Nicht persistiert. */
     @Transient
     private int currentInitiativeStep;
+
+    /** Initiative-Step ohne ON_INITIATIVE-Boni — Basiswert für die Anzeige. Nicht persistiert. */
+    @Transient
+    private int baseInitiativeStep;
 }

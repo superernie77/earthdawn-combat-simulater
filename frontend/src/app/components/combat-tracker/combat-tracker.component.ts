@@ -147,7 +147,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               <div class="comb-title">
                 <span class="initiative-badge"
                       [matTooltip]="session?.phase === 'DECLARATION' ? 'Initiative-Stufe (wird gewürfelt sobald alle angesagt haben)' : 'Initiative-Wurf'">
-                  {{ session?.phase === 'DECLARATION' ? ('S' + (c.currentInitiativeStep ?? 0)) : c.initiative }}
+                  {{ session?.phase === 'DECLARATION' ? initiativeStepLabel(c) : c.initiative }}
                 </span>
                 <span class="combatant-name">{{ cn(c) }}</span>
                 <span class="discipline-badge">{{ c.character.discipline?.name }}</span>
@@ -3573,6 +3573,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   hasTigersprungTalent(c: CombatantState): boolean {
     return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Tigersprung');
+  }
+
+  /** Anzeige in der Ansagephase: 'S5' oder 'S5+3' wenn ON_INITIATIVE-Boni aktiv sind. */
+  initiativeStepLabel(c: CombatantState): string {
+    const base = c.baseInitiativeStep ?? 0;
+    const total = c.currentInitiativeStep ?? base;
+    const bonus = total - base;
+    return bonus > 0 ? `S${base}+${bonus}` : `S${base}`;
   }
 
   performTigersprung(c: CombatantState): void {
