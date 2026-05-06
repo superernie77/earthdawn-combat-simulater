@@ -1847,10 +1847,16 @@ public class CombatService {
           .append(" (Step ").append(r.getAttackStep()).append(")")
           .append(" vs VK ").append(r.getDefenseValue()).append(". ");
         if (r.isHit()) {
-            sb.append("TREFFER! Schaden: ").append(r.getDamageRoll().getTotal())
-              .append(" − ").append(r.getArmorValue()).append(" = ").append(r.getNetDamage()).append(". ");
-            if (r.isWoundDealt()) sb.append("WUNDE! ");
-            if (r.isTargetDefeated()) sb.append(r.getTargetName()).append(" ist besiegt! ");
+            if (r.isHitPendingRiposte()) {
+                sb.append("TREFFER! (Riposte ausstehend)");
+            } else if (r.isHitPendingDodge()) {
+                sb.append("TREFFER! Schaden: ").append(r.getNetDamage()).append(" (Ausweichen ausstehend).");
+            } else {
+                sb.append("TREFFER! Schaden: ").append(r.getDamageRoll().getTotal())
+                  .append(" − ").append(r.getArmorValue()).append(" = ").append(r.getNetDamage()).append(". ");
+                if (r.isWoundDealt()) sb.append("WUNDE! ");
+                if (r.isTargetDefeated()) sb.append(r.getTargetName()).append(" ist besiegt! ");
+            }
         } else {
             sb.append("Verfehlt.");
         }
