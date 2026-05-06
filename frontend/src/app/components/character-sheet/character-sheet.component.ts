@@ -777,6 +777,8 @@ export class CharacterSheetComponent implements OnInit {
     { key: 'deathRating', label: 'Todesschwelle' },
     { key: 'initiativeStep', label: 'Initiativestufe' },
     { key: 'recoveryStep', label: 'Erholungsstufe' },
+    { key: 'physicalArmor', label: 'Rüstung (physisch)' },
+    { key: 'mysticArmor', label: 'Rüstung (mystisch)' },
   ];
 
   defenseBonusFields = [

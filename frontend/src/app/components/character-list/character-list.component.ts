@@ -70,6 +70,14 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
                   {{ c.karmaCurrent }}/{{ c.karmaMax }} Karma
                 </span>
               </div>
+              <div class="armor-row" *ngIf="totalPhysArmor(c) > 0 || totalMystArmor(c) > 0">
+                <span class="armor-chip phys" title="Physische Rüstung">
+                  🛡 {{ totalPhysArmor(c) }} phys.
+                </span>
+                <span class="armor-chip myst" title="Mystische Rüstung" *ngIf="totalMystArmor(c) > 0">
+                  ✨ {{ totalMystArmor(c) }} myst.
+                </span>
+              </div>
             </mat-card-content>
             <mat-card-actions>
               <button mat-button (click)="openCharacter(c.id!); $event.stopPropagation()">
@@ -165,6 +173,13 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
     .status-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #999; }
     .status-item { display: flex; align-items: center; gap: 2px; }
 
+    .armor-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .armor-chip {
+      padding: 2px 8px; border-radius: 10px; font-size: 11px;
+      &.phys { background: rgba(66,165,245,0.12); border: 1px solid #1a3a5a; color: #42a5f5; }
+      &.myst { background: rgba(171,71,188,0.12); border: 1px solid #3a1a50; color: #ab47bc; }
+    }
+
     .empty-state {
       text-align: center; padding: 60px 20px; color: #666;
       mat-icon { font-size: 64px; height: 64px; width: 64px; opacity: 0.3; }
@@ -240,5 +255,21 @@ export class CharacterListComponent implements OnInit {
 
   unconsciousnessRating(c: Character): number {
     return c.unconsciousnessRating ?? c.toughness * 2;
+  }
+
+  /** Sum of physicalArmor across all ARMOR and SHIELD equipment pieces. */
+  totalPhysArmor(c: Character): number {
+    if (c.physicalArmor != null) return c.physicalArmor;
+    return (c.equipment ?? [])
+      .filter(e => e.type === 'ARMOR' || e.type === 'SHIELD')
+      .reduce((sum, e) => sum + (e.physicalArmor ?? 0), 0);
+  }
+
+  /** Sum of mysticalArmor across all ARMOR and SHIELD equipment pieces. */
+  totalMystArmor(c: Character): number {
+    if (c.mysticArmor != null) return c.mysticArmor;
+    return (c.equipment ?? [])
+      .filter(e => e.type === 'ARMOR' || e.type === 'SHIELD')
+      .reduce((sum, e) => sum + (e.mysticalArmor ?? 0), 0);
   }
 }
