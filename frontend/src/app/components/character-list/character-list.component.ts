@@ -70,6 +70,17 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
                   {{ c.karmaCurrent }}/{{ c.karmaMax }} Karma
                 </span>
               </div>
+              <div class="defense-row">
+                <span class="def-chip phys" title="KV – Körperliche Verteidigung">
+                  🛡 KV {{ physicalDefense(c) }}
+                </span>
+                <span class="def-chip myst" title="MV – Mystische Verteidigung">
+                  ✨ MV {{ spellDefense(c) }}
+                </span>
+                <span class="def-chip social" title="SV – Soziale Verteidigung">
+                  💬 SV {{ socialDefense(c) }}
+                </span>
+              </div>
               <div class="armor-row" *ngIf="totalPhysArmor(c) > 0 || totalMystArmor(c) > 0">
                 <span class="armor-chip phys" title="Physische Rüstung">
                   🛡 {{ totalPhysArmor(c) }} phys.
@@ -179,6 +190,13 @@ import { NewCharacterDialogComponent } from '../new-character-dialog/new-charact
       &.phys { background: rgba(66,165,245,0.12); border: 1px solid #1a3a5a; color: #42a5f5; }
       &.myst { background: rgba(171,71,188,0.12); border: 1px solid #3a1a50; color: #ab47bc; }
     }
+    .defense-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .def-chip {
+      padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+      &.phys   { background: rgba(66,165,245,0.12); border: 1px solid #1a3a5a; color: #42a5f5; }
+      &.myst   { background: rgba(171,71,188,0.12); border: 1px solid #3a1a50; color: #ab47bc; }
+      &.social { background: rgba(255,167,38,0.12); border: 1px solid #5a3a1a; color: #ffa726; }
+    }
 
     .empty-state {
       text-align: center; padding: 60px 20px; color: #666;
@@ -255,6 +273,30 @@ export class CharacterListComponent implements OnInit {
 
   unconsciousnessRating(c: Character): number {
     return c.unconsciousnessRating ?? c.toughness * 2;
+  }
+
+  /** KV (physische Verteidigung). Override hat Vorrang, sonst (GES + 3) / 2. + Bonus + Schild. */
+  physicalDefense(c: Character): number {
+    const base = c.physicalDefense ?? Math.floor((c.dexterity + 3) / 2);
+    const shieldBonus = (c.equipment ?? [])
+      .filter(e => e.type === 'SHIELD')
+      .reduce((s, e) => s + (e.physicalDefenseBonus ?? 0), 0);
+    return base + (c.physicalDefenseBonus ?? 0) + shieldBonus;
+  }
+
+  /** MV (mystische Verteidigung). Override hat Vorrang, sonst (WAH + 3) / 2. + Bonus + Schild. */
+  spellDefense(c: Character): number {
+    const base = c.spellDefense ?? Math.floor((c.perception + 3) / 2);
+    const shieldBonus = (c.equipment ?? [])
+      .filter(e => e.type === 'SHIELD')
+      .reduce((s, e) => s + (e.mysticDefenseBonus ?? 0), 0);
+    return base + (c.spellDefenseBonus ?? 0) + shieldBonus;
+  }
+
+  /** SV (soziale Verteidigung). Override hat Vorrang, sonst (CHA + 3) / 2. + Bonus. */
+  socialDefense(c: Character): number {
+    const base = c.socialDefense ?? Math.floor((c.charisma + 3) / 2);
+    return base + (c.socialDefenseBonus ?? 0);
   }
 
   /** Sum of physicalArmor across all ARMOR and SHIELD equipment pieces. */
