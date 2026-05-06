@@ -388,6 +388,38 @@ After taking a wound: defender rolls `TOU-Step vs netDamage`. On failure: `knock
 - **Aufspringen**: `DEX-Step vs 6`, costs 2 damage; success = stand + still act (hasActedThisRound stays false).
 - Knockdown immediately removes any **Akrobatische Verteidigung** effect from the defender.
 
+### Health Thresholds (Schwellenwerte)
+
+Computed by `CharacterService.recalculateDerived()` using the official ED4 FASA table (values without discipline circle bonuses):
+
+| ZÄ | ZÄ-Stufe | Wundenschwelle | Bewusstlosigkeit | Todesschwelle |
+|:-:|:-:|:-:|:-:|:-:|
+| 1–3 | 2 | 3–4 | 2–6 | 4–8 |
+| 4–6 | 3 | 4–5 | 8–12 | 11–15 |
+| 7–9 | 4 | 6–7 | 14–18 | 18–22 |
+| 10–12 | 5 | 7–8 | 20–24 | 25–29 |
+| 13–15 | 6 | 9–10 | 26–30 | 32–36 |
+| 16–18 | 7 | 10–11 | 32–36 | 39–43 |
+| 19–21 | 8 | 12–13 | 38–42 | 46–50 |
+| 22–24 | 9 | 13–14 | 44–48 | 53–57 |
+| 25 | 10 | 15 | 50 | 60 |
+
+**Formulas:**
+```
+woundThreshold      = (ZÄ + 1) / 2 + 2          // integer division
+unconsciousness     = ZÄ × 2 + bwBonus × (circle − 1)
+deathRating         = ZÄ × 2 + attributeToStep(ZÄ) + tdBonus × (circle − 1)
+```
+`attributeToStep`: every 3 attribute points = +1 step (1–3→2, 4–6→3, 7–9→4, 10–12→5, …)
+
+Per-discipline circle bonuses:
+| Discipline | BW-Bonus/circle | TD-Bonus/circle |
+|---|:-:|:-:|
+| Krieger, Schwertmeister | 7 | 8 |
+| Kundschafter, Dieb, Troubadour | 5 | 6 |
+| Elementarist, Illusionist, Magier | 3 | 4 |
+| No discipline (fallback) | 5 | 6 |
+
 ### Dodge resolution
 
 1. Defender attempts: `DEX-Step + Ausweichen-Rank vs attackTotal`

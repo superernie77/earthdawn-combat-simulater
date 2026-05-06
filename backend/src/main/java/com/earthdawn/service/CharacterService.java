@@ -23,6 +23,7 @@ public class CharacterService {
     private final SkillDefinitionRepository skillDefRepo;
     private final SpellDefinitionRepository spellDefRepo;
     private final ModifierAggregator modifierAggregator;
+    private final StepRollService stepRollService;
 
     public List<GameCharacter> findAll() {
         return characterRepo.findByOrderByNameAsc();
@@ -170,12 +171,16 @@ public class CharacterService {
         c.setPhysicalDefense((c.getDexterity() + 3) / 2);
         c.setSpellDefense((c.getPerception() + 3) / 2);
         c.setSocialDefense((c.getCharisma() + 3) / 2);
-        c.setWoundThreshold((c.getToughness() / 2) + 4);
+        // Wundenschwelle: (ZÄ + 1) / 2 + 2  (matches ED4 FASA official table)
+        c.setWoundThreshold((c.getToughness() + 1) / 2 + 2);
         int circleBonus = Math.max(0, c.getCircle() - 1);
         int bwBonus = c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() : 5;
         int tdBonus = c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() : 6;
+        // Bewusstlosigkeitsschwelle: ZÄ × 2  (+ bwBonus per additional circle)
         c.setUnconsciousnessRating(c.getToughness() * 2 + bwBonus * circleBonus);
-        c.setDeathRating(c.getToughness() * 2 + 10 + tdBonus * circleBonus);
+        // Todesschwelle: Bewusstlosigkeit + ZÄ-Stufe  (+ tdBonus per additional circle)
+        int toughnessStep = stepRollService.attributeToStep(c.getToughness());
+        c.setDeathRating(c.getToughness() * 2 + toughnessStep + tdBonus * circleBonus);
         c.setKarmaMax(c.getKarmaModifier() * c.getCircle());
         c.setKarmaCurrent(Math.min(c.getKarmaCurrent(), c.getKarmaMax()));
         return characterRepo.save(c);
