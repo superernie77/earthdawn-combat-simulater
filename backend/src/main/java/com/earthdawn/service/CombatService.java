@@ -37,8 +37,23 @@ public class CombatService {
     }
 
     public CombatSession findById(Long id) {
-        return sessionRepo.findById(id)
+        CombatSession session = sessionRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Kampfsession nicht gefunden: " + id));
+        enrichTransientFields(session);
+        return session;
+    }
+
+    /** Berechnet flüchtige Anzeigefelder (z.B. aktueller Initiative-Step) für alle Kombattanten. */
+    private void enrichTransientFields(CombatSession session) {
+        for (CombatantState c : session.getCombatants()) {
+            try {
+                c.setCurrentInitiativeStep(
+                    modifiers.getEffectiveValue(c, StatType.INITIATIVE_STEP, TriggerContext.ON_INITIATIVE)
+                );
+            } catch (Exception e) {
+                c.setCurrentInitiativeStep(0);
+            }
+        }
     }
 
     public CombatSession createSession(String name) {
@@ -1709,23 +1724,29 @@ public class CombatService {
                 .orElseThrow(() -> new IllegalStateException("Talent 'Tigersprung' nicht gefunden."));
 
         int rank = ct.getRank();
-        int newInitiative = actor.getInitiative() + rank;
 
         // 1 Überanstrengung, kein Würfelwurf
         actor.setCurrentDamage(actor.getCurrentDamage() + 1);
-        actor.setInitiative(newInitiative);
         actor.setTigersprungUsedThisRound(true);
 
-        // Reihenfolge neu sortieren, damit der neue Initiative-Wert die Action-Phase beeinflusst
-        session.getCombatants().sort(Comparator
-                .comparingInt(CombatantState::getInitiative).reversed()
-                .thenComparingInt(c -> c.isNpc() ? 1 : 0));
-        for (int i = 0; i < session.getCombatants().size(); i++) {
-            session.getCombatants().get(i).setInitiativeOrder(i);
-        }
+        // Step-Bonus als ActiveEffect — wirkt auf die kommende Initiative-Probe
+        actor.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(actor)
+                .name("Tigersprung")
+                .description("+" + rank + " Stufen auf Initiative-Probe")
+                .sourceType(SourceType.TALENT)
+                .remainingRounds(1)
+                .negative(false)
+                .modifiers(List.of(ModifierEntry.builder()
+                        .targetStat(StatType.INITIATIVE_STEP)
+                        .operation(ModifierOperation.ADD)
+                        .value(rank)
+                        .triggerContext(TriggerContext.ON_INITIATIVE)
+                        .build()))
+                .build());
 
         String actorName = actor.getCharacter().getName();
-        String desc = actorName + " aktiviert Tigersprung (Rang " + rank + "): Initiative +" + rank + " → " + newInitiative + ". Kostet 1 Überanstrengung.";
+        String desc = actorName + " aktiviert Tigersprung (Rang " + rank + "): +" + rank + " Stufen auf Initiative-Probe. Kostet 1 Überanstrengung.";
 
         addLog(session, actorName, null, ActionType.TIGERSPRUNG, desc, true);
         sessionRepo.save(session);
@@ -1733,7 +1754,7 @@ public class CombatService {
 
         return TigersprungResult.builder()
                 .actorName(actorName).rank(rank)
-                .initiativeBonus(rank).newInitiative(newInitiative)
+                .initiativeBonus(rank).newInitiative(actor.getInitiative())
                 .damageTaken(1).description(desc).build();
     }
 
@@ -1840,6 +1861,7 @@ public class CombatService {
 
     void broadcast(CombatSession session) {
         try {
+            enrichTransientFields(session);
             websocket.convertAndSend("/topic/combat/" + session.getId(), session);
         } catch (Exception e) {
             log.warn("WebSocket broadcast fehlgeschlagen: {}", e.getMessage());

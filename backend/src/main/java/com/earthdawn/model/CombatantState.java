@@ -143,4 +143,8 @@ public class CombatantState {
     @OneToMany(mappedBy = "combatantState", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<ActiveEffect> activeEffects = new ArrayList<>();
+
+    /** Berechneter Initiative-Step (für Anzeige in der Ansagephase). Nicht persistiert. */
+    @Transient
+    private int currentInitiativeStep;
 }

@@ -145,7 +145,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <!-- Combatant Header -->
             <div class="comb-header">
               <div class="comb-title">
-                <span class="initiative-badge" matTooltip="Initiative">{{ c.initiative }}</span>
+                <span class="initiative-badge"
+                      [matTooltip]="session?.phase === 'DECLARATION' ? 'Initiative-Stufe (wird gewürfelt sobald alle angesagt haben)' : 'Initiative-Wurf'">
+                  {{ session?.phase === 'DECLARATION' ? ('S' + (c.currentInitiativeStep ?? 0)) : c.initiative }}
+                </span>
                 <span class="combatant-name">{{ cn(c) }}</span>
                 <span class="discipline-badge">{{ c.character.discipline?.name }}</span>
                 <mat-icon *ngIf="c.defeated" style="color:#f44336;font-size:16px">skull</mat-icon>

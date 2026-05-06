@@ -61,6 +61,7 @@ export interface CombatantState {
   character: Character;
   initiative: number;
   initiativeOrder: number;
+  currentInitiativeStep?: number;
   currentDamage: number;
   wounds: number;
   currentKarma: number;
