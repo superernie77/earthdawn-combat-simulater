@@ -257,40 +257,47 @@ public class CombatService {
             int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
             int netDamage = Math.max(0, damageRoll.getTotal() - armor);
 
-            // 7. Hat Ziel Riposte-Talent? → Angriff zurückhalten (kein Schaden, warten auf Reaktion)
+            // 7. Reaktionsmöglichkeiten des Verteidigers (Riposte und/oder Ausweichen)
             boolean defenderHasRiposte = req.getActionType() == ActionType.MELEE_ATTACK
                     && defender.getCharacter().getTalents().stream()
                     .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
                     && defender.getPendingRiposteAttackTotal() < 0;
+            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
 
-            if (defenderHasRiposte) {
-                defender.setPendingRiposteAttackTotal(attackTotal);
-                defender.setPendingRiposteAttackerId(attacker.getId());
+            if (defenderHasRiposte || defenderHasDodge) {
+                // Beide möglichen Pending-Zustände setzen — Verteidiger wählt eine Reaktion
+                if (defenderHasRiposte) {
+                    defender.setPendingRiposteAttackTotal(attackTotal);
+                    defender.setPendingRiposteAttackerId(attacker.getId());
+                    result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                }
+                if (defenderHasDodge) {
+                    defender.setPendingDodgeDamage(netDamage);
+                    defender.setPendingDodgeAttackTotal(attackTotal);
+                    defender.setPendingDamageStep(damageStep);
+                    defender.setPendingArmorValue(armor);
+                    try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
+                    result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(netDamage);
+                }
+                // Wenn nur Riposte (kein Ausweichen): Aktion ist durch, Treffer wird beim Riposte-Resolve angewendet
+                // Wenn Ausweichen aktiv ist: regulärer Pfad — Schaden steht aus, Aktion ebenfalls verbraucht
                 attacker.setHasActedThisRound(true);
-                result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                result.extraSuccesses(extraSuccesses).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(netDamage);
                 CombatActionResult actionResult = result.build();
                 actionResult.setDescription(buildDescription(actionResult));
+                String tag = defenderHasRiposte && defenderHasDodge
+                        ? " (Riposte oder Ausweichen möglich!)"
+                        : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
                 addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
-                        req.getActionType(), actionResult.getDescription() + " (Riposte möglich!)", hit);
+                        req.getActionType(), actionResult.getDescription() + tag, hit);
                 sessionRepo.save(session);
                 broadcast(session);
                 return actionResult;
             }
 
-            // 8. Hat Ziel Ausweichen-Talent? → Schaden zurückhalten
-            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
-                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
-
-            if (defenderHasDodge) {
-                defender.setPendingDodgeDamage(netDamage);
-                defender.setPendingDodgeAttackTotal(attackTotal);
-                defender.setPendingDamageStep(damageStep);
-                defender.setPendingArmorValue(armor);
-                try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
-                result.hitPendingDodge(true)
-                      .dodgeDefenderId(defender.getId())
-                      .pendingDodgeDamage(netDamage);
-            } else {
+            {
                 int wt2 = modifiers.getEffectiveValue(defender, StatType.WOUND_THRESHOLD, TriggerContext.ALWAYS);
                 int prevWounds = defender.getWounds();
                 KnockdownResult kdr = applyDamageToDefender(session, defender, netDamage);
@@ -621,6 +628,9 @@ public class CombatService {
         defender.setPendingDamageStep(0);
         defender.setPendingArmorValue(0);
         defender.setPendingDamageRollJson(null);
+        // Falls auch Riposte pending war: Riposte-Reaktion verwerfen, da Ausweichen gewählt wurde
+        defender.setPendingRiposteAttackTotal(-1);
+        defender.setPendingRiposteAttackerId(null);
 
         if (!req.isDodgeAttempted()) {
             // Kein Ausweichen — Schaden direkt anwenden
@@ -1546,6 +1556,12 @@ public class CombatService {
         // Ausstehenden Angriff immer zurücksetzen
         defender.setPendingRiposteAttackTotal(-1);
         defender.setPendingRiposteAttackerId(null);
+        // Falls auch Ausweichen pending war: Dodge-Reaktion verwerfen, da Riposte gewählt wurde
+        defender.setPendingDodgeDamage(0);
+        defender.setPendingDodgeAttackTotal(0);
+        defender.setPendingDamageStep(0);
+        defender.setPendingArmorValue(0);
+        defender.setPendingDamageRollJson(null);
 
         if (!req.isRiposteAttempted()) {
             // Kein Riposte — Angriff annehmen, Schaden anwenden

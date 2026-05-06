@@ -509,30 +509,36 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </ng-container>
           </ng-container>
         </div>
-        <!-- Dodge prompt -->
-        <div class="dodge-prompt" *ngIf="r.hitPendingDodge">
-          <mat-icon>directions_run</mat-icon>
-          Ziel kann Ausweichen versuchen
+        <!-- Reaktions-Prompt (Riposte und/oder Ausweichen) -->
+        <div class="dodge-prompt" *ngIf="r.hitPendingRiposte && r.hitPendingDodge"
+             style="border-color:#b39ddb;color:#b39ddb">
+          <mat-icon>shield</mat-icon>
+          Ziel kann Riposte oder Ausweichen wählen
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px" *ngIf="r.hitPendingDodge; else riposteCheck">
-          <button mat-stroked-button style="flex:1" (click)="skipDodge()">Schaden annehmen</button>
-          <button mat-raised-button color="primary" style="flex:1" (click)="openDodgeDialog()">
-            <mat-icon>directions_run</mat-icon> Ausweichen
-          </button>
-        </div>
-        <ng-template #riposteCheck>
-        <!-- Riposte prompt -->
-        <div class="dodge-prompt" *ngIf="r.hitPendingRiposte" style="border-color:#ff8a65;color:#ff8a65">
+        <div class="dodge-prompt" *ngIf="r.hitPendingRiposte && !r.hitPendingDodge" style="border-color:#ff8a65;color:#ff8a65">
           <mat-icon>sports_martial_arts</mat-icon>
           Ziel kann Riposte versuchen (2 Überanstrengung)
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px" *ngIf="r.hitPendingRiposte; else closeOnly">
-          <button mat-stroked-button style="flex:1" (click)="skipRiposte()">Schaden annehmen</button>
-          <button mat-raised-button color="accent" style="flex:1" (click)="openRiposteDialogFromResult()">
+        <div class="dodge-prompt" *ngIf="r.hitPendingDodge && !r.hitPendingRiposte">
+          <mat-icon>directions_run</mat-icon>
+          Ziel kann Ausweichen versuchen
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap" *ngIf="r.hitPendingRiposte || r.hitPendingDodge; else closeOnly">
+          <button mat-stroked-button style="flex:1;min-width:140px"
+                  (click)="r.hitPendingDodge ? skipDodge() : skipRiposte()">
+            Schaden annehmen
+          </button>
+          <button mat-raised-button color="primary" style="flex:1;min-width:140px"
+                  *ngIf="r.hitPendingDodge"
+                  (click)="openDodgeDialog()">
+            <mat-icon>directions_run</mat-icon> Ausweichen
+          </button>
+          <button mat-raised-button color="accent" style="flex:1;min-width:140px"
+                  *ngIf="r.hitPendingRiposte"
+                  (click)="openRiposteDialogFromResult()">
             <mat-icon>sports_martial_arts</mat-icon> Riposte
           </button>
         </div>
-        </ng-template>
         <ng-template #closeOnly>
           <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(resultModal)">
             Schließen
