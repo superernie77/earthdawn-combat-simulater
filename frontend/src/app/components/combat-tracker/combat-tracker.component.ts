@@ -280,7 +280,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   class="combat-option-btn zweitwaffe-btn"
                   [disabled]="c.zweitWaffeUsedThisRound"
                   (click)="openZweitwaffeDialog(c)"
-                  matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung)">
+                  matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung) — freie Aktion, 1×/Runde">
                   <mat-icon>join_full</mat-icon>
                 </button>
                 <button mat-icon-button *ngIf="session!.status === 'SETUP'"

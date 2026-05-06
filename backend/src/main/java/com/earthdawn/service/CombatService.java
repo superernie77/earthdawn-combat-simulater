@@ -1743,11 +1743,9 @@ public class CombatService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Zweitwaffe' nicht gefunden."));
 
-        // 1 Überanstrengung
+        // 1 Überanstrengung — Zweitwaffe ist eine freie Aktion (1× pro Runde)
         attacker.setCurrentDamage(attacker.getCurrentDamage() + 1);
         attacker.setZweitWaffeUsedThisRound(true);
-        // Zweite Aktion setzt auch hasActedThisRound (falls noch nicht geschehen)
-        attacker.setHasActedThisRound(true);
 
         int dexStep = Math.max(1, diceService.attributeToStep(attacker.getCharacter().getDexterity()) - attacker.getWounds());
         int attackStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
