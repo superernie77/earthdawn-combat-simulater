@@ -686,7 +686,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       <div class="dialog-box result-box" *ngIf="riposteModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'sports_martial_arts' : 'close' }}</mat-icon>
-          {{ r.success ? (r.counterAttack ? 'PARIERT + GEGENANGRIFF!' : 'PARIERT!') : 'RIPOSTE FEHLGESCHLAGEN' }}
+          {{ r.success ? 'PARIERT!' : 'RIPOSTE FEHLGESCHLAGEN' }}
+        </div>
+        <div *ngIf="r.success && r.counterAttack" class="result-subtitle"
+             [style.color]="r.counterAttackHit ? '#ff8a65' : '#888'">
+          + Gegenangriff{{ r.counterAttackHit ? '' : ' verfehlt' }}
         </div>
         <div class="result-names">
           <span class="result-actor" [style.color]="nameColor(r.defenderName)">{{ r.defenderName }}</span>
@@ -2055,6 +2059,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       mat-icon { font-size: 2rem; height: 2rem; width: 2rem; }
       &.hit { color: #ef5350; }
       &.miss { color: #555; }
+    }
+    .result-subtitle {
+      text-align: center; font-size: 1rem; font-weight: 700;
+      letter-spacing: 0.08em; margin-top: -4px; margin-bottom: 4px;
     }
     .result-names {
       display: flex; align-items: center; justify-content: center; gap: 8px;
