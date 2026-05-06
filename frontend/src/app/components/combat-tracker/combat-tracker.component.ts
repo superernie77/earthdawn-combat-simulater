@@ -2744,7 +2744,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   ma(c: CombatantState): number {
     const equipBonus = (c.character.equipment ?? []).filter(e => e.type === 'ARMOR').reduce((s, e) => s + (e.mysticalArmor ?? 0), 0);
-    return (c.character.mysticArmor ?? 0) + equipBonus;
+    // Natürliche mystische Rüstung aus Willenskraft (ED4): min(6, WIL/5)
+    const natural = Math.min(6, Math.max(0, Math.floor((c.character.willpower ?? 0) / 5)));
+    const base = c.character.mysticArmor ?? natural;
+    return base + equipBonus;
   }
 
   damagePercent(c: CombatantState): number {
