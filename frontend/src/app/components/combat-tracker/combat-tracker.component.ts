@@ -273,7 +273,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   [disabled]="c.tigersprungUsedThisRound"
                   (click)="performTigersprung(c)"
                   matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
-                  <mat-icon>bolt</mat-icon>
+                  <mat-icon>bolt</mat-icon> Tigersprung
                 </button>
                 <!-- Zweitwaffe: zweiter Angriff -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
