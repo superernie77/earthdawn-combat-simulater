@@ -180,8 +180,12 @@ import { ProbeResult } from '../../models/dice.model';
 
               <div class="derived-grid" *ngIf="derived">
                 <div class="section-title">Abgeleitete Werte</div>
-                <div class="derived-item" *ngFor="let d of derivedFields">
-                  <span class="derived-label">{{ d.label }}</span>
+                <div class="derived-item" *ngFor="let d of derivedFields"
+                     [matTooltip]="derivedTooltip(d.key)" [matTooltipDisabled]="!derivedTooltip(d.key)">
+                  <span class="derived-label">
+                    {{ d.label }}
+                    <span class="derived-note" *ngIf="derivedNote(d.key) as note">{{ note }}</span>
+                  </span>
                   <span class="derived-val">{{ getDerived(d.key) }}</span>
                 </div>
 
@@ -619,7 +623,8 @@ import { ProbeResult } from '../../models/dice.model';
     .attr-step { min-width: 60px; text-align: right; font-size: 0.8rem; color: #666; }
 
     .derived-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #2a2520; }
-    .derived-label { color: #999; font-size: 0.85rem; }
+    .derived-label { color: #999; font-size: 0.85rem; display: flex; align-items: baseline; gap: 6px; }
+    .derived-note { color: #b39ddb; font-size: 0.7rem; font-style: italic; }
     .derived-val { font-weight: bold; color: #e0d5c0; }
     .inline-input { background: transparent; border: none; border-bottom: 1px solid #555; color: #e0d5c0; width: 120px; }
 
@@ -953,6 +958,31 @@ export class CharacterSheetComponent implements OnInit {
 
   getDerived(key: string): number {
     return (this.derived as any)?.[key] ?? 0;
+  }
+
+  /** Natürliche mystische Rüstung anhand der Wahrnehmung (ED4): min(6, WAH/5). */
+  naturalMysticArmor(): number {
+    const wah = this.character?.perception ?? 0;
+    return Math.min(6, Math.max(0, Math.floor(wah / 5)));
+  }
+
+  /** Kleiner Hinweistext, der unter dem Label angezeigt wird. */
+  derivedNote(key: string): string | null {
+    if (key === 'mysticArmor') {
+      const nat = this.naturalMysticArmor();
+      return nat > 0 ? `+${nat} aus WAH` : null;
+    }
+    return null;
+  }
+
+  /** Tooltip mit ausführlicher Erklärung. */
+  derivedTooltip(key: string): string {
+    if (key === 'mysticArmor') {
+      const wah = this.character?.perception ?? 0;
+      const nat = this.naturalMysticArmor();
+      return `Natürliche mystische Rüstung aus Wahrnehmung ${wah}: ${nat} (Tabelle: 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6). Ausrüstungs-Boni werden zusätzlich addiert.`;
+    }
+    return '';
   }
 
   getDefenseBonus(field: string): number {
