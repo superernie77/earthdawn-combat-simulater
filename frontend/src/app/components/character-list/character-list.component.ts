@@ -265,11 +265,17 @@ export class CharacterListComponent implements OnInit {
       .reduce((sum, e) => sum + (e.physicalArmor ?? 0), 0);
   }
 
-  /** Sum of mysticalArmor across all ARMOR and SHIELD equipment pieces. */
+  /** Natural mystic armor from willpower (ED4 table): min(6, WIL/5). */
+  naturalMystArmor(c: Character): number {
+    return Math.min(6, Math.max(0, Math.floor((c.willpower ?? 0) / 5)));
+  }
+
+  /** Sum of natural (willpower-based) and equipment mystic armor; override wins if set. */
   totalMystArmor(c: Character): number {
-    if (c.mysticArmor != null) return c.mysticArmor;
-    return (c.equipment ?? [])
+    const equipment = (c.equipment ?? [])
       .filter(e => e.type === 'ARMOR' || e.type === 'SHIELD')
       .reduce((sum, e) => sum + (e.mysticalArmor ?? 0), 0);
+    const base = c.mysticArmor != null ? c.mysticArmor : this.naturalMystArmor(c);
+    return base + equipment;
   }
 }
