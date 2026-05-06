@@ -367,13 +367,13 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </div>
             <!-- Defense Values -->
             <div class="comb-defense-row">
-              <span class="def-stat" matTooltip="KV – Körperliche Verteidigung">
+              <span class="def-chip phys" matTooltip="KV – Körperliche Verteidigung">
                 <mat-icon>shield</mat-icon> KV {{ pd(c) }}<span *ngIf="effectivePd(c) !== pd(c)" class="def-modified"> ({{ effectivePd(c) }})</span>
               </span>
-              <span class="def-stat mystic" matTooltip="MV – Mystische Verteidigung">
+              <span class="def-chip myst" matTooltip="MV – Mystische Verteidigung">
                 <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}<span *ngIf="effectiveSd(c) !== sd(c)" class="def-modified"> ({{ effectiveSd(c) }})</span>
               </span>
-              <span class="def-stat social" matTooltip="SV – Soziale Verteidigung">
+              <span class="def-chip social" matTooltip="SV – Soziale Verteidigung">
                 <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
               </span>
             </div>
@@ -2026,16 +2026,15 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .comb-stat-label { font-size: 11px; color: #888; min-width: 45px; }
 
     .comb-defense-row {
-      display: flex; gap: 12px; padding: 4px 0 2px; border-top: 1px solid #2a2520;
+      display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 0 2px; border-top: 1px solid #2a2520;
     }
-    .def-stat {
-      display: flex; align-items: center; gap: 3px;
-      font-size: 0.82rem; font-weight: 600; color: #7cb8e0;
+    .def-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
       mat-icon { font-size: 13px; height: 13px; width: 13px; }
-      &.mystic { color: #b39ddb; }
-      &.social { color: #80cbc4; }
-      &.armor-phys { color: #a5d6a7; }
-      &.armor-myst { color: #ce93d8; }
+      &.phys   { background: rgba(66,165,245,0.12);  border: 1px solid #1a3a5a; color: #42a5f5; }
+      &.myst   { background: rgba(171,71,188,0.12);  border: 1px solid #3a1a50; color: #ab47bc; }
+      &.social { background: rgba(255,167,38,0.12);  border: 1px solid #5a3a1a; color: #ffa726; }
     }
     .comb-armor-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
     .armor-chip {
