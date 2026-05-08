@@ -146,6 +146,8 @@ export interface CombatActionResult {
   woundThreshold?: number;
   targetDefeated?: boolean;
   attackBonusNotes?: string[];
+  /** Notizen zu Schadensboni (z.B. "Schwachstelle erkennen vs X +6 (noch 2 Runden)"). */
+  damageBonusNotes?: string[];
   hitPendingDodge?: boolean;
   dodgeDefenderId?: number;
   pendingDodgeDamage?: number;

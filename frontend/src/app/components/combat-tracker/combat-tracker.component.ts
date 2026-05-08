@@ -505,6 +505,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <span class="die-mini-rolls">{{ r.damageKarmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.damageKarmaRoll.exploded"> 💥</span></span>
                 </div>
               </div>
+              <div class="roll-effect-notes" *ngIf="r.damageBonusNotes?.length">
+                <span class="effect-note damage-note" *ngFor="let note of r.damageBonusNotes">✦ {{ note }}</span>
+              </div>
             </div>
             <div class="wound-banner" *ngIf="r.woundDealt">
               <mat-icon>bolt</mat-icon>
@@ -2255,6 +2258,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .die-mini-sum { color: #777; }
     .roll-effect-notes { display: flex; flex-wrap: wrap; gap: 4px; }
     .effect-note { font-size: 0.75rem; color: #c9a84c; background: rgba(201,168,76,0.08); border-radius: 10px; padding: 1px 8px; }
+    .effect-note.damage-note { color: #80cbc4; background: rgba(128,203,196,0.1); }
 
     .aggressive-active-badge {
       display: flex; align-items: center; gap: 6px;

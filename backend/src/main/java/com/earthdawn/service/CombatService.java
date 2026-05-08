@@ -244,19 +244,29 @@ public class CombatService {
 
             // Ziel-spezifische Schadensboni (Schwachstelle erkennen) — nur bei physischen Angriffen.
             // Zauberwürfe laufen über SpellService und sind dadurch automatisch ausgeschlossen.
+            java.util.List<String> damageBonusNotes = new java.util.ArrayList<>();
             if (req.getActionType() == ActionType.MELEE_ATTACK || req.getActionType() == ActionType.RANGED_ATTACK) {
                 Long defenderId = defender.getId();
                 for (ActiveEffect eff : attacker.getActiveEffects()) {
                     if (eff.getTargetCombatantId() == null) continue;
                     if (!eff.getTargetCombatantId().equals(defenderId)) continue;
+                    int effectBonus = 0;
                     for (ModifierEntry mod : eff.getModifiers()) {
                         if (mod.getTargetStat() != StatType.DAMAGE_STEP) continue;
                         TriggerContext tc = mod.getTriggerContext();
                         if (tc != TriggerContext.ALWAYS && tc != TriggerContext.ON_DAMAGE_DEALT) continue;
-                        damageStep += (int) mod.getValue();
+                        effectBonus += (int) mod.getValue();
+                    }
+                    if (effectBonus != 0) {
+                        damageStep += effectBonus;
+                        String suffix = eff.getRemainingRounds() > 0
+                                ? " (noch " + eff.getRemainingRounds() + " Runden)"
+                                : eff.getRemainingRounds() < 0 ? " (permanent)" : "";
+                        damageBonusNotes.add(eff.getName() + " " + (effectBonus >= 0 ? "+" : "") + effectBonus + suffix);
                     }
                 }
             }
+            result.damageBonusNotes(damageBonusNotes);
 
             boolean weaponIsClaw = false;
             if (req.getWeaponId() != null) {

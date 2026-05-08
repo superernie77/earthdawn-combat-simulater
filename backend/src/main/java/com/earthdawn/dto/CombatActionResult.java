@@ -34,6 +34,8 @@ public class CombatActionResult {
     private boolean targetDefeated;
 
     private List<String> attackBonusNotes;
+    /** Notizen zu Schadensboni (z.B. "Schwachstelle erkennen +6 (noch 2 Runden)"). */
+    private List<String> damageBonusNotes;
 
     /** Treffer, aber Schaden noch nicht angewandt — Ziel kann Ausweichen versuchen. */
     private boolean hitPendingDodge;
