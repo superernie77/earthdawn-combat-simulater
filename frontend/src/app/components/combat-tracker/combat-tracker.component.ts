@@ -302,6 +302,15 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Lufttanz-Zusatzangriff verfügbar! Gleiche Waffe wie der auslösende Angriff.">
                   <mat-icon>air</mat-icon> Zusatzangriff
                 </button>
+                <!-- Blattschuss: pending Karma-Nachschuss -->
+                <button mat-raised-button color="primary"
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingBlattschussDefenderId >= 0 && !c.defeated"
+                  class="combat-option-btn blattschuss-pending-btn"
+                  [disabled]="c.currentKarma <= 0"
+                  (click)="resumeBlattschuss(c)"
+                  matTooltip="Blattschuss: Karma nachschießen. {{ c.pendingBlattschussKarmaUsed }}/{{ c.pendingBlattschussRank }} eingesetzt, Wurf-Total {{ c.pendingBlattschussTotal }} vs VK {{ c.pendingBlattschussDefense }}.">
+                  <mat-icon>track_changes</mat-icon> +Karma ({{ c.pendingBlattschussRank - c.pendingBlattschussKarmaUsed }} übrig)
+                </button>
                 <!-- Zweitwaffe: zweiter Angriff -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
                   class="combat-option-btn zweitwaffe-btn"
@@ -561,6 +570,21 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
              style="border-color:#29b6f6;color:#29b6f6">
           <mat-icon>air</mat-icon>
           Lufttanz-Zusatzangriff verfügbar! (Initiative-Vorsprung +{{ r.lufttanzInitiativeDiff }} ≥ 10)
+        </div>
+        <div class="dodge-prompt" *ngIf="r.blattschussCanAddKarma"
+             style="border-color:#a5d6a7;color:#a5d6a7">
+          <mat-icon>track_changes</mat-icon>
+          Blattschuss: Fehlschlag — weiteres Karma nachschießen?
+          ({{ r.blattschussKarmaUsed ?? 0 }}/{{ r.blattschussRank }} eingesetzt)
+        </div>
+        <div *ngIf="r.blattschussCanAddKarma" style="display:flex;gap:8px;margin-top:8px">
+          <button mat-raised-button color="primary" style="flex:1"
+                  [disabled]="(blattschussActor()?.currentKarma ?? 0) <= 0"
+                  (click)="addBlattschussKarma()">
+            <mat-icon>auto_awesome</mat-icon>
+            +1 Karma einsetzen ({{ blattschussActor()?.currentKarma ?? 0 }} verfügbar)
+          </button>
+          <button mat-stroked-button (click)="resultModal.open = false">Aufgeben</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap" *ngIf="r.hitPendingRiposte || r.hitPendingDodge; else closeOnly">
           <button mat-stroked-button style="flex:1;min-width:140px"
@@ -1044,6 +1068,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             matTooltip="Krallenhand: zusätzliches Karma auf den Schadenswurf">
             <mat-icon>local_fire_department</mat-icon>
             Karma (Schaden)
+          </label>
+          <label class="karma-toggle blattschuss-toggle"
+            *ngIf="canUseBlattschuss(attackDialog)"
+            [class.active]="attackDialog.useBlattschuss"
+            (click)="attackDialog.useBlattschuss = !attackDialog.useBlattschuss"
+            matTooltip="Blattschuss ankündigen: bei Fehlschlag bis zu Rang Karma nachschießen. Kostet 2 Schaden, 1×/Runde, nur Fernkampf.">
+            <mat-icon>track_changes</mat-icon>
+            Blattschuss
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
@@ -2447,6 +2479,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.lufttanz-btn:not([disabled]):hover { border-color: #b3e5fc; background: rgba(179,229,252,0.1); }
     .combat-option-btn.lufttanz-attack-btn { color: #fff; background: #29b6f6; }
     .combat-option-btn.lufttanz-attack-btn:hover { background: #03a9f4; }
+    .combat-option-btn.blattschuss-pending-btn { color: #fff; background: #66bb6a; }
+    .combat-option-btn.blattschuss-pending-btn:hover:not([disabled]) { background: #4caf50; }
+    .karma-toggle.blattschuss-toggle.active { color: #a5d6a7; border-color: #a5d6a7; background: rgba(165,214,167,0.15); }
     .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
@@ -2561,9 +2596,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     bonusSteps: number;
     spendKarma: boolean;
     spendKarmaForDamage?: boolean;
+    useBlattschuss?: boolean;
     aggressiveAttack: boolean;
     defensiveStance: boolean;
-  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false, aggressiveAttack: false, defensiveStance: false };
+  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false, useBlattschuss: false, aggressiveAttack: false, defensiveStance: false };
 
   /** Letztes Angriffsziel pro Kombattant (combatantId → defenderId) */
   private lastTargetMap = new Map<number, number>();
@@ -2905,9 +2941,57 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       bonusSteps: 0,
       spendKarma: false,
       spendKarmaForDamage: false,
+      useBlattschuss: false,
       aggressiveAttack: false,
       defensiveStance: false
     };
+  }
+
+  /** True wenn Blattschuss verwendet werden kann: Talent vorhanden, RANGED-Talent gewählt, nicht bereits diese Runde benutzt. */
+  canUseBlattschuss(dialog: { attacker?: CombatantState; talentId?: number }): boolean {
+    if (!dialog.attacker || dialog.attacker.blattschussUsedThisRound) return false;
+    const hasTalent = (dialog.attacker.character.talents ?? [])
+      .some(t => t.talentDefinition.name === 'Blattschuss');
+    if (!hasTalent) return false;
+    const talentName = (dialog.attacker.character.talents ?? [])
+      .find(t => t.talentDefinition.id === dialog.talentId)?.talentDefinition.name ?? '';
+    return talentName === 'Projektilwaffen' || talentName === 'Wurfwaffen';
+  }
+
+  /** Anwender des aktuell ausstehenden Blattschuss-Angriffs (per Result-Modal-Akteursnamen). */
+  blattschussActor(): CombatantState | undefined {
+    const r = this.resultModal.result;
+    if (!r?.blattschussCanAddKarma || !this.session) return undefined;
+    return this.session.combatants.find(c => c.character.name === r.actorName);
+  }
+
+  /** Direkt vom Kombattanten-Button: Karma nachschießen (auch nach Schließen des Modals). */
+  resumeBlattschuss(actor: CombatantState): void {
+    if (!this.session || actor.pendingBlattschussDefenderId < 0) return;
+    this.combatService.performBlattschussAddKarma(this.session.id, actor.id).subscribe({
+      next: result => {
+        this.lastResult = result;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  /** Setzt einen weiteren Karmawürfel auf den ausstehenden Blattschuss-Angriff. */
+  addBlattschussKarma(): void {
+    const r = this.resultModal.result;
+    if (!this.session || !r?.blattschussCanAddKarma) return;
+    const actor = this.session.combatants.find(c => c.character.name === r.actorName);
+    if (!actor) return;
+    this.combatService.performBlattschussAddKarma(this.session.id, actor.id).subscribe({
+      next: result => {
+        this.lastResult = result;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
   }
 
   /**
@@ -2991,6 +3075,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       bonusSteps: this.attackDialog.bonusSteps,
       spendKarma: this.attackDialog.spendKarma,
       spendKarmaForDamage: this.attackDialog.spendKarmaForDamage,
+      useBlattschuss: this.attackDialog.useBlattschuss,
       aggressiveAttack: this.attackDialog.aggressiveAttack,
       defensiveStance: this.attackDialog.defensiveStance
     };

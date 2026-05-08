@@ -99,6 +99,41 @@ public class CombatantState {
     @Builder.Default
     private boolean lufttanzBonusUsedThisRound = false;
 
+    /** Blattschuss bereits diese Runde verwendet (1×/Runde). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean blattschussUsedThisRound = false;
+
+    /** ID des Verteidigers eines pending Blattschuss-Angriffs (Fehlschlag, weitere Karma möglich). -1 = keiner. */
+    @Column(columnDefinition = "bigint default -1")
+    @Builder.Default
+    private Long pendingBlattschussDefenderId = -1L;
+
+    /** Aktueller akkumulierter Wurf-Total für Blattschuss-Pending. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingBlattschussTotal = 0;
+
+    /** Anzahl der bereits via Blattschuss eingesetzten Zusatzkarmawürfel. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingBlattschussKarmaUsed = 0;
+
+    /** Maximalzahl der Zusatzkarmawürfel = Talentrang zum Zeitpunkt des Angriffs. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingBlattschussRank = 0;
+
+    /** Waffe des Blattschuss-Pending-Angriffs (für späteren Schadenswurf). */
+    @Column(columnDefinition = "bigint default -1")
+    @Builder.Default
+    private Long pendingBlattschussWeaponId = -1L;
+
+    /** Verteidigungswert des Ziels zum Zeitpunkt des Blattschuss-Angriffs. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingBlattschussDefense = 0;
+
     @Builder.Default
     private int pendingDodgeDamage = 0;
 

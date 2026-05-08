@@ -30,5 +30,6 @@ public enum ActionType {
     ZWEITE_WAFFE,
     SPOT_ARMOR_FLAW,
     LUFTTANZ,
-    LUFTTANZ_ATTACK
+    LUFTTANZ_ATTACK,
+    BLATTSCHUSS_KARMA
 }

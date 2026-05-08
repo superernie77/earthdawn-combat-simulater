@@ -109,6 +109,20 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Blattschuss").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Blattschuss")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Magisches Schützentalent: erlaubt bei einer Projektil-/Wurfwaffen-Probe " +
+                            "bis zu Rang zusätzliche Karmawürfel. Wird vor der Probe angekündigt. " +
+                            "Bei Fehlschlag dürfen weitere Karma einzeln eingesetzt und das Ergebnis aufaddiert " +
+                            "werden, bis Treffer erreicht oder Rang ausgeschöpft. Nach Treffer kein weiteres " +
+                            "Karma. Freie Aktion, kostet 2 Überanstrengung, 1× pro Runde.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Blattschuss' hinzugefügt.");
+        }
         if (talentRepo.findByName("Lufttanz").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Lufttanz")

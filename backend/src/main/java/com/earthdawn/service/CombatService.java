@@ -198,6 +198,27 @@ public class CombatService {
         // den ModifierAggregator automatisch in attackStep / Verteidigungswerte ein.
         boolean wasAggressive = attacker.getDeclaredStance() == DeclaredStance.AGGRESSIVE;
 
+        // 1b. Blattschuss-Validierung: nur RANGED_ATTACK, Talent vorhanden, nicht bereits verwendet
+        int blattschussRank = 0;
+        boolean blattschussActive = false;
+        if (req.isUseBlattschuss()) {
+            if (req.getActionType() != ActionType.RANGED_ATTACK) {
+                throw new IllegalStateException("Blattschuss ist nur bei Projektil-/Wurfwaffen-Angriffen einsetzbar.");
+            }
+            if (attacker.isBlattschussUsedThisRound()) {
+                throw new IllegalStateException("Blattschuss wurde diese Runde bereits eingesetzt.");
+            }
+            CharacterTalent bs = attacker.getCharacter().getTalents().stream()
+                    .filter(t -> TalentNames.BLATTSCHUSS.equals(t.getTalentDefinition().getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Talent 'Blattschuss' nicht gefunden."));
+            blattschussRank = bs.getRank();
+            blattschussActive = true;
+            // 2 Schaden Überanstrengung
+            attacker.setCurrentDamage(attacker.getCurrentDamage() + 2);
+            attacker.setBlattschussUsedThisRound(true);
+        }
+
         // 2. Karma — immer W6 (Stufe 4)
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
@@ -233,7 +254,20 @@ public class CombatService {
                 .karmaRoll(karmaRoll)
                 .defenseValue(pd)
                 .hit(hit)
-                .attackBonusNotes(attackBonusNotes);
+                .attackBonusNotes(attackBonusNotes)
+                .blattschussActive(blattschussActive)
+                .blattschussRank(blattschussRank);
+
+        // Blattschuss + Fehlschlag: pending-State setzen, damit weitere Karma eingesetzt werden können
+        if (!hit && blattschussActive && blattschussRank > 0) {
+            attacker.setPendingBlattschussDefenderId(defender.getId());
+            attacker.setPendingBlattschussTotal(attackTotal);
+            attacker.setPendingBlattschussKarmaUsed(0);
+            attacker.setPendingBlattschussRank(blattschussRank);
+            attacker.setPendingBlattschussWeaponId(req.getWeaponId() != null ? req.getWeaponId() : -1L);
+            attacker.setPendingBlattschussDefense(pd);
+            result.blattschussCanAddKarma(true).blattschussKarmaUsed(0);
+        }
 
         if (hit) {
             // 5. Übererfolge: je 5 über VK → +2 Schadensstufen
@@ -408,6 +442,8 @@ public class CombatService {
             combatant.setLufttanzBonusUsedThisRound(false);
             combatant.setPendingLufttanzTargetId(-1L);
             combatant.setPendingLufttanzWeaponId(-1L);
+            combatant.setBlattschussUsedThisRound(false);
+            clearBlattschussPending(combatant);
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
@@ -1957,6 +1993,129 @@ public class CombatService {
                 .actorName(actorName).rank(rank)
                 .initiativeBonus(rank).newInitiative(actor.getInitiative())
                 .damageTaken(1).description(desc).build();
+    }
+
+    // --- Blattschuss ---
+
+    /**
+     * Setzt einen weiteren Karmawürfel auf den ausstehenden Blattschuss-Angriff. Wenn der neue
+     * Total ≥ Verteidigung des Ziels: Treffer wird abgewickelt (Schadenswurf, Riposte/Dodge-Checks).
+     * Sonst: pending bleibt bestehen, falls noch Karma übrig — sonst finaler Fehlschlag.
+     */
+    public CombatActionResult performBlattschussAddKarma(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState attacker = findCombatant(session, actorCombatantId);
+
+        if (attacker.isDefeated()) throw new IllegalStateException(attacker.getCharacter().getName() + " ist besiegt.");
+        if (attacker.getPendingBlattschussDefenderId() == null || attacker.getPendingBlattschussDefenderId() < 0) {
+            throw new IllegalStateException("Kein ausstehender Blattschuss-Angriff.");
+        }
+        if (attacker.getPendingBlattschussKarmaUsed() >= attacker.getPendingBlattschussRank()) {
+            throw new IllegalStateException("Blattschuss-Karma-Maximum erreicht.");
+        }
+        if (attacker.getCurrentKarma() <= 0) {
+            throw new IllegalStateException(attacker.getCharacter().getName() + " hat kein Karma mehr.");
+        }
+
+        CombatantState defender = findCombatant(session, attacker.getPendingBlattschussDefenderId());
+
+        // Karmawürfel werfen, vom Karma-Pool abziehen
+        RollResult karmaRoll = diceService.roll(4);
+        attacker.setCurrentKarma(attacker.getCurrentKarma() - 1);
+        int newTotal = attacker.getPendingBlattschussTotal() + karmaRoll.getTotal();
+        int karmaUsed = attacker.getPendingBlattschussKarmaUsed() + 1;
+        int rank = attacker.getPendingBlattschussRank();
+        int defenseValue = attacker.getPendingBlattschussDefense();
+        attacker.setPendingBlattschussTotal(newTotal);
+        attacker.setPendingBlattschussKarmaUsed(karmaUsed);
+
+        boolean hit = newTotal >= defenseValue;
+        boolean canAddMore = !hit && karmaUsed < rank && attacker.getCurrentKarma() > 0;
+
+        CombatActionResult.CombatActionResultBuilder result = CombatActionResult.builder()
+                .actorName(attacker.getCharacter().getName())
+                .targetName(defender.getCharacter().getName())
+                .actionType(ActionType.RANGED_ATTACK)
+                .attackStep(0) // initial step ist nicht mehr verfügbar — wir zeigen nur den Karma-Würfel
+                .karmaRoll(karmaRoll)
+                .defenseValue(defenseValue)
+                .hit(hit)
+                .blattschussActive(true)
+                .blattschussRank(rank)
+                .blattschussKarmaUsed(karmaUsed)
+                .blattschussCanAddKarma(canAddMore);
+
+        if (hit) {
+            // Treffer: Schadenswurf + Reaktionen wie regulärer Angriff
+            int extraSuccesses = (newTotal - defenseValue) / 5;
+            int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
+            Long weaponId = attacker.getPendingBlattschussWeaponId();
+            boolean weaponIsClaw = false;
+            if (weaponId != null && weaponId >= 0) {
+                com.earthdawn.model.Equipment weapon = attacker.getCharacter().getEquipment().stream()
+                        .filter(e -> e.getId().equals(weaponId))
+                        .findFirst().orElse(null);
+                if (weapon != null) {
+                    damageStep += weapon.getDamageBonus();
+                    weaponIsClaw = weapon.isClawWeapon();
+                }
+            }
+            damageStep += extraSuccesses * 2;
+            RollResult damageRoll = diceService.roll(damageStep);
+            int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+            int netDamage = Math.max(0, damageRoll.getTotal() - armor);
+
+            // Pending zurücksetzen
+            clearBlattschussPending(attacker);
+
+            // Reaktionen: Ausweichen ist erlaubt (Fernkampf), Riposte nicht (nur Nahkampf)
+            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
+            if (defenderHasDodge) {
+                defender.setPendingDodgeDamage(netDamage);
+                defender.setPendingDodgeAttackTotal(newTotal);
+                defender.setPendingDamageStep(damageStep);
+                defender.setPendingArmorValue(armor);
+                try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
+                result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(netDamage)
+                      .extraSuccesses(extraSuccesses).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(netDamage);
+            } else {
+                int wt = modifiers.getEffectiveValue(defender, StatType.WOUND_THRESHOLD, TriggerContext.ALWAYS);
+                int prevWounds = defender.getWounds();
+                KnockdownResult kdr = applyDamageToDefender(session, defender, netDamage);
+                int newWounds = defender.getWounds() - prevWounds;
+                result.extraSuccesses(extraSuccesses).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(netDamage)
+                      .woundDealt(newWounds > 0).newWounds(newWounds)
+                      .totalWounds(defender.getWounds()).woundThreshold(wt)
+                      .targetDefeated(defender.isDefeated()).knockdownResult(kdr);
+            }
+        } else if (!canAddMore) {
+            // Kein weiteres Karma möglich → finaler Fehlschlag
+            clearBlattschussPending(attacker);
+        }
+
+        CombatActionResult actionResult = result.build();
+        String desc = attacker.getCharacter().getName() + " setzt Blattschuss-Karma ein ("
+                + karmaUsed + "/" + rank + "): +" + karmaRoll.getTotal()
+                + " → Total " + newTotal + " vs " + defenseValue
+                + (hit ? " — TREFFER!" : (canAddMore ? " — Fehlschlag, weiter möglich." : " — finaler Fehlschlag."));
+        actionResult.setDescription(desc);
+        addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                ActionType.BLATTSCHUSS_KARMA, desc, hit);
+        sessionRepo.save(session);
+        broadcast(session);
+        return actionResult;
+    }
+
+    private void clearBlattschussPending(CombatantState c) {
+        c.setPendingBlattschussDefenderId(-1L);
+        c.setPendingBlattschussTotal(0);
+        c.setPendingBlattschussKarmaUsed(0);
+        c.setPendingBlattschussRank(0);
+        c.setPendingBlattschussWeaponId(-1L);
+        c.setPendingBlattschussDefense(0);
     }
 
     // --- Lufttanz ---

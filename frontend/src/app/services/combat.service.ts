@@ -226,4 +226,10 @@ export class CombatService {
   performLufttanzAttack(sessionId: number, req: LufttanzAttackRequest): Observable<CombatActionResult> {
     return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/lufttanz-attack`, req);
   }
+
+  performBlattschussAddKarma(sessionId: number, combatantId: number): Observable<CombatActionResult> {
+    return this.http.post<CombatActionResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/blattschuss-add-karma`, {}
+    );
+  }
 }

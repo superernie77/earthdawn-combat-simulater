@@ -51,6 +51,17 @@ public class CombatActionResult {
     /** Initiative-Differenz (attacker - defender) zur Anzeige. */
     private int lufttanzInitiativeDiff;
 
+    /** Blattschuss war für diesen Angriff aktiviert (kostete 2 Schaden). */
+    private boolean blattschussActive;
+    /** Pending: Fehlschlag, weitere Karma einsetzbar. */
+    private boolean blattschussCanAddKarma;
+    /** Bisher per Blattschuss eingesetzte Karmawürfel. */
+    private int blattschussKarmaUsed;
+    /** Maximalzahl der Karmawürfel = Talentrang. */
+    private int blattschussRank;
+    /** Liste der bisherigen Blattschuss-Karmawürfe (separat von normalem karmaRoll). */
+    private java.util.List<RollResult> blattschussKarmaRolls;
+
     /** Niedergeschlagen-Probe Ergebnis (wenn Wunde zugefügt). */
     private KnockdownResult knockdownResult;
 

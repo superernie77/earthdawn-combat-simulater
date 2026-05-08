@@ -248,4 +248,10 @@ public class CombatController {
         req.setSessionId(id);
         return combatService.performLufttanzAttack(req);
     }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/blattschuss-add-karma")
+    public CombatActionResult performBlattschussAddKarma(@PathVariable Long id,
+                                                          @PathVariable Long combatantId) {
+        return combatService.performBlattschussAddKarma(id, combatantId);
+    }
 }

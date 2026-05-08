@@ -84,6 +84,13 @@ export interface CombatantState {
   lufttanzBonusUsedThisRound: boolean;
   pendingLufttanzTargetId: number;
   pendingLufttanzWeaponId: number;
+  blattschussUsedThisRound: boolean;
+  pendingBlattschussDefenderId: number;
+  pendingBlattschussTotal: number;
+  pendingBlattschussKarmaUsed: number;
+  pendingBlattschussRank: number;
+  pendingBlattschussWeaponId: number;
+  pendingBlattschussDefense: number;
   preparingSpellId?: number;
   threadsWoven: number;
   threadsRequired: number;
@@ -123,6 +130,8 @@ export interface AttackActionRequest {
   spendKarma: boolean;
   /** Karma zusätzlich auf den Schadenswurf einsetzen (nur bei Krallenhand-Waffen). */
   spendKarmaForDamage?: boolean;
+  /** Blattschuss ankündigen: erlaubt nach Fehlschlag weitere Karma (max. Rang) — nur RANGED_ATTACK. */
+  useBlattschuss?: boolean;
   aggressiveAttack?: boolean;
   defensiveStance?: boolean;
 }
@@ -160,6 +169,12 @@ export interface CombatActionResult {
   /** Lufttanz: Initiative-Vorsprung ≥ 10 → Bonusangriff ausstehend. */
   lufttanzBonusReady?: boolean;
   lufttanzInitiativeDiff?: number;
+  /** Blattschuss war aktiviert (kostete 2 Schaden). */
+  blattschussActive?: boolean;
+  /** Pending: Fehlschlag, weitere Karma einsetzbar. */
+  blattschussCanAddKarma?: boolean;
+  blattschussKarmaUsed?: number;
+  blattschussRank?: number;
   knockdownResult?: KnockdownResult;
   description: string;
 }

@@ -17,6 +17,8 @@ public class AttackActionRequest {
     private boolean spendKarma;
     /** Karma zusätzlich auf den Schadenswurf einsetzen (nur erlaubt bei Krallenhand-Waffen). */
     private boolean spendKarmaForDamage;
+    /** Blattschuss ankündigen: erlaubt nach Fehlschlag weitere Karmawürfel (max. Rang) — nur bei RANGED_ATTACK. */
+    private boolean useBlattschuss;
     private boolean aggressiveAttack;
     private boolean defensiveStance;
 }
