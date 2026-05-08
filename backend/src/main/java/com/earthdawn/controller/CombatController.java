@@ -199,6 +199,13 @@ public class CombatController {
         return combatService.performDistract(id, req);
     }
 
+    @PostMapping("/sessions/{id}/spot-armor-flaw")
+    public SpotArmorFlawResult performSpotArmorFlaw(@PathVariable Long id,
+                                                    @RequestBody SpotArmorFlawRequest req) {
+        req.setSessionId(id);
+        return combatService.performSpotArmorFlaw(req);
+    }
+
     @PostMapping("/sessions/{id}/combatants/{combatantId}/iron-will")
     public IronWillResult performIronWill(
             @PathVariable Long id,

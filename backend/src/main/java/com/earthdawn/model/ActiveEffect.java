@@ -51,4 +51,11 @@ public class ActiveEffect {
     /** true = negativer Effekt/Zustand (rot), false = Buff (grün) */
     @Builder.Default
     private boolean negative = false;
+
+    /**
+     * Wenn gesetzt: dieser Effekt gilt nur, wenn der Träger gegen den angegebenen
+     * Kombattanten agiert (z.B. Schwachstelle erkennen → Schadensbonus nur gegen
+     * dieses Ziel). null = unkonditional.
+     */
+    private Long targetCombatantId;
 }

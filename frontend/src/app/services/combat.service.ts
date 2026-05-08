@@ -14,7 +14,8 @@ import {
   RiposteRequest, RiposteResult,
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
-  ZweitwaffeRequest
+  ZweitwaffeRequest,
+  SpotArmorFlawRequest, SpotArmorFlawResult
 } from '../models/combat.model';
 
 @Injectable({ providedIn: 'root' })
@@ -140,6 +141,10 @@ export class CombatService {
 
   performDistract(sessionId: number, req: DistractRequest): Observable<DistractResult> {
     return this.http.post<DistractResult>(`${this.base}/sessions/${sessionId}/distract`, req);
+  }
+
+  performSpotArmorFlaw(sessionId: number, req: SpotArmorFlawRequest): Observable<SpotArmorFlawResult> {
+    return this.http.post<SpotArmorFlawResult>(`${this.base}/sessions/${sessionId}/spot-armor-flaw`, req);
   }
 
   performIronWill(sessionId: number, combatantId: number,

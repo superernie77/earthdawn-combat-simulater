@@ -27,5 +27,6 @@ public enum ActionType {
     RIPOSTE,
     MANOEUVER,
     TIGERSPRUNG,
-    ZWEITE_WAFFE
+    ZWEITE_WAFFE,
+    SPOT_ARMOR_FLAW
 }

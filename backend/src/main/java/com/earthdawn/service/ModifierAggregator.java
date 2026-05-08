@@ -38,6 +38,10 @@ public class ModifierAggregator {
         int setMax = Integer.MAX_VALUE;
 
         for (ActiveEffect effect : effects) {
+            // Ziel-spezifische Effekte (z.B. Schwachstelle erkennen) werden hier ignoriert —
+            // sie müssen vom Aufrufer (z.B. performAttack) explizit gegen das aktuelle Ziel
+            // angewendet werden.
+            if (effect.getTargetCombatantId() != null) continue;
             for (ModifierEntry mod : effect.getModifiers()) {
                 if (mod.getTargetStat() != stat) continue;
                 TriggerContext tc = mod.getTriggerContext();

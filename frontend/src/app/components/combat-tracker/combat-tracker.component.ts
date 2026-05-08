@@ -30,7 +30,8 @@ import {
   RiposteRequest, RiposteResult,
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
-  ZweitwaffeRequest
+  ZweitwaffeRequest,
+  SpotArmorFlawRequest, SpotArmorFlawResult
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -255,6 +256,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openIronWillDialog(c)"
                   matTooltip="Eiserner Wille (WIL + Rang vs. Zauberwurf, freie Aktion, kostet 1 Schaden)">
                   <mat-icon>psychology</mat-icon>
+                </button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasSpotArmorFlawTalent(c) && !c.defeated"
+                  class="combat-option-btn spot-flaw-btn"
+                  (click)="openSpotArmorFlawDialog(c)"
+                  matTooltip="Schwachstelle erkennen (WAH + Rang vs. max(MV, Rüstung) — +2 Schaden/Erfolg gegen das Ziel für Rang Runden, kostet 1 Schaden, keine Hauptaktion)">
+                  <mat-icon>biotech</mat-icon>
                 </button>
                 <!-- Riposte: nur sichtbar wenn ein Angriff aussteht -->
                 <button mat-raised-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasRiposteTalent(c) && c.pendingRiposteAttackTotal >= 0 && !c.defeated"
@@ -1374,6 +1381,113 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
+    <!-- Schwachstelle erkennen Dialog -->
+    <div class="attack-dialog" *ngIf="spotArmorFlawDialog.open">
+      <div class="dialog-backdrop" (click)="spotArmorFlawDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#80cbc4">biotech</mat-icon>Schwachstelle erkennen: {{ spotArmorFlawDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WAH + Rang vs. max(MV, physische Rüstung) · +2 Schaden/Erfolg gegen das Ziel für Rang Runden · keine Hauptaktion
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="spotArmorFlawDialog.targetId">
+            <mat-option *ngFor="let c of spotArmorFlawTargets()" [value]="c.id">
+              {{ cn(c) }} (MV {{ sd(c) }}, Rüstung {{ pa(c) }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Bonusstufen</mat-label>
+          <input matInput type="number" [(ngModel)]="spotArmorFlawDialog.bonusSteps" min="0">
+        </mat-form-field>
+        <div class="fa-cost-badge">
+          <mat-icon>warning</mat-icon> Kostet 1 Schaden · keine Hauptaktion
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="spotArmorFlawDialog.spendKarma"
+            [class.disabled]="(spotArmorFlawDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(spotArmorFlawDialog.actor?.currentKarma ?? 0) > 0 && (spotArmorFlawDialog.spendKarma = !spotArmorFlawDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(spotArmorFlawDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ spotArmorFlawDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="spotArmorFlawDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performSpotArmorFlaw()" [disabled]="!spotArmorFlawDialog.targetId">
+            <mat-icon>biotech</mat-icon> Analysieren
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schwachstelle erkennen Result Modal -->
+    <div class="result-modal" *ngIf="spotArmorFlawModal.open">
+      <div class="dialog-backdrop" (click)="spotArmorFlawModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="spotArmorFlawModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'biotech' : 'close' }}</mat-icon>
+          {{ r.success ? 'SCHWACHSTELLE GEFUNDEN!' : 'KEINE LÜCKE ENTDECKT' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Probe · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">{{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div style="font-size:0.78rem;color:#888;margin-top:4px">
+              TN = max(MV {{ r.spellDefense }}, Rüstung {{ r.physicalArmor }})
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Erfolge</span>
+              <span class="roll-expr">{{ r.successes }}× → +{{ r.damageBonus }} Schaden vs. {{ r.targetName }}</span>
+              <span class="roll-value extra-success">{{ r.successes }}</span>
+            </div>
+            <div class="roll-row" style="background:rgba(129,199,132,0.08)">
+              <span class="roll-label">Dauer</span>
+              <span class="roll-expr">physische Angriffe (Nahkampf/Fernkampf, keine Zauber)</span>
+              <span class="roll-value" style="color:#81c784">{{ r.duration }} Runden</span>
+            </div>
+          </ng-container>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.strainCost }}</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="spotArmorFlawModal.open = false">
+          Schließen
+        </button>
+      </div>
+    </div>
+
     <!-- Eiserner Wille Dialog -->
     <div class="attack-dialog" *ngIf="ironWillDialog.open">
       <div class="dialog-backdrop" (click)="ironWillDialog.open = false"></div>
@@ -2214,6 +2328,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.combat-sense-btn:not([disabled]):hover { border-color: #ffcc80; background: rgba(255,204,128,0.1); }
     .combat-option-btn.distract-btn { color: #ffab91; border-color: #3a1a10; }
     .combat-option-btn.distract-btn:not([disabled]):hover { border-color: #ffab91; background: rgba(255,171,145,0.1); }
+    .combat-option-btn.spot-flaw-btn { color: #80cbc4; border-color: #1e3a36; }
+    .combat-option-btn.spot-flaw-btn:not([disabled]):hover { border-color: #80cbc4; background: rgba(128,203,196,0.1); }
     .combat-option-btn.iron-will-btn { color: #b0bec5; border-color: #2a3038; }
     .combat-option-btn.iron-will-btn:not([disabled]):hover { border-color: #b0bec5; background: rgba(176,190,197,0.1); }
     .combat-option-btn.riposte-btn { color: #ff8a65; border-color: #4a2010; background: rgba(255,138,101,0.12); }
@@ -2467,6 +2583,16 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   } = { open: false, spendKarma: false };
 
   distractModal: { open: boolean; result?: DistractResult } = { open: false };
+
+  spotArmorFlawDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    bonusSteps: number;
+    spendKarma: boolean;
+  } = { open: false, bonusSteps: 0, spendKarma: false };
+
+  spotArmorFlawModal: { open: boolean; result?: SpotArmorFlawResult } = { open: false };
 
   ironWillDialog: {
     open: boolean;
@@ -3152,6 +3278,44 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       next: result => {
         this.distractDialog.open = false;
         this.distractModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
+        this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  // --- Schwachstelle erkennen ---
+
+  hasSpotArmorFlawTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Schwachstelle erkennen');
+  }
+
+  spotArmorFlawTargets(): CombatantState[] {
+    return (this.session?.combatants ?? []).filter(c =>
+      c.id !== this.spotArmorFlawDialog.actor?.id && !c.defeated
+    );
+  }
+
+  openSpotArmorFlawDialog(actor: CombatantState): void {
+    this.spotArmorFlawDialog = { open: true, actor, targetId: undefined, bonusSteps: 0, spendKarma: false };
+  }
+
+  performSpotArmorFlaw(): void {
+    if (!this.session || !this.spotArmorFlawDialog.actor || !this.spotArmorFlawDialog.targetId) return;
+    const req: SpotArmorFlawRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.spotArmorFlawDialog.actor.id,
+      targetCombatantId: this.spotArmorFlawDialog.targetId,
+      bonusSteps: this.spotArmorFlawDialog.bonusSteps,
+      spendKarma: this.spotArmorFlawDialog.spendKarma
+    };
+    this.combatService.performSpotArmorFlaw(this.session.id, req).subscribe({
+      next: result => {
+        this.spotArmorFlawDialog.open = false;
+        this.spotArmorFlawModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },
       error: err => {

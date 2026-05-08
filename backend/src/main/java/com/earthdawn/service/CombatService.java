@@ -241,6 +241,23 @@ public class CombatService {
 
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
+
+            // Ziel-spezifische Schadensboni (Schwachstelle erkennen) — nur bei physischen Angriffen.
+            // Zauberwürfe laufen über SpellService und sind dadurch automatisch ausgeschlossen.
+            if (req.getActionType() == ActionType.MELEE_ATTACK || req.getActionType() == ActionType.RANGED_ATTACK) {
+                Long defenderId = defender.getId();
+                for (ActiveEffect eff : attacker.getActiveEffects()) {
+                    if (eff.getTargetCombatantId() == null) continue;
+                    if (!eff.getTargetCombatantId().equals(defenderId)) continue;
+                    for (ModifierEntry mod : eff.getModifiers()) {
+                        if (mod.getTargetStat() != StatType.DAMAGE_STEP) continue;
+                        TriggerContext tc = mod.getTriggerContext();
+                        if (tc != TriggerContext.ALWAYS && tc != TriggerContext.ON_DAMAGE_DEALT) continue;
+                        damageStep += (int) mod.getValue();
+                    }
+                }
+            }
+
             boolean weaponIsClaw = false;
             if (req.getWeaponId() != null) {
                 com.earthdawn.model.Equipment weapon = attacker.getCharacter().getEquipment().stream()
@@ -1352,6 +1369,115 @@ public class CombatService {
                 .actorPenalty(success ? successes : 0)
                 .targetPenalty(success ? successes : 0)
                 .damageTaken(1)
+                .description(desc)
+                .build();
+    }
+
+    // --- Schwachstelle erkennen ---
+
+    /**
+     * Schwachstelle erkennen: WAH-Step + Rang vs. max(MV, physische Rüstung) des Ziels.
+     * Bei Erfolg: pro Erfolg +2 Schaden auf physische Angriffe (Nahkampf/Fernkampf) gegen
+     * dieses spezifische Ziel für Rang Runden. Kostet 1 Überanstrengung. Verbraucht KEINE
+     * Hauptaktion. Nicht für Zaubersprüche.
+     *
+     * Ein bereits aktiver Schwachstelle-Effekt gegen dasselbe Ziel wird ersetzt
+     * (neue Probe überschreibt alte).
+     */
+    public SpotArmorFlawResult performSpotArmorFlaw(SpotArmorFlawRequest req) {
+        CombatSession session = findById(req.getSessionId());
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.SCHWACHSTELLE_ERKENNEN.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Schwachstelle erkennen' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelschritt: WAH-Step + Rang + Bonus − Wunden
+        int perStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getPerception()) - actor.getWounds());
+        int rollStep = Math.max(1, perStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // TN = max(MV, physische Rüstung)
+        int spellDef = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ON_SPELL_DEFENSE);
+        int physArmor = modifiers.getEffectiveValue(target, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+        int tn = Math.max(spellDef, physArmor);
+
+        boolean success = total >= tn;
+        int extraSucc   = success ? (total - tn) / 5 : 0;
+        int successes   = success ? 1 + extraSucc : 0;
+        int damageBonus = successes * 2;
+        int duration    = ct.getRank();
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+
+        if (success && successes > 0) {
+            // Vorhandenen Effekt gegen dasselbe Ziel entfernen (neue Probe überschreibt)
+            actor.getActiveEffects().removeIf(e ->
+                    e.getSourceType() == SourceType.TALENT
+                    && e.getName() != null
+                    && e.getName().startsWith(TalentNames.SCHWACHSTELLE_ERKENNEN)
+                    && req.getTargetCombatantId().equals(e.getTargetCombatantId()));
+
+            ActiveEffect effect = ActiveEffect.builder()
+                    .combatantState(actor)
+                    .name(TalentNames.SCHWACHSTELLE_ERKENNEN + " vs " + targetName)
+                    .description("+" + damageBonus + " Schaden gegen " + targetName + " (physische Angriffe) für " + duration + " Runde(n)")
+                    .sourceType(SourceType.TALENT)
+                    .remainingRounds(duration)
+                    .negative(false)
+                    .targetCombatantId(req.getTargetCombatantId())
+                    .modifiers(List.of(
+                            ModifierEntry.builder()
+                                    .targetStat(StatType.DAMAGE_STEP)
+                                    .operation(ModifierOperation.ADD)
+                                    .value(damageBonus)
+                                    .triggerContext(TriggerContext.ON_DAMAGE_DEALT)
+                                    .build()
+                    ))
+                    .build();
+            actor.getActiveEffects().add(effect);
+        }
+
+        String desc = success
+                ? actorName + " erkennt Schwachstellen an " + targetName + "! " + successes
+                  + " Erfolg(e) → +" + damageBonus + " Schaden auf physische Angriffe für " + duration + " Runde(n) (TN " + tn + ")."
+                : actorName + " sucht Schwachstellen an " + targetName + ", findet keine. (" + total + " vs " + tn + ")";
+
+        addLog(session, actorName, targetName, ActionType.SPOT_ARMOR_FLAW, desc, success);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return SpotArmorFlawResult.builder()
+                .actorName(actorName)
+                .targetName(targetName)
+                .rollStep(rollStep)
+                .roll(roll)
+                .karmaRoll(karmaRoll)
+                .targetNumber(tn)
+                .spellDefense(spellDef)
+                .physicalArmor(physArmor)
+                .success(success)
+                .successes(successes)
+                .damageBonus(damageBonus)
+                .duration(duration)
+                .strainCost(1)
                 .description(desc)
                 .build();
     }

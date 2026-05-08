@@ -31,6 +31,8 @@ export interface ActiveEffect {
   modifiers: ModifierEntry[];
   remainingRounds: number;
   negative: boolean;
+  /** Wenn gesetzt: Effekt gilt nur, wenn der Träger gegen diesen Kombattanten agiert. */
+  targetCombatantId?: number;
 }
 
 export interface KnockdownResult {
@@ -408,6 +410,33 @@ export interface ManoeuverResult {
   defenseBonus: number;
   attackBonus: number;
   damageTaken: number;
+  description: string;
+}
+
+// --- Schwachstelle erkennen ---
+export interface SpotArmorFlawRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface SpotArmorFlawResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult;
+  /** TN = max(MV, physische Rüstung) */
+  targetNumber: number;
+  spellDefense: number;
+  physicalArmor: number;
+  success: boolean;
+  successes: number;
+  damageBonus: number;
+  duration: number;
+  strainCost: number;
   description: string;
 }
 

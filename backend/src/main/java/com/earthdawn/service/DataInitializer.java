@@ -109,6 +109,20 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Schwachstelle erkennen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Schwachstelle erkennen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Analysiert magisch die Rüstung eines Gegners. Probe: WAH + Rang vs. " +
+                            "max(MV, physische Rüstung) des Ziels. Einfache Aktion, kostet 1 Überanstrengung " +
+                            "(verbraucht in dieser Implementierung KEINE Hauptaktion). " +
+                            "Bei Erfolg: +2 Schaden pro Erfolg auf physische Angriffe gegen dieses Ziel " +
+                            "für Rang Runden. Nicht für Zaubersprüche.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Schwachstelle erkennen' hinzugefügt.");
+        }
         if (talentRepo.findByName("Krallenhand").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Krallenhand")

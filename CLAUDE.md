@@ -99,6 +99,15 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 ### Charakterdatenblatt-Talente (außerhalb des Kampfsystems)
 - **Holzhaut**: Auf dem Charakterdatenblatt (Attribute-Tab) verfügbar, wenn der Charakter das Talent besitzt. Wurf: `ZÄH-Step + Talentrang` (`StepRollService.attributeToStep` + Rang). Das Wurfergebnis wird als `holzhautBonus` auf `GameCharacter` gespeichert und in `getDerivedStats()` auf Bewusstlosigkeits- und Todesschwelle addiert. Pro Charakter ist nur **ein** Holzhaut-Bonus gleichzeitig aktiv — erneutes Wirken überschreibt den alten Wert. Beim Beenden (`/holzhaut/end`) wird `currentDamage` um den aktiven Bonus reduziert (Puffer-Heilung) und `holzhautBonus` auf 0 zurückgesetzt. Endpoints: `POST /api/characters/{id}/holzhaut` und `POST /api/characters/{id}/holzhaut/end`. Gibt jeweils `HolzhautResult` zurück.
 
+### Schwachstelle erkennen
+- **Wurf**: WAH-Step + Rang vs. **max(MV, physische Rüstung)** des Ziels
+- **Effekt**: Pro Erfolg +2 Schaden auf physische Angriffe (MELEE/RANGED, **nicht** SPELL_ATTACK) gegen dieses Ziel für `Rang` Runden
+- **Kosten**: 1 Schaden (Überanstrengung); **konsumiert keine Hauptaktion** (`hasActedThisRound` bleibt unverändert)
+- **Speicherung**: `ActiveEffect` auf dem Anwender mit neuem Feld `targetCombatantId` und `ModifierEntry { DAMAGE_STEP, ADD, +2×Erfolge, ON_DAMAGE_DEALT }`. Erneutes Wirken gegen dasselbe Ziel ersetzt den alten Effekt.
+- **Modifier-Engine**: `ModifierAggregator.applyModifiers` ignoriert Effekte mit gesetztem `targetCombatantId`. Nur `CombatService.performAttack` wendet sie explizit an, gefiltert nach `defender.id == effect.targetCombatantId` und `actionType ∈ {MELEE_ATTACK, RANGED_ATTACK}`. Dadurch sind Spruchschäden automatisch ausgeschlossen (laufen über `SpellService`) und SPELL_ATTACK-Talente erhalten den Bonus ebenfalls nicht.
+- **Endpoint**: `POST /api/combat/sessions/{id}/spot-armor-flaw` mit `SpotArmorFlawRequest`, gibt `SpotArmorFlawResult` zurück.
+- **Flyway V14**: `active_effects.target_combatant_id` (BIGINT, nullable).
+
 ### Krallenhand
 - **Krallenhand**: Verwandelt die Hände magisch in Klauen für den waffenlosen Kampf (STR-basiertes Talent).
 - **Modellierung**: Wird automatisch als Equipment vom Typ `WEAPON` mit Flag `clawWeapon=true` angelegt, wenn das Talent dem Charakter hinzugefügt wird. `damageBonus = rank + 3` — entspricht der Krallenhandstufe `STR + Rang + 3` in Kombination mit der Standardformel `damageStep = STR + weaponBonus`.
@@ -235,6 +244,7 @@ POST   /api/combat/sessions/{id}/dodge               DodgeRequest
 POST   /api/combat/sessions/{id}/free-action         FreeActionRequest
 POST   /api/combat/sessions/{id}/taunt               TauntRequest
 POST   /api/combat/sessions/{id}/distract            DistractRequest
+POST   /api/combat/sessions/{id}/spot-armor-flaw     SpotArmorFlawRequest
 POST   /api/combat/sessions/{id}/combat-sense        CombatSenseRequest
 POST   /api/combat/sessions/{id}/combatants/{cId}/stand-up
 POST   /api/combat/sessions/{id}/combatants/{cId}/aufspringen    ?spendKarma=
@@ -275,6 +285,7 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Reaction / passive: Ausweichen, Standhaftigkeit, Starrsinn, Eiserner Wille, Riposte (DEX)
 - Social actions: Verspotten (CHA), Ablenken (CHA)
 - Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER), Manövrieren (DEX)
+- Recon: Schwachstelle erkennen (PER, ziel-spezifischer Schadensbonus, nur physisch)
 - Additional attacks: Zweitwaffe (DEX)
 - Initiative: Tigersprung (DEX, once/round, no roll)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
