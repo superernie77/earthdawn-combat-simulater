@@ -146,8 +146,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="comb-header">
               <div class="comb-title">
                 <span class="initiative-badge"
-                      [matTooltip]="session?.phase === 'DECLARATION' ? 'Initiative-Stufe (wird gewürfelt sobald alle angesagt haben)' : 'Initiative-Wurf'">
-                  {{ session?.phase === 'DECLARATION' ? initiativeStepLabel(c) : c.initiative }}
+                      [matTooltip]="session.phase === 'DECLARATION' ? 'Initiative-Stufe (wird gewürfelt sobald alle angesagt haben)' : 'Initiative-Wurf'">
+                  {{ session.phase === 'DECLARATION' ? initiativeStepLabel(c) : c.initiative }}
                 </span>
                 <span class="combatant-name">{{ cn(c) }}</span>
                 <span class="discipline-badge">{{ c.character.discipline?.name }}</span>
@@ -716,7 +716,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="roll-block-header">
               <span class="roll-block-label">Riposte · Step {{ r.riposteStep }}</span>
               <div class="roll-block-totals">
-                <span class="roll-big-total">{{ (r.riposteRoll.total ?? 0) + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-total">{{ r.riposteRoll.total + (r.karmaRoll?.total ?? 0) }}</span>
                 <span class="roll-big-vs">vs</span>
                 <span class="roll-big-target">{{ r.attackTotal }}</span>
               </div>
@@ -789,7 +789,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="roll-block-header">
               <span class="roll-block-label">Manövrieren · Step {{ r.rollStep }}</span>
               <div class="roll-block-totals">
-                <span class="roll-big-total">{{ (r.roll?.total ?? 0) + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
                 <span class="roll-big-vs">vs KV</span>
                 <span class="roll-big-target">{{ r.defenseValue }}</span>
               </div>
@@ -1106,7 +1106,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="roll-block-header">
               <span class="roll-block-label">GE-Probe · Step {{ r.rollStep }}</span>
               <div class="roll-block-totals">
-                <span class="roll-big-total">{{ (r.roll?.total ?? 0) + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
                 <span class="roll-big-vs">vs</span>
                 <span class="roll-big-target">{{ r.targetNumber }}</span>
               </div>
