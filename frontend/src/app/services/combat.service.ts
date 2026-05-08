@@ -15,7 +15,8 @@ import {
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
   ZweitwaffeRequest,
-  SpotArmorFlawRequest, SpotArmorFlawResult
+  SpotArmorFlawRequest, SpotArmorFlawResult,
+  LufttanzActivationResult, LufttanzAttackRequest
 } from '../models/combat.model';
 
 @Injectable({ providedIn: 'root' })
@@ -214,5 +215,15 @@ export class CombatService {
 
   performZweitwaffe(sessionId: number, req: ZweitwaffeRequest): Observable<CombatActionResult> {
     return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/zweitwaffe`, req);
+  }
+
+  performLufttanz(sessionId: number, combatantId: number): Observable<LufttanzActivationResult> {
+    return this.http.post<LufttanzActivationResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/lufttanz`, {}
+    );
+  }
+
+  performLufttanzAttack(sessionId: number, req: LufttanzAttackRequest): Observable<CombatActionResult> {
+    return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/lufttanz-attack`, req);
   }
 }

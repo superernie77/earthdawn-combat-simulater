@@ -80,6 +80,10 @@ export interface CombatantState {
   pendingRiposteAttackTotal: number;
   tigersprungUsedThisRound: boolean;
   zweitWaffeUsedThisRound: boolean;
+  lufttanzActivatedThisRound: boolean;
+  lufttanzBonusUsedThisRound: boolean;
+  pendingLufttanzTargetId: number;
+  pendingLufttanzWeaponId: number;
   preparingSpellId?: number;
   threadsWoven: number;
   threadsRequired: number;
@@ -153,6 +157,9 @@ export interface CombatActionResult {
   pendingDodgeDamage?: number;
   hitPendingRiposte?: boolean;
   riposteDefenderId?: number;
+  /** Lufttanz: Initiative-Vorsprung ≥ 10 → Bonusangriff ausstehend. */
+  lufttanzBonusReady?: boolean;
+  lufttanzInitiativeDiff?: number;
   knockdownResult?: KnockdownResult;
   description: string;
 }
@@ -413,6 +420,23 @@ export interface ManoeuverResult {
   attackBonus: number;
   damageTaken: number;
   description: string;
+}
+
+// --- Lufttanz ---
+export interface LufttanzActivationResult {
+  actorName: string;
+  rank: number;
+  initiativeBonus: number;
+  damageTaken: number;
+  description: string;
+}
+
+export interface LufttanzAttackRequest {
+  sessionId: number;
+  attackerCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+  spendKarmaForDamage?: boolean;
 }
 
 // --- Schwachstelle erkennen ---

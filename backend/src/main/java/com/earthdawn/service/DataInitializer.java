@@ -109,6 +109,21 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Lufttanz").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Lufttanz")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Magisches Bewegungstalent. Lufttanzstufe = GES + Rang. Wird bei der " +
+                            "Initiativeprobe statt der reinen GES-Stufe verwendet (Modifikatoren wie " +
+                            "Rüstungsmalus bleiben). Bei einem Initiative-Vorsprung von ≥10 (3+ Erfolge) " +
+                            "gegen das Ziel eines Nahkampfangriffs darf ein zusätzlicher Nahkampfangriff " +
+                            "mit derselben Waffe ausgeführt werden. Freie Aktion in der Ansagephase, " +
+                            "kostet 2 Überanstrengung, 1× pro Runde.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Lufttanz' hinzugefügt.");
+        }
         if (talentRepo.findByName("Schwachstelle erkennen").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Schwachstelle erkennen")

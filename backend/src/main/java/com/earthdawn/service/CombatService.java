@@ -239,6 +239,20 @@ public class CombatService {
             // 5. Übererfolge: je 5 über VK → +2 Schadensstufen
             int extraSuccesses = (attackTotal - pd) / 5;
 
+            // 5a. Lufttanz-Trigger: Nahkampf, Lufttanz aktiv, Initiative-Vorsprung ≥ 10,
+            // noch nicht ausgelöst und noch nicht verbraucht.
+            if (req.getActionType() == ActionType.MELEE_ATTACK
+                    && attacker.isLufttanzActivatedThisRound()
+                    && !attacker.isLufttanzBonusUsedThisRound()
+                    && (attacker.getPendingLufttanzTargetId() == null || attacker.getPendingLufttanzTargetId() < 0)) {
+                int initDiff = attacker.getInitiative() - defender.getInitiative();
+                if (initDiff >= 10) {
+                    attacker.setPendingLufttanzTargetId(defender.getId());
+                    attacker.setPendingLufttanzWeaponId(req.getWeaponId() != null ? req.getWeaponId() : -1L);
+                    result.lufttanzBonusReady(true).lufttanzInitiativeDiff(initDiff);
+                }
+            }
+
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
 
@@ -390,6 +404,10 @@ public class CombatService {
             combatant.setPendingDefenseBonus(0);
             combatant.setTigersprungUsedThisRound(false);
             combatant.setZweitWaffeUsedThisRound(false);
+            combatant.setLufttanzActivatedThisRound(false);
+            combatant.setLufttanzBonusUsedThisRound(false);
+            combatant.setPendingLufttanzTargetId(-1L);
+            combatant.setPendingLufttanzWeaponId(-1L);
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
@@ -1939,6 +1957,115 @@ public class CombatService {
                 .actorName(actorName).rank(rank)
                 .initiativeBonus(rank).newInitiative(actor.getInitiative())
                 .damageTaken(1).description(desc).build();
+    }
+
+    // --- Lufttanz ---
+
+    /**
+     * Aktiviert Lufttanz: freie Aktion in der Ansagephase. +Rang Stufen auf die Initiative-Probe
+     * (entspricht "Rang+DEX statt DEX-Stufe"). Kostet 2 Überanstrengung. 1× pro Runde. Ermöglicht
+     * einen Bonus-Nahkampfangriff, wenn der Initiative-Vorsprung gegen das Ziel ≥ 10 ist.
+     */
+    public LufttanzActivationResult performLufttanz(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.DECLARATION)
+            throw new IllegalStateException("Lufttanz kann nur in der Ansagephase aktiviert werden.");
+        if (actor.isLufttanzActivatedThisRound())
+            throw new IllegalStateException("Lufttanz wurde bereits in dieser Runde aktiviert.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.LUFTTANZ.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Lufttanz' nicht gefunden."));
+
+        int rank = ct.getRank();
+
+        // 2 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 2);
+        actor.setLufttanzActivatedThisRound(true);
+
+        actor.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(actor)
+                .name("Lufttanz")
+                .description("+" + rank + " Stufen auf Initiative-Probe (Rang+DEX statt DEX-Stufe)")
+                .sourceType(SourceType.TALENT)
+                .remainingRounds(1)
+                .negative(false)
+                .modifiers(List.of(ModifierEntry.builder()
+                        .targetStat(StatType.INITIATIVE_STEP)
+                        .operation(ModifierOperation.ADD)
+                        .value(rank)
+                        .triggerContext(TriggerContext.ON_INITIATIVE)
+                        .build()))
+                .build());
+
+        String actorName = actor.getCharacter().getName();
+        String desc = actorName + " aktiviert Lufttanz (Rang " + rank + "): +" + rank
+                + " Stufen auf Initiative; Bonusangriff bei Initiative-Vorsprung ≥ 10. Kostet 2 Überanstrengung.";
+
+        addLog(session, actorName, null, ActionType.LUFTTANZ, desc, true);
+        sessionRepo.save(session);
+        broadcast(session);
+
+        return LufttanzActivationResult.builder()
+                .actorName(actorName)
+                .rank(rank)
+                .initiativeBonus(rank)
+                .damageTaken(2)
+                .description(desc)
+                .build();
+    }
+
+    /**
+     * Lufttanz-Bonusangriff: zusätzlicher Nahkampfangriff mit derselben Waffe wie der
+     * auslösende Angriff. Verbraucht keine Hauptaktion. Kostet keine zusätzliche Überanstrengung
+     * (die 2 Strain wurden bei Aktivierung bezahlt).
+     */
+    public CombatActionResult performLufttanzAttack(LufttanzAttackRequest req) {
+        CombatSession session = findById(req.getSessionId());
+        CombatantState attacker = findCombatant(session, req.getAttackerCombatantId());
+
+        if (attacker.isDefeated()) throw new IllegalStateException(attacker.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (attacker.getPendingLufttanzTargetId() == null || attacker.getPendingLufttanzTargetId() < 0) {
+            throw new IllegalStateException("Kein ausstehender Lufttanz-Bonusangriff.");
+        }
+
+        Long defenderId = attacker.getPendingLufttanzTargetId();
+        Long weaponId = attacker.getPendingLufttanzWeaponId();
+
+        // Pending sofort zurücksetzen + bonus als verbraucht markieren, damit der Bonus-Angriff
+        // selbst keinen weiteren Bonus auslöst
+        attacker.setPendingLufttanzTargetId(-1L);
+        attacker.setPendingLufttanzWeaponId(-1L);
+        attacker.setLufttanzBonusUsedThisRound(true);
+
+        // Regulären Nahkampfangriff mit gleicher Waffe ausführen, ohne hasActedThisRound zu setzen
+        boolean originalActed = attacker.isHasActedThisRound();
+        attacker.setHasActedThisRound(false);
+        try {
+            AttackActionRequest attackReq = new AttackActionRequest();
+            attackReq.setSessionId(req.getSessionId());
+            attackReq.setAttackerCombatantId(req.getAttackerCombatantId());
+            attackReq.setDefenderCombatantId(defenderId);
+            attackReq.setActionType(ActionType.MELEE_ATTACK);
+            attackReq.setWeaponId(weaponId);
+            attackReq.setBonusSteps(req.getBonusSteps());
+            attackReq.setSpendKarma(req.isSpendKarma());
+            attackReq.setSpendKarmaForDamage(req.isSpendKarmaForDamage());
+            CombatActionResult result = performAttack(attackReq);
+            // Lufttanz-Bonusangriff verbraucht keine Hauptaktion — Status zurücksetzen
+            attacker.setHasActedThisRound(originalActed);
+            sessionRepo.save(session);
+            broadcast(session);
+            return result;
+        } catch (RuntimeException ex) {
+            attacker.setHasActedThisRound(originalActed);
+            throw ex;
+        }
     }
 
     // --- Zweitwaffe ---

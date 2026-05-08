@@ -28,5 +28,7 @@ public enum ActionType {
     MANOEUVER,
     TIGERSPRUNG,
     ZWEITE_WAFFE,
-    SPOT_ARMOR_FLAW
+    SPOT_ARMOR_FLAW,
+    LUFTTANZ,
+    LUFTTANZ_ATTACK
 }

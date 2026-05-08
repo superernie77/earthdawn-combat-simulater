@@ -31,7 +31,8 @@ import {
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
   ZweitwaffeRequest,
-  SpotArmorFlawRequest, SpotArmorFlawResult
+  SpotArmorFlawRequest, SpotArmorFlawResult,
+  LufttanzActivationResult, LufttanzAttackRequest
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -284,6 +285,22 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="performTigersprung(c)"
                   matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
                   <mat-icon>bolt</mat-icon> Tigersprung
+                </button>
+                <!-- Lufttanz: freie Aktion in der Ansagephase, ermöglicht Bonusangriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasLufttanzTalent(c) && !c.defeated"
+                  class="combat-option-btn lufttanz-btn"
+                  [disabled]="c.lufttanzActivatedThisRound"
+                  (click)="performLufttanz(c)"
+                  matTooltip="Lufttanz: +Rang auf Initiative; bei Initiative-Vorsprung ≥10 ein Bonus-Nahkampfangriff. Ansagephase, 1×/Runde, kostet 2 Überanstrengung.">
+                  <mat-icon>air</mat-icon> Lufttanz
+                </button>
+                <!-- Lufttanz-Bonusangriff: nur wenn pending -->
+                <button mat-raised-button color="warn"
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingLufttanzTargetId >= 0 && !c.defeated"
+                  class="combat-option-btn lufttanz-attack-btn"
+                  (click)="openLufttanzAttackDialog(c)"
+                  matTooltip="Lufttanz-Zusatzangriff verfügbar! Gleiche Waffe wie der auslösende Angriff.">
+                  <mat-icon>air</mat-icon> Zusatzangriff
                 </button>
                 <!-- Zweitwaffe: zweiter Angriff -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
@@ -539,6 +556,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         <div class="dodge-prompt" *ngIf="r.hitPendingDodge && !r.hitPendingRiposte">
           <mat-icon>directions_run</mat-icon>
           Ziel kann Ausweichen versuchen
+        </div>
+        <div class="dodge-prompt" *ngIf="r.lufttanzBonusReady"
+             style="border-color:#29b6f6;color:#29b6f6">
+          <mat-icon>air</mat-icon>
+          Lufttanz-Zusatzangriff verfügbar! (Initiative-Vorsprung +{{ r.lufttanzInitiativeDiff }} ≥ 10)
         </div>
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap" *ngIf="r.hitPendingRiposte || r.hitPendingDodge; else closeOnly">
           <button mat-stroked-button style="flex:1;min-width:140px"
@@ -844,6 +866,85 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </div>
         </div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="tigersprungModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Lufttanz Activation Result Modal -->
+    <div class="result-modal" *ngIf="lufttanzModal.open">
+      <div class="dialog-backdrop" (click)="lufttanzModal.open = false"></div>
+      <div class="dialog-box result-box" *ngIf="lufttanzModal.result as r">
+        <div class="result-outcome hit">
+          <mat-icon>air</mat-icon>
+          LUFTTANZ AKTIVIERT! +{{ r.initiativeBonus }} Initiative
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-row" style="background:rgba(179,229,252,0.08)">
+            <span class="roll-label">Initiative-Bonus</span>
+            <span class="roll-expr">Rang {{ r.rank }} (Lufttanzstufe = GES + {{ r.rank }})</span>
+            <span class="roll-value" style="color:#b3e5fc">+{{ r.initiativeBonus }}</span>
+          </div>
+          <div class="roll-row" style="background:rgba(129,199,132,0.08)">
+            <span class="roll-label">Bonus-Angriff</span>
+            <span class="roll-expr">bei Initiative-Vorsprung ≥10 nach Nahkampftreffer</span>
+            <span class="roll-value" style="color:#81c784">möglich</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="lufttanzModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Lufttanz Bonusangriff Dialog -->
+    <div class="attack-dialog" *ngIf="lufttanzAttackDialog.open">
+      <div class="dialog-backdrop" (click)="lufttanzAttackDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#29b6f6">air</mat-icon>Lufttanz-Zusatzangriff: {{ lufttanzAttackDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          Zusatz-Nahkampfangriff mit derselben Waffe wie der auslösende Angriff.
+          Verbraucht keine Hauptaktion, keine zusätzlichen Kosten.
+        </div>
+        <div *ngIf="lufttanzAttackDialog.actor as a" style="background:#1a1410;border:1px solid #2a2218;border-radius:6px;padding:8px;margin-bottom:8px;font-size:0.85rem">
+          <div>Ziel: <strong>{{ cn(lufttanzTarget(a)!) }}</strong> (KV {{ pd(lufttanzTarget(a)!) }})</div>
+          <div>Waffe: <strong>{{ lufttanzWeaponName(a) }}</strong></div>
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Bonusstufen</mat-label>
+          <input matInput type="number" [(ngModel)]="lufttanzAttackDialog.bonusSteps" min="0">
+        </mat-form-field>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="karma-toggle"
+            [class.active]="lufttanzAttackDialog.spendKarma"
+            [class.disabled]="(lufttanzAttackDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(lufttanzAttackDialog.actor?.currentKarma ?? 0) > 0 && (lufttanzAttackDialog.spendKarma = !lufttanzAttackDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma (Angriff)
+            <span class="karma-count-badge" [class.empty]="(lufttanzAttackDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ lufttanzAttackDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+          <label class="karma-toggle"
+            *ngIf="lufttanzAttackDialog.actor && isLufttanzClawWeapon(lufttanzAttackDialog.actor)"
+            [class.active]="lufttanzAttackDialog.spendKarmaForDamage"
+            [class.disabled]="(lufttanzAttackDialog.actor?.currentKarma ?? 0) <= (lufttanzAttackDialog.spendKarma ? 1 : 0)"
+            (click)="toggleKarmaForDamage(lufttanzAttackDialog)"
+            matTooltip="Krallenhand: zusätzliches Karma auf den Schadenswurf">
+            <mat-icon>local_fire_department</mat-icon>
+            Karma (Schaden)
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="lufttanzAttackDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performLufttanzAttack()">
+            <mat-icon>air</mat-icon> Zuschlagen
+          </button>
+        </div>
       </div>
     </div>
 
@@ -2342,6 +2443,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.manoeuver-btn:not([disabled]):hover { border-color: #80deea; background: rgba(128,222,234,0.1); }
     .combat-option-btn.tigersprung-btn { color: #ffee58; border-color: #3a3010; }
     .combat-option-btn.tigersprung-btn:not([disabled]):hover { border-color: #ffee58; background: rgba(255,238,88,0.1); }
+    .combat-option-btn.lufttanz-btn { color: #b3e5fc; border-color: #1a3040; }
+    .combat-option-btn.lufttanz-btn:not([disabled]):hover { border-color: #b3e5fc; background: rgba(179,229,252,0.1); }
+    .combat-option-btn.lufttanz-attack-btn { color: #fff; background: #29b6f6; }
+    .combat-option-btn.lufttanz-attack-btn:hover { background: #03a9f4; }
     .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
@@ -2517,6 +2622,15 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   manoeuverModal: { open: boolean; result?: ManoeuverResult } = { open: false };
 
   tigersprungModal: { open: boolean; result?: TigersprungResult } = { open: false };
+
+  lufttanzModal: { open: boolean; result?: LufttanzActivationResult } = { open: false };
+  lufttanzAttackDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    bonusSteps: number;
+    spendKarma: boolean;
+    spendKarmaForDamage?: boolean;
+  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false };
 
   zweitwaffeDialog: {
     open: boolean;
@@ -3855,6 +3969,69 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.combatService.performTigersprung(this.session.id, c.id).subscribe({
       next: result => {
         this.tigersprungModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Lufttanz ---
+
+  hasLufttanzTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Lufttanz');
+  }
+
+  performLufttanz(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.performLufttanz(this.session.id, c.id).subscribe({
+      next: result => {
+        this.lufttanzModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  openLufttanzAttackDialog(actor: CombatantState): void {
+    this.lufttanzAttackDialog = {
+      open: true, actor, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false
+    };
+  }
+
+  /** Hilfs-Lookup: Ziel des ausstehenden Lufttanz-Bonusangriffs. */
+  lufttanzTarget(actor: CombatantState): CombatantState | undefined {
+    return this.session?.combatants.find(c => c.id === actor.pendingLufttanzTargetId);
+  }
+
+  /** Hilfs-Lookup: Waffenname für den Lufttanz-Bonusangriff. */
+  lufttanzWeaponName(actor: CombatantState): string {
+    const id = actor.pendingLufttanzWeaponId;
+    if (id == null || id < 0) return 'Keine Waffe';
+    return (actor.character.equipment ?? []).find(e => e.id === id)?.name ?? '(unbekannt)';
+  }
+
+  /** True wenn die Lufttanz-Waffe eine Krallenhand ist (Karma-für-Schaden möglich). */
+  isLufttanzClawWeapon(actor: CombatantState): boolean {
+    const id = actor.pendingLufttanzWeaponId;
+    if (id == null || id < 0) return false;
+    return !!(actor.character.equipment ?? []).find(e => e.id === id)?.clawWeapon;
+  }
+
+  performLufttanzAttack(): void {
+    const actor = this.lufttanzAttackDialog.actor;
+    if (!this.session || !actor) return;
+    const req: LufttanzAttackRequest = {
+      sessionId: this.session.id,
+      attackerCombatantId: actor.id,
+      bonusSteps: this.lufttanzAttackDialog.bonusSteps,
+      spendKarma: this.lufttanzAttackDialog.spendKarma,
+      spendKarmaForDamage: this.lufttanzAttackDialog.spendKarmaForDamage
+    };
+    this.combatService.performLufttanzAttack(this.session.id, req).subscribe({
+      next: result => {
+        this.lastResult = result;
+        this.lufttanzAttackDialog.open = false;
+        this.resultModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })

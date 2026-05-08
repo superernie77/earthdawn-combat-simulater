@@ -99,6 +99,14 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 ### Charakterdatenblatt-Talente (außerhalb des Kampfsystems)
 - **Holzhaut**: Auf dem Charakterdatenblatt (Attribute-Tab) verfügbar, wenn der Charakter das Talent besitzt. Wurf: `ZÄH-Step + Talentrang` (`StepRollService.attributeToStep` + Rang). Das Wurfergebnis wird als `holzhautBonus` auf `GameCharacter` gespeichert und in `getDerivedStats()` auf Bewusstlosigkeits- und Todesschwelle addiert. Pro Charakter ist nur **ein** Holzhaut-Bonus gleichzeitig aktiv — erneutes Wirken überschreibt den alten Wert. Beim Beenden (`/holzhaut/end`) wird `currentDamage` um den aktiven Bonus reduziert (Puffer-Heilung) und `holzhautBonus` auf 0 zurückgesetzt. Endpoints: `POST /api/characters/{id}/holzhaut` und `POST /api/characters/{id}/holzhaut/end`. Gibt jeweils `HolzhautResult` zurück.
 
+### Lufttanz
+- **Aktivierung**: Freie Aktion in der **DECLARATION-Phase**, 2 Schaden, 1×/Runde (`lufttanzActivatedThisRound`).
+- **Initiative-Effekt**: ActiveEffect mit `+rank` auf `INITIATIVE_STEP` (mathematisch identisch zu „Lufttanzstufe = Rang+DEX statt DEX-Stufe"). Erlischt nach 1 Runde.
+- **Bonus-Trigger**: In `performAttack` nach erfolgreichem `MELEE_ATTACK`: wenn `attacker.initiative - defender.initiative ≥ 10` und Lufttanz aktiviert und Bonus noch nicht verbraucht → `pendingLufttanzTargetId` + `pendingLufttanzWeaponId` werden auf `attacker` gesetzt. `CombatActionResult.lufttanzBonusReady = true` und `lufttanzInitiativeDiff` zur Anzeige.
+- **Bonus-Angriff**: `POST /api/combat/sessions/{id}/lufttanz-attack` (`LufttanzAttackRequest`). Führt regulären `performAttack` mit gespeichertem Ziel und Waffe aus, verbraucht **kein** `hasActedThisRound`, setzt `lufttanzBonusUsedThisRound=true` und löscht pending-Felder vor dem Aufruf — verhindert dadurch Selbst-Retrigger.
+- **CombatantState** Felder: `lufttanzActivatedThisRound`, `lufttanzBonusUsedThisRound`, `pendingLufttanzTargetId` (-1 = none), `pendingLufttanzWeaponId` (-1). Alle 4 werden in `nextRound()` zurückgesetzt.
+- **Flyway V15**: 4 neue Spalten auf `combatant_states`.
+
 ### Schwachstelle erkennen
 - **Wurf**: WAH-Step + Rang vs. **max(MV, physische Rüstung)** des Ziels
 - **Effekt**: Pro Erfolg +2 Schaden auf physische Angriffe (MELEE/RANGED, **nicht** SPELL_ATTACK) gegen dieses Ziel für `Rang` Runden
@@ -254,6 +262,8 @@ POST   /api/combat/sessions/{id}/riposte             RiposteRequest { defenderCo
 POST   /api/combat/sessions/{id}/manoeuver           ManoeuverRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/zweitwaffe          ZweitwaffeRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/combatants/{cId}/tigersprung   → no body; initiative += rank, costs 1 damage
+POST   /api/combat/sessions/{id}/combatants/{cId}/lufttanz      → no body; +rank initiative (DECLARATION), enables bonus melee attack, costs 2 damage
+POST   /api/combat/sessions/{id}/lufttanz-attack                LufttanzAttackRequest (bonus melee attack, no hasActedThisRound consumed)
 
 PATCH  /api/combat/sessions/{id}/combatants/{cId}/value  ?field=damage|wounds|karma|initiative|defeated&delta=
 POST   /api/combat/sessions/{id}/combatants/{cId}/effects
@@ -287,7 +297,7 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER), Manövrieren (DEX)
 - Recon: Schwachstelle erkennen (PER, ziel-spezifischer Schadensbonus, nur physisch)
 - Additional attacks: Zweitwaffe (DEX)
-- Initiative: Tigersprung (DEX, once/round, no roll)
+- Initiative: Tigersprung (DEX, once/round, no roll), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
 
 **Spells (~105 total):** Illusionist (Circles 1–8) + Geisterbeschwörer (Circles 1–8)

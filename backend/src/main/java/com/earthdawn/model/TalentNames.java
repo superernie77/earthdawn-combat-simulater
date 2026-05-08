@@ -21,6 +21,7 @@ public final class TalentNames {
 
     public static final String CLAW_WEAPON_NAME        = "Krallenhand";
     public static final String SCHWACHSTELLE_ERKENNEN  = "Schwachstelle erkennen";
+    public static final String LUFTTANZ                = "Lufttanz";
 
     public static final String EFFECT_AGGRESSIVER_ANGRIFF = "Aggressiver Angriff";
     public static final String EFFECT_DEFENSIVE_HALTUNG   = "Defensive Haltung";

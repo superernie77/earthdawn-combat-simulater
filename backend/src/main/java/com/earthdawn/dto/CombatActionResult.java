@@ -46,6 +46,11 @@ public class CombatActionResult {
     private boolean hitPendingRiposte;
     private Long riposteDefenderId;
 
+    /** Lufttanz: Initiative-Vorsprung ≥ 10 → Bonusangriff ausstehend. */
+    private boolean lufttanzBonusReady;
+    /** Initiative-Differenz (attacker - defender) zur Anzeige. */
+    private int lufttanzInitiativeDiff;
+
     /** Niedergeschlagen-Probe Ergebnis (wenn Wunde zugefügt). */
     private KnockdownResult knockdownResult;
 

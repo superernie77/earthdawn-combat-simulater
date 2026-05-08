@@ -79,6 +79,26 @@ public class CombatantState {
     @Builder.Default
     private boolean zweitWaffeUsedThisRound = false;
 
+    /** Lufttanz wurde in dieser Runde aktiviert (Initiative-Bonus, ermöglicht Bonusangriff). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean lufttanzActivatedThisRound = false;
+
+    /** ID des Ziels eines ausstehenden Lufttanz-Bonusangriffs (-1 = keiner ausstehend). */
+    @Column(columnDefinition = "bigint default -1")
+    @Builder.Default
+    private Long pendingLufttanzTargetId = -1L;
+
+    /** ID der Waffe, mit der der Lufttanz-Bonusangriff durchgeführt werden muss (-1 = keine). */
+    @Column(columnDefinition = "bigint default -1")
+    @Builder.Default
+    private Long pendingLufttanzWeaponId = -1L;
+
+    /** Lufttanz-Bonusangriff wurde diese Runde bereits aufgelöst — verhindert erneutes Auslösen. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean lufttanzBonusUsedThisRound = false;
+
     @Builder.Default
     private int pendingDodgeDamage = 0;
 
