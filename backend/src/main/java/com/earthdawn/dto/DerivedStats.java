@@ -19,4 +19,6 @@ public class DerivedStats {
     private int karmaStep;
     private int recoveryStep;
     private int carryingCapacity;
+    /** Aktiver Holzhaut-Bonus (0 = nicht aktiv). Bereits in unconsciousnessRating und deathRating eingerechnet. */
+    private int holzhautBonus;
 }

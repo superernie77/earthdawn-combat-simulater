@@ -1,4 +1,6 @@
-# Earthdawn Combat Simulator — Project Overview for Claude
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What This Is
 A local dev tool for simulating Earthdawn 4th Edition (FASA) pen-and-paper RPG combat.
@@ -8,12 +10,13 @@ turn-based combat sessions with live updates via WebSocket.
 ## Tech Stack
 - **Backend**: Java 21, Spring Boot 3.5, Maven (`./mvnw`), Spring Data JPA, PostgreSQL, Spring WebSocket (STOMP)
 - **Frontend**: Angular 20 standalone components, Angular Material dark theme
-- **Database**: PostgreSQL via Docker (`docker-compose up -d`)
+- **Database**: PostgreSQL via Docker (`docker compose up -d`)
+- **Migrations**: Flyway (schema managed in `backend/src/main/resources/db/migration/`)
 
 ## Starting the App
 ```bash
 # PostgreSQL
-docker-compose up -d
+docker compose up -d
 
 # Backend (from backend/)
 ./mvnw spring-boot:run
@@ -22,7 +25,32 @@ docker-compose up -d
 npm install
 npx ng serve
 ```
-Backend: `http://localhost:8080` | Frontend: `http://localhost:4200`
+Backend: `http://localhost:8081` | Frontend: `http://localhost:4200`
+
+## Running Tests
+```bash
+# All tests (from backend/)
+./mvnw test
+
+# Single test class
+./mvnw test -Dtest=StepRollServiceTest
+
+# Single test method
+./mvnw test -Dtest=StepRollServiceTest#testStep4
+```
+Test classes (plain Mockito, no Spring context — fast):
+- `StepRollServiceTest` — dice step table, attribute→step mapping, explosion flag
+- `ModifierAggregatorTest` — ADD/MULTIPLY/OVERRIDE/SET_MIN/SET_MAX, trigger context filtering
+- `CombatServiceDamageTest` — `applyDamageToDefender`: damage, wounds, defeat, knockdown
+
+## Production Deployment
+```bash
+# On server: rebuild and redeploy
+git pull && docker compose -f docker-compose.prod.yml up -d --build
+
+# Tail backend logs
+docker compose -f docker-compose.prod.yml logs -f --tail 100 earthdawn-backend
+```
 
 ## Earthdawn 4 (FASA) Rules Implemented
 
@@ -61,16 +89,23 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 |---|---|---|---|
 | **Verspotten** | CHA | Soziale VK (SV) | −1/Erfolg auf alle Proben+SV des Ziels für Rang Runden. Auto-Starrsinn-Gegenprobe. |
 | **Ablenken** | CHA | Soziale VK (SV) | −successes KV auf Anwender UND Ziel (Toter Winkel für Verbündete). |
-| **Akrobatische Verteidigung** | DEX | Höchste KV aller Gegner | **Freie Aktion.** +2 KV/Erfolg für 1 Runde. Erlischt bei Niedergeschlagen. Nicht mit Kampfsinn. |
-| **Kampfsinn** | PER | MV des Ziels | **Freie Aktion.** +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
+| **Akrobatische Verteidigung** | DEX | Höchste KV aller Gegner | +2 KV/Erfolg für 1 Runde. Erlischt bei Niedergeschlagen. Nicht mit Kampfsinn. |
+| **Kampfsinn** | PER | MV des Ziels | +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
+| **Manövrieren** | DEX | KV des Ziels | +successes×2 KV (ON_MELEE_DEFENSE) + pending attack bonus für 1 Runde. |
+| **Zweitwaffe** | DEX | KV des Ziels | Zusätzlicher Waffenangriff. Eigener once-per-round-Flag (`zweitWaffeUsedThisRound`). Kann nach Hauptangriff oder statt ihm eingesetzt werden. |
 
 **Successes formula** for all main-action talents: `1 + floor((total − TN) / 5)` on success.
+
+### Charakterdatenblatt-Talente (außerhalb des Kampfsystems)
+- **Holzhaut**: Auf dem Charakterdatenblatt (Attribute-Tab) verfügbar, wenn der Charakter das Talent besitzt. Wurf: `ZÄH-Step + Talentrang` (`StepRollService.attributeToStep` + Rang). Das Wurfergebnis wird als `holzhautBonus` auf `GameCharacter` gespeichert und in `getDerivedStats()` auf Bewusstlosigkeits- und Todesschwelle addiert. Pro Charakter ist nur **ein** Holzhaut-Bonus gleichzeitig aktiv — erneutes Wirken überschreibt den alten Wert. Beim Beenden (`/holzhaut/end`) wird `currentDamage` um den aktiven Bonus reduziert (Puffer-Heilung) und `holzhautBonus` auf 0 zurückgesetzt. Endpoints: `POST /api/characters/{id}/holzhaut` und `POST /api/characters/{id}/holzhaut/end`. Gibt jeweils `HolzhautResult` zurück.
 
 ### Passive / Reaction Talents
 - **Standhaftigkeit**: Passiv. Bei Niederschlagsprobe: STR-Step + Talentrang statt reiner STR-Step.
 - **Starrsinn**: Auto-Gegenprobe gegen Verspotten. WIL-Step + Rang vs. Verspotten-Ergebnis. Bei Erfolg: Effekt negiert.
 - **Eiserner Wille**: Freie Aktion. WIL-Step + Rang vs. Zauberwurf des Angreifers (manuell eingegeben). Bei Erfolg: jüngster negativer Zaubereffekt entfernt.
 - **Ausweichen**: Nach Treffer. DEX-Step + Rang vs. Angriffswurf. Kostet 1 Schaden.
+- **Riposte**: Reaktion nach Nahkampftreffer. DEX-Step + Rang vs. Angriffswurf. Schaden wird gehalten in `pendingRiposteAttackTotal`; nach Riposte-Entscheid aufgelöst. Extraerfolge → Gegenangriff. Kostet 2 Schaden.
+- **Tigersprung**: Freie Aktion (1×/Runde). Kein Wurf. Initiative += Rang. `tigersprungUsedThisRound`-Flag, reset by `nextRound()`. Kostet 1 Schaden.
 
 ## Character Sheet — Configurable Bonuses
 - **Defense bonuses**: `physicalDefenseBonus`, `spellDefenseBonus`, `socialDefenseBonus` (int, default 0) on `GameCharacter` — added on top of the formula/override value in `ModifierAggregator`. Editable via +/− steppers in the "Verteidigungs-Boni" section on the Attribute tab.
@@ -111,28 +146,32 @@ Talents, spells, conditions, equipment, stances = all stored as `ActiveEffect` w
 ```
 com.earthdawn
 ├── config/       WebSocketConfig, CorsConfig, JacksonConfig
-├── controller/   CharacterController, CombatController, DiceController, ReferenceDataController
+├── controller/   CharacterController, CombatController, DiceController,
+│               ReferenceDataController, UserAccountController
 ├── dto/          RollResult, DieRollDetail, ProbeRequest/Result,
 │                 AttackActionRequest, CombatActionResult,
 │                 DodgeRequest/Result, StandUpResult, KnockdownResult,
 │                 FreeActionRequest/Result,
 │                 TauntRequest/Result, DistractRequest/Result,
 │                 AcrobaticDefenseResult, CombatSenseRequest/Result,
-│                 IronWillResult,
+│                 IronWillResult, ManoeuverRequest/Result,
+│                 RiposteRequest/Result, TigersprungResult,
+│                 ZweitwaffeRequest,
 │                 ThreadweaveRequest/Result, SpellCastRequest/Result,
 │                 DerivedStats, FieldUpdateRequest
 ├── model/        GameCharacter, DisciplineDefinition, TalentDefinition, SkillDefinition,
-│                 CharacterTalent, CharacterSkill, Equipment,
-│                 ModifierEntry, ActiveEffect,
+│                 CharacterTalent, CharacterSkill, CharacterSpell, Equipment,
+│                 ModifierEntry, ActiveEffect, UserAccount,
 │                 SpellDefinition,
 │                 CombatSession, CombatantState, CombatLog
 │   └── enums/    StatType, AttributeType, ModifierOperation, TriggerContext, SourceType,
 │                 ActionType, CombatStatus, CombatPhase,
 │                 DeclaredStance, DeclaredActionType,
-│                 SpellEffectType, FreeActionTarget
+│                 SpellEffectType, FreeActionTarget, EquipmentType, Race
 ├── repository/   CharacterRepository, CombatSessionRepository, DisciplineRepository,
 │                 TalentDefinitionRepository, SkillDefinitionRepository,
-│                 SpellDefinitionRepository
+│                 SpellDefinitionRepository, CharacterSpellRepository,
+│                 EquipmentRepository, UserAccountRepository
 └── service/      StepRollService, ModifierAggregator, CharacterService,
                   CombatService, SpellService, ProbeService, DataInitializer
 ```
@@ -159,6 +198,8 @@ POST   /api/characters/{id}/skills       ?skillDefinitionId=&rank=
 POST   /api/characters/{id}/equipment    Equipment body
 PATCH  /api/characters/{id}/equipment/{equipmentId}  ?quantity=N
 DELETE /api/characters/{id}/equipment/{equipmentId}
+POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speichert als holzhautBonus (überschreibt)
+POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
 
 GET    /api/reference/disciplines
 GET    /api/reference/talents
@@ -192,6 +233,10 @@ POST   /api/combat/sessions/{id}/combatants/{cId}/stand-up
 POST   /api/combat/sessions/{id}/combatants/{cId}/aufspringen    ?spendKarma=
 POST   /api/combat/sessions/{id}/combatants/{cId}/acrobatic-defense  ?bonusSteps=&spendKarma=
 POST   /api/combat/sessions/{id}/combatants/{cId}/iron-will      ?attackTotal=&spendKarma=
+POST   /api/combat/sessions/{id}/riposte             RiposteRequest { defenderCombatantId, bonusSteps, spendKarma, riposteAttempted }
+POST   /api/combat/sessions/{id}/manoeuver           ManoeuverRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma }
+POST   /api/combat/sessions/{id}/zweitwaffe          ZweitwaffeRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma }
+POST   /api/combat/sessions/{id}/combatants/{cId}/tigersprung   → no body; initiative += rank, costs 1 damage
 
 PATCH  /api/combat/sessions/{id}/combatants/{cId}/value  ?field=damage|wounds|karma|initiative|defeated&delta=
 POST   /api/combat/sessions/{id}/combatants/{cId}/effects
@@ -220,9 +265,12 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Attack talents: Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf, Spruchzauberei
 - Weaving: Elementarismus, Illusionismus, Magie, Geisterbeschwörung
 - Free action: Magische Markierung (PER, freeAction=true)
-- Reaction / passive: Ausweichen, Standhaftigkeit, Starrsinn, Eiserner Wille
+- Reaction / passive: Ausweichen, Standhaftigkeit, Starrsinn, Eiserner Wille, Riposte (DEX)
 - Social actions: Verspotten (CHA), Ablenken (CHA)
-- Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER)
+- Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER), Manövrieren (DEX)
+- Additional attacks: Zweitwaffe (DEX)
+- Initiative: Tigersprung (DEX, once/round, no roll)
+- Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH)
 
 **Spells (~105 total):** Illusionist (Circles 1–8) + Geisterbeschwörer (Circles 1–8)
 
@@ -237,13 +285,5 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - **SpellService** uses `ModifierAggregator` for `KARMA_STEP` and spell defense values — same engine as physical combat.
 - **Free actions**: `TalentDefinition.freeAction=true` triggers `performFreeAction()` in `CombatService`. Does not set `hasActedThisRound`. Eiserner Wille is a separate endpoint (not via the generic free-action path) because it needs a manual `attackTotal` input.
 - **TalentNames constants**: All hardcoded talent/effect name strings live in `model/TalentNames.java`. Use these constants instead of inline German strings when checking for specific talents or effects.
-
-## Running Tests
-```bash
-# From backend/
-./mvnw test
-```
-Test classes (no Spring context required — plain unit tests with Mockito):
-- `StepRollServiceTest` — dice step table, attribute→step mapping, explosion flag, result invariants (58 cases run in ~160 ms)
-- `ModifierAggregatorTest` — ADD/MULTIPLY/OVERRIDE/SET_MIN/SET_MAX modifiers, trigger context filtering, base value formulas
-- `CombatServiceDamageTest` — `applyDamageToDefender`: damage counter, wound calculation, defeat threshold, knockdown trigger and outcome
+- **Riposte pending state**: `performAttack()` detects a Riposte trigger and stores `pendingRiposteAttackTotal` + `pendingRiposteAttackerId` on the defender instead of applying damage. The frontend shows a Riposte button only when `pendingRiposteAttackTotal >= 0`. The `/riposte` endpoint resolves it (accept damage or counter-attack).
+- **Once-per-round flags**: `tigersprungUsedThisRound` and `zweitWaffeUsedThisRound` on `CombatantState` are independent of `hasActedThisRound` and are reset in `nextRound()`.

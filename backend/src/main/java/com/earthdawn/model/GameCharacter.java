@@ -83,6 +83,10 @@ public class GameCharacter {
     private int currentDamage;
     private int wounds;
 
+    /** Aktiver Holzhaut-Bonus auf Bewusstlosigkeits- und Todesschwelle (0 = nicht aktiv). */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int holzhautBonus = 0;
+
     // --- Spielleiter ---
     /** true = nur für den Spielleiter sichtbar */
     @Column(columnDefinition = "boolean default false")

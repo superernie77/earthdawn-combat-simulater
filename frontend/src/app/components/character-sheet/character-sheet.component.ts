@@ -16,7 +16,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, SpellDefinition, RACES } from '../../models/character.model';
+import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -200,6 +200,43 @@ import { ProbeResult } from '../../models/dice.model';
                     <button mat-icon-button (click)="adjustField(b.field, 1)"><mat-icon>add</mat-icon></button>
                   </div>
                 </div>
+
+                <!-- Holzhaut -->
+                <ng-container *ngIf="hasHolzhautTalent()">
+                  <div class="section-title" style="margin-top:14px">Holzhaut</div>
+                  <div class="holzhaut-row">
+                    <div class="holzhaut-status">
+                      <span class="holzhaut-icon">🌳</span>
+                      <span *ngIf="isHolzhautActive()" class="holzhaut-active">
+                        Aktiv · <strong>+{{ holzhautBonus() }}</strong> auf BW & TD
+                      </span>
+                      <span *ngIf="!isHolzhautActive()" class="holzhaut-inactive">Nicht aktiv</span>
+                    </div>
+                    <div class="holzhaut-actions">
+                      <button mat-stroked-button color="primary" (click)="useHolzhaut()"
+                              [matTooltip]="isHolzhautActive() ? 'Neu wirken (überschreibt aktuellen Bonus)' : 'Holzhaut wirken: ZÄH-Stufe + Talentrang. Kostet 1 Erholungsprobe.'">
+                        <mat-icon>park</mat-icon>
+                        {{ isHolzhautActive() ? 'Neu wirken' : 'Wirken' }}
+                      </button>
+                      <button mat-stroked-button color="accent" *ngIf="isHolzhautActive()" (click)="endHolzhaut()"
+                              matTooltip="Effekt beenden: aktueller Schaden wird um den Bonuswert reduziert (Puffer-Heilung).">
+                        <mat-icon>healing</mat-icon> Beenden
+                      </button>
+                    </div>
+                  </div>
+                  <div class="holzhaut-result" *ngIf="lastHolzhaut">
+                    <div class="holzhaut-detail" *ngIf="lastHolzhaut.roll as r">
+                      Probe: ZÄH-Stufe {{ lastHolzhaut.toughnessStep }} + Rang {{ lastHolzhaut.rank }}
+                      = Stufe {{ lastHolzhaut.rollStep }} ({{ r.diceExpression }})
+                      → <strong class="holzhaut-total">{{ r.total }}</strong>
+                      <span *ngIf="lastHolzhaut.previousBonus > 0"> · ersetzt vorigen Bonus +{{ lastHolzhaut.previousBonus }}</span>
+                    </div>
+                    <div class="holzhaut-detail" *ngIf="!lastHolzhaut.roll && lastHolzhaut.healed >= 0">
+                      Beendet · <strong class="holzhaut-total">{{ lastHolzhaut.healed }}</strong> Schaden geheilt
+                      (Puffer war +{{ lastHolzhaut.previousBonus }})
+                    </div>
+                  </div>
+                </ng-container>
               </div>
             </div>
 
@@ -746,6 +783,23 @@ import { ProbeResult } from '../../models/dice.model';
     .heal-name { font-weight: 600; color: #e0d5c0; font-size: 0.9rem; }
     .heal-detail { font-size: 0.85rem; color: #999; margin-top: 2px; }
     .heal-amount { color: #66bb6a; font-size: 1rem; }
+
+    .holzhaut-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 8px 4px;
+    }
+    .holzhaut-status { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; }
+    .holzhaut-icon { font-size: 1.2rem; }
+    .holzhaut-active { color: #81c784; }
+    .holzhaut-active strong { color: #c5e1a5; font-weight: 700; }
+    .holzhaut-inactive { color: #777; font-style: italic; }
+    .holzhaut-actions { display: flex; gap: 8px; }
+    .holzhaut-result {
+      background: rgba(129,199,132,0.08); border: 1px solid rgba(129,199,132,0.3);
+      border-radius: 6px; padding: 8px 12px; margin-top: 6px;
+    }
+    .holzhaut-detail { font-size: 0.82rem; color: #999; }
+    .holzhaut-total { color: #81c784; font-size: 0.95rem; }
   `]
 })
 export class CharacterSheetComponent implements OnInit {
@@ -766,6 +820,7 @@ export class CharacterSheetComponent implements OnInit {
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
   newPotion: { name: string; healStep: number; quantity: number; description: string } = { name: 'Heiltrank', healStep: 7, quantity: 1, description: '' };
   lastHeal?: { potionName: string; step: number; diceExpression: string; amount: number; remaining: number };
+  lastHolzhaut?: HolzhautResult;
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
   attributeFields = [
@@ -972,6 +1027,9 @@ export class CharacterSheetComponent implements OnInit {
       const nat = this.naturalMysticArmor();
       return nat > 0 ? `+${nat} aus WIL` : null;
     }
+    if ((key === 'unconsciousnessRating' || key === 'deathRating') && this.holzhautBonus() > 0) {
+      return `+${this.holzhautBonus()} Holzhaut`;
+    }
     return null;
   }
 
@@ -982,7 +1040,67 @@ export class CharacterSheetComponent implements OnInit {
       const nat = this.naturalMysticArmor();
       return `Natürliche mystische Rüstung aus Willenskraft ${wil}: ${nat} (Tabelle: 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6). Ausrüstungs-Boni werden zusätzlich addiert.`;
     }
+    if ((key === 'unconsciousnessRating' || key === 'deathRating') && this.holzhautBonus() > 0) {
+      return `Inklusive Holzhaut-Bonus von +${this.holzhautBonus()}`;
+    }
     return '';
+  }
+
+  // --- Holzhaut ---
+
+  /** True, wenn der Charakter das Holzhaut-Talent besitzt. */
+  hasHolzhautTalent(): boolean {
+    return !!this.character?.talents?.some(t => t.talentDefinition.name === 'Holzhaut');
+  }
+
+  /** Aktueller Holzhaut-Bonus (vom Backend via derived geliefert). */
+  holzhautBonus(): number {
+    return this.derived?.holzhautBonus ?? this.character?.holzhautBonus ?? 0;
+  }
+
+  isHolzhautActive(): boolean {
+    return this.holzhautBonus() > 0;
+  }
+
+  useHolzhaut(): void {
+    if (!this.character?.id) return;
+    this.characterService.useHolzhaut(this.character.id).subscribe({
+      next: result => {
+        this.lastHolzhaut = result;
+        if (this.character) {
+          this.character.holzhautBonus = result.bonus;
+        }
+        this.loadDerived();
+        const msg = result.previousBonus > 0
+          ? `Holzhaut neu gewirkt: +${result.bonus} (vorher +${result.previousBonus})`
+          : `Holzhaut gewirkt: +${result.bonus}`;
+        this.snack.open(msg, 'OK', { duration: 2500 });
+      },
+      error: err => {
+        this.snack.open(err?.error?.message ?? 'Holzhaut konnte nicht gewirkt werden.', 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  endHolzhaut(): void {
+    if (!this.character?.id || !this.isHolzhautActive()) return;
+    this.characterService.endHolzhaut(this.character.id).subscribe({
+      next: result => {
+        this.lastHolzhaut = result;
+        if (this.character) {
+          this.character.holzhautBonus = 0;
+          this.character.currentDamage = Math.max(0, this.character.currentDamage - result.healed);
+        }
+        this.loadDerived();
+        this.snack.open(
+          `Holzhaut beendet · ${result.healed} Schaden geheilt (Puffer war +${result.previousBonus})`,
+          'OK', { duration: 2500 }
+        );
+      },
+      error: err => {
+        this.snack.open(err?.error?.message ?? 'Holzhaut konnte nicht beendet werden.', 'OK', { duration: 3000 });
+      }
+    });
   }
 
   getDefenseBonus(field: string): number {

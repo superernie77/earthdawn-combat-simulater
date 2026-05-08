@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Character, DerivedStats, Equipment, SpellDefinition } from '../models/character.model';
+import { Character, DerivedStats, Equipment, HolzhautResult, SpellDefinition } from '../models/character.model';
 
 @Injectable({ providedIn: 'root' })
 export class CharacterService {
@@ -120,6 +120,16 @@ export class CharacterService {
 
   removeSpell(characterId: number, spellId: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${characterId}/spells/${spellId}`);
+  }
+
+  // --- Holzhaut ---
+
+  useHolzhaut(id: number): Observable<HolzhautResult> {
+    return this.http.post<HolzhautResult>(`${this.base}/${id}/holzhaut`, {});
+  }
+
+  endHolzhaut(id: number): Observable<HolzhautResult> {
+    return this.http.post<HolzhautResult>(`${this.base}/${id}/holzhaut/end`, {});
   }
 
   delete(id: number): Observable<void> {

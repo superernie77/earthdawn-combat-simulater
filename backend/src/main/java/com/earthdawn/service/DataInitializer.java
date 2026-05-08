@@ -109,6 +109,19 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Holzhaut").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Holzhaut")
+                    .attribute(AttributeType.TOUGHNESS)
+                    .description("Härtet den Körper magisch. Probe: ZÄH + Rang. Ergebnis wird zur Bewusstlosigkeits- und " +
+                            "Todesschwelle addiert. Hauptaktion, kostet 1 Erholungsprobe (kein Strain). " +
+                            "Wirkt für Rang Stunden. Beim Beenden: aktueller Schaden wird um das Würfelergebnis reduziert. " +
+                            "Effekt bleibt aktiv, auch wenn der Adept bewusstlos wird.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Holzhaut' hinzugefügt.");
+        }
         if (talentRepo.findByName("Magische Markierung").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Magische Markierung")

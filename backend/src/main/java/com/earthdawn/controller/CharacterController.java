@@ -2,6 +2,7 @@ package com.earthdawn.controller;
 
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
+import com.earthdawn.dto.HolzhautResult;
 import com.earthdawn.model.Equipment;
 import com.earthdawn.model.GameCharacter;
 import com.earthdawn.model.SpellDefinition;
@@ -138,6 +139,18 @@ public class CharacterController {
     public ResponseEntity<Void> removeSpell(@PathVariable Long id, @PathVariable Long spellId) {
         characterService.removeSpell(id, spellId);
         return ResponseEntity.ok().build();
+    }
+
+    // --- Holzhaut ---
+
+    @PostMapping("/{id}/holzhaut")
+    public HolzhautResult useHolzhaut(@PathVariable Long id) {
+        return characterService.useHolzhaut(id);
+    }
+
+    @PostMapping("/{id}/holzhaut/end")
+    public HolzhautResult endHolzhaut(@PathVariable Long id) {
+        return characterService.endHolzhaut(id);
     }
 
     @DeleteMapping("/{id}")

@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
+import com.earthdawn.dto.HolzhautResult;
+import com.earthdawn.dto.RollResult;
 import com.earthdawn.model.CharacterSkill;
 import com.earthdawn.model.CharacterSpell;
 import com.earthdawn.model.CharacterTalent;
@@ -14,6 +16,7 @@ import com.earthdawn.model.GameCharacter;
 import com.earthdawn.model.SkillDefinition;
 import com.earthdawn.model.SpellDefinition;
 import com.earthdawn.model.TalentDefinition;
+import com.earthdawn.model.TalentNames;
 import com.earthdawn.model.enums.StatType;
 import com.earthdawn.repository.CharacterRepository;
 import com.earthdawn.repository.SkillDefinitionRepository;
@@ -161,19 +164,82 @@ public class CharacterService {
     /** Berechnet alle abgeleiteten Werte neu vom Charakter. */
     public DerivedStats getDerivedStats(Long id) {
         GameCharacter c = findById(id);
+        int holzhaut = c.getHolzhautBonus();
+        int unconsciousness = modifierAggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING) + holzhaut;
+        int death = modifierAggregator.getBaseValueFromCharacter(c, StatType.DEATH_RATING) + holzhaut;
         return DerivedStats.builder()
                 .physicalDefense(modifierAggregator.getBaseValueFromCharacter(c, StatType.PHYSICAL_DEFENSE))
                 .spellDefense(modifierAggregator.getBaseValueFromCharacter(c, StatType.SPELL_DEFENSE))
                 .socialDefense(modifierAggregator.getBaseValueFromCharacter(c, StatType.SOCIAL_DEFENSE))
                 .woundThreshold(modifierAggregator.getBaseValueFromCharacter(c, StatType.WOUND_THRESHOLD))
-                .unconsciousnessRating(modifierAggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING))
-                .deathRating(modifierAggregator.getBaseValueFromCharacter(c, StatType.DEATH_RATING))
+                .unconsciousnessRating(unconsciousness)
+                .deathRating(death)
                 .initiativeStep(modifierAggregator.getBaseValueFromCharacter(c, StatType.INITIATIVE_STEP))
                 .physicalArmor(modifierAggregator.getBaseValueFromCharacter(c, StatType.PHYSICAL_ARMOR))
                 .mysticArmor(modifierAggregator.getBaseValueFromCharacter(c, StatType.MYSTIC_ARMOR))
                 .karmaStep(modifierAggregator.getBaseValueFromCharacter(c, StatType.KARMA_STEP))
                 .recoveryStep(modifierAggregator.getBaseValueFromCharacter(c, StatType.RECOVERY_STEP))
                 .carryingCapacity(modifierAggregator.getBaseValueFromCharacter(c, StatType.CARRYING_CAPACITY))
+                .holzhautBonus(holzhaut)
+                .build();
+    }
+
+    /**
+     * Wirkt das Holzhaut-Talent: würfelt Talentrang + ZÄH-Step und speichert das Ergebnis als
+     * aktiven Bonus. Ein bereits aktiver Bonus wird überschrieben (das Talent gilt als nur einmal
+     * gleichzeitig aktiv). Die Heilung beim Beenden bezieht sich immer auf den zuletzt gewürfelten
+     * Wert; das ist mechanisch eine zulässige Vereinfachung der "neue Probe ersetzt alte"-Regel.
+     */
+    public HolzhautResult useHolzhaut(Long characterId) {
+        GameCharacter c = findById(characterId);
+        CharacterTalent ct = c.getTalents().stream()
+                .filter(t -> TalentNames.HOLZHAUT.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Charakter besitzt das Talent 'Holzhaut' nicht."));
+
+        int rank = ct.getRank();
+        int touStep = stepRollService.attributeToStep(c.getToughness());
+        int rollStep = touStep + rank;
+        RollResult roll = stepRollService.roll(rollStep);
+
+        int previous = c.getHolzhautBonus();
+        c.setHolzhautBonus(roll.getTotal());
+        characterRepo.save(c);
+
+        return HolzhautResult.builder()
+                .rank(rank)
+                .toughnessStep(touStep)
+                .rollStep(rollStep)
+                .roll(roll)
+                .bonus(roll.getTotal())
+                .previousBonus(previous)
+                .healed(0)
+                .build();
+    }
+
+    /**
+     * Beendet einen aktiven Holzhaut-Effekt: reduziert currentDamage um den Bonus (min 0)
+     * und setzt den Bonus auf 0 zurück.
+     */
+    public HolzhautResult endHolzhaut(Long characterId) {
+        GameCharacter c = findById(characterId);
+        int bonus = c.getHolzhautBonus();
+        if (bonus <= 0) {
+            throw new IllegalStateException("Kein aktiver Holzhaut-Effekt zum Beenden.");
+        }
+        int healed = Math.min(bonus, c.getCurrentDamage());
+        c.setCurrentDamage(c.getCurrentDamage() - healed);
+        c.setHolzhautBonus(0);
+        characterRepo.save(c);
+
+        return HolzhautResult.builder()
+                .rank(0)
+                .toughnessStep(0)
+                .rollStep(0)
+                .roll(null)
+                .bonus(0)
+                .previousBonus(bonus)
+                .healed(healed)
                 .build();
     }
 

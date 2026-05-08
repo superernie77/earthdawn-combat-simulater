@@ -1,3 +1,5 @@
+import { RollResult } from './dice.model';
+
 export type Race =
   | 'ZWERGE' | 'ORKS' | 'MENSCHEN' | 'TROLLE'
   | 'ELFEN' | 'BLUTELFEN' | 'TSKRANG' | 'OBSIDIANER' | 'WINDLINGE';
@@ -150,6 +152,9 @@ export interface Character {
   wounds: number;
   notes: string;
 
+  // Holzhaut – aktiver Bonus auf Bewusstlosigkeits-/Todesschwelle (0 = nicht aktiv)
+  holzhautBonus?: number;
+
   // Spielleiter
   gmCharacter?: boolean;
 
@@ -172,6 +177,19 @@ export interface DerivedStats {
   karmaStep: number;
   recoveryStep: number;
   carryingCapacity: number;
+  /** Aktiver Holzhaut-Bonus (0 = nicht aktiv); bereits in unconsciousnessRating und deathRating eingerechnet. */
+  holzhautBonus: number;
+}
+
+export interface HolzhautResult {
+  rank: number;
+  toughnessStep: number;
+  rollStep: number;
+  roll: RollResult | null;
+  bonus: number;
+  previousBonus: number;
+  /** Bei /end: Anzahl der durch Holzhaut geheilten Schadenspunkte. */
+  healed: number;
 }
 
 export function emptyCharacter(): Character {

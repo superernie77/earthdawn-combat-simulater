@@ -16,6 +16,7 @@ public final class TalentNames {
     public static final String MANOEUVER               = "Manövrieren";
     public static final String TIGERSPRUNG             = "Tigersprung";
     public static final String ZWEITWAFFE              = "Zweitwaffe";
+    public static final String HOLZHAUT                = "Holzhaut";
 
     public static final String EFFECT_AGGRESSIVER_ANGRIFF = "Aggressiver Angriff";
     public static final String EFFECT_DEFENSIVE_HALTUNG   = "Defensive Haltung";
