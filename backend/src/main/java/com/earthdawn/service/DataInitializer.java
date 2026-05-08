@@ -360,7 +360,7 @@ public class DataInitializer {
      */
     private void cleanupUnimplementedTalents() {
         java.util.List<String> toRemove = java.util.List.of(
-            "Initiative", "Lufttanz", "Schlossknacken", "Schleichen", "Klettern",
+            "Initiative", "Schlossknacken", "Schleichen", "Klettern",
             "Schwimmen", "Zähigkeit", "Arkane Waffe", "Fadenmagie", "Erste Hilfe",
             "Tiergespür", "Überzeugung", "Einschüchterung", "Meditation",
             "Standhalten", "Wissensmagie"
