@@ -895,7 +895,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </mat-form-field>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Waffe</mat-label>
-          <mat-select [(ngModel)]="attackDialog.weaponId">
+          <mat-select [ngModel]="attackDialog.weaponId" (ngModelChange)="onAttackWeaponChange($event)">
             <mat-option [value]="null">Keine Waffe</mat-option>
             <mat-option *ngFor="let e of weaponsOf(attackDialog.attacker)" [value]="e.id">
               {{ e.name }} (+{{ e.damageBonus }} Schaden)
@@ -2342,6 +2342,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   /** Letztes Angriffsziel pro Kombattant (combatantId → defenderId) */
   private lastTargetMap = new Map<number, number>();
+  /** Letzte gewählte Waffe pro Kombattant (combatantId → equipmentId) */
+  private lastWeaponMap = new Map<number, number>();
+  /** Letztes gewähltes Waffentalent pro Kombattant (combatantId → talentDefinitionId) */
+  private lastTalentMap = new Map<number, number>();
 
   private autofightCombatants = new Set<number>();
   private autofightPending = false;
@@ -2622,10 +2626,25 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openAttackDialog(attacker: CombatantState): void {
-    // Höchstes Angriffstalent als Default
-    const bestAttackTalent = (attacker.character.talents ?? [])
-      .filter(t => t.talentDefinition.attackTalent)
-      .sort((a, b) => b.rank - a.rank)[0];
+    const equipment = attacker.character.equipment ?? [];
+    const talents = attacker.character.talents ?? [];
+
+    // Letzte Waffe wiederherstellen, sonst beste Waffe
+    const lastWeaponId = this.lastWeaponMap.get(attacker.id!);
+    const lastWeapon = lastWeaponId != null
+      ? equipment.find(e => e.id === lastWeaponId && e.type === 'WEAPON')
+      : undefined;
+    const bestWeapon = equipment
+      .filter(e => e.type === 'WEAPON')
+      .sort((a, b) => b.damageBonus - a.damageBonus)[0];
+    const weapon = lastWeapon ?? bestWeapon;
+
+    // Letztes Talent wiederherstellen, sonst Auto-Wahl basierend auf Waffe
+    const lastTalentId = this.lastTalentMap.get(attacker.id!);
+    const lastTalent = lastTalentId != null
+      ? talents.find(t => t.talentDefinition.id === lastTalentId)
+      : undefined;
+    const talent = lastTalent ?? this.defaultTalentForWeapon(attacker, weapon?.clawWeapon);
 
     // Letztes Ziel als Default (falls noch vorhanden und nicht besiegt)
     const lastDefenderId = this.lastTargetMap.get(attacker.id!);
@@ -2633,23 +2652,46 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       ? this.session?.combatants.find(c => c.id === lastDefenderId && !c.defeated)
       : undefined;
 
-    // Waffe mit höchstem Schadensbonus als Default
-    const bestWeapon = (attacker.character.equipment ?? [])
-      .filter(e => e.type === 'WEAPON')
-      .sort((a, b) => b.damageBonus - a.damageBonus)[0];
-
     this.attackDialog = {
       open: true,
       attacker,
       defenderId: lastDefender?.id,
-      talentId: bestAttackTalent?.talentDefinition.id,
-      weaponId: bestWeapon?.id,
+      talentId: talent?.talentDefinition.id,
+      weaponId: weapon?.id,
       bonusSteps: 0,
       spendKarma: false,
       spendKarmaForDamage: false,
       aggressiveAttack: false,
       defensiveStance: false
     };
+  }
+
+  /**
+   * Wählt das passende Angriffstalent: bei Krallenhand "Waffenloser Kampf", sonst
+   * das ranghöchste Angriffstalent. Fallback wenn keine Talente: undefined.
+   */
+  private defaultTalentForWeapon(attacker: CombatantState, isClaw?: boolean) {
+    const talents = attacker.character.talents ?? [];
+    if (isClaw) {
+      const unarmed = talents.find(t => t.talentDefinition.name === 'Waffenloser Kampf');
+      if (unarmed) return unarmed;
+    }
+    return talents
+      .filter(t => t.talentDefinition.attackTalent)
+      .sort((a, b) => b.rank - a.rank)[0];
+  }
+
+  /** Reagiert auf Waffenwechsel im Angriffsdialog: bei Wechsel auf Krallenhand wird "Waffenloser Kampf" vorgewählt. */
+  onAttackWeaponChange(weaponId: number | undefined): void {
+    this.attackDialog.weaponId = weaponId;
+    if (!this.attackDialog.attacker || weaponId == null) return;
+    const weapon = (this.attackDialog.attacker.character.equipment ?? [])
+      .find(e => e.id === weaponId);
+    if (weapon?.clawWeapon) {
+      const unarmed = (this.attackDialog.attacker.character.talents ?? [])
+        .find(t => t.talentDefinition.name === 'Waffenloser Kampf');
+      if (unarmed) this.attackDialog.talentId = unarmed.talentDefinition.id;
+    }
   }
 
   /** True wenn die im Dialog ausgewählte Waffe eine Krallenhand ist. */
@@ -2712,6 +2754,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       next: result => {
         this.lastResult = result;
         this.lastTargetMap.set(req.attackerCombatantId, req.defenderCombatantId);
+        if (req.weaponId != null) this.lastWeaponMap.set(req.attackerCombatantId, req.weaponId);
+        else this.lastWeaponMap.delete(req.attackerCombatantId);
+        if (req.talentId != null) this.lastTalentMap.set(req.attackerCombatantId, req.talentId);
+        else this.lastTalentMap.delete(req.attackerCombatantId);
         this.attackDialog.open = false;
         this.resultModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
