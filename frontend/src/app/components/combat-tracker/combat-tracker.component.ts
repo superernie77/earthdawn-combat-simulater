@@ -478,7 +478,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   </span>
                 </span>
                 <div class="roll-block-totals">
-                  <span class="roll-big-total" style="color:#ef5350">{{ r.damageRoll!.total }}</span>
+                  <span class="roll-big-total" style="color:#ef5350">{{ r.damageRoll!.total + (r.damageKarmaRoll?.total ?? 0) }}</span>
                   <ng-container *ngIf="(r.armorValue ?? 0) > 0">
                     <span class="roll-big-vs">−</span>
                     <span class="roll-big-total" style="color:#888;font-size:1.4rem">{{ r.armorValue }}</span>
@@ -492,6 +492,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <span class="die-mini-sides">W{{ d.sides }}</span>
                   <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
                   <span *ngIf="d.exploded" class="explode-mini">💥</span>
+                </div>
+                <div class="die-mini karma-die" *ngIf="r.damageKarmaRoll" matTooltip="Karma auf Schaden (Krallenhand)">
+                  <span class="die-mini-sides">Karma W6</span>
+                  <span class="die-mini-rolls">{{ r.damageKarmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.damageKarmaRoll.exploded"> 💥</span></span>
                 </div>
               </div>
             </div>
@@ -910,16 +914,25 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </mat-option>
           </mat-select>
         </mat-form-field>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <label class="karma-toggle"
             [class.active]="attackDialog.spendKarma"
             [class.disabled]="(attackDialog.attacker?.currentKarma ?? 0) <= 0"
             (click)="(attackDialog.attacker?.currentKarma ?? 0) > 0 && (attackDialog.spendKarma = !attackDialog.spendKarma)">
             <mat-icon>auto_awesome</mat-icon>
-            Karma
+            Karma (Angriff)
             <span class="karma-count-badge" [class.empty]="(attackDialog.attacker?.currentKarma ?? 0) <= 0">
               {{ attackDialog.attacker?.currentKarma ?? 0 }}
             </span>
+          </label>
+          <label class="karma-toggle"
+            *ngIf="isClawWeaponSelected(attackDialog)"
+            [class.active]="attackDialog.spendKarmaForDamage"
+            [class.disabled]="(attackDialog.attacker?.currentKarma ?? 0) <= (attackDialog.spendKarma ? 1 : 0)"
+            (click)="toggleKarmaForDamage(attackDialog)"
+            matTooltip="Krallenhand: zusätzliches Karma auf den Schadenswurf">
+            <mat-icon>local_fire_department</mat-icon>
+            Karma (Schaden)
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
@@ -2322,9 +2335,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     weaponId?: number;
     bonusSteps: number;
     spendKarma: boolean;
+    spendKarmaForDamage?: boolean;
     aggressiveAttack: boolean;
     defensiveStance: boolean;
-  } = { open: false, bonusSteps: 0, spendKarma: false, aggressiveAttack: false, defensiveStance: false };
+  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false, aggressiveAttack: false, defensiveStance: false };
 
   /** Letztes Angriffsziel pro Kombattant (combatantId → defenderId) */
   private lastTargetMap = new Map<number, number>();
@@ -2632,9 +2646,25 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       weaponId: bestWeapon?.id,
       bonusSteps: 0,
       spendKarma: false,
+      spendKarmaForDamage: false,
       aggressiveAttack: false,
       defensiveStance: false
     };
+  }
+
+  /** True wenn die im Dialog ausgewählte Waffe eine Krallenhand ist. */
+  isClawWeaponSelected(dialog: { attacker?: CombatantState; weaponId?: number }): boolean {
+    if (!dialog.attacker || !dialog.weaponId) return false;
+    return !!(dialog.attacker.character.equipment ?? [])
+      .find(e => e.id === dialog.weaponId)?.clawWeapon;
+  }
+
+  /** Toggle für Karma-auf-Schaden, mit Karma-Ausreichend-Check (1 für Angriff + 1 für Schaden). */
+  toggleKarmaForDamage(dialog: { attacker?: CombatantState; spendKarma: boolean; spendKarmaForDamage?: boolean }): void {
+    const karma = dialog.attacker?.currentKarma ?? 0;
+    const required = (dialog.spendKarma ? 1 : 0) + 1;
+    if (!dialog.spendKarmaForDamage && karma < required) return;
+    dialog.spendKarmaForDamage = !dialog.spendKarmaForDamage;
   }
 
   possibleTargets(actor?: CombatantState): CombatantState[] {
@@ -2674,15 +2704,21 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       weaponId: this.attackDialog.weaponId ?? undefined,
       bonusSteps: this.attackDialog.bonusSteps,
       spendKarma: this.attackDialog.spendKarma,
+      spendKarmaForDamage: this.attackDialog.spendKarmaForDamage,
       aggressiveAttack: this.attackDialog.aggressiveAttack,
       defensiveStance: this.attackDialog.defensiveStance
     };
-    this.combatService.performAttack(req).subscribe(result => {
-      this.lastResult = result;
-      this.lastTargetMap.set(req.attackerCombatantId, req.defenderCombatantId);
-      this.attackDialog.open = false;
-      this.resultModal = { open: true, result };
-      this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+    this.combatService.performAttack(req).subscribe({
+      next: result => {
+        this.lastResult = result;
+        this.lastTargetMap.set(req.attackerCombatantId, req.defenderCombatantId);
+        this.attackDialog.open = false;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => {
+        this.snack.open(err?.error?.message ?? 'Angriff fehlgeschlagen.', 'OK', { duration: 3500 });
+      }
     });
   }
 

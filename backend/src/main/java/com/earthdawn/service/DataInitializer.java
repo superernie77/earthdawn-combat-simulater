@@ -109,6 +109,22 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Krallenhand").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Krallenhand")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Verwandelt die Hände magisch in Klauen für den waffenlosen Kampf. " +
+                            "Krallenhand-Stufe = STR + Rang + 3 (ersetzt die Stärkestufe beim Schadenswurf). " +
+                            "Einfache Aktion, 0 Überanstrengung. " +
+                            "Wird beim Hinzufügen automatisch als Waffe (clawWeapon) im Inventar angelegt; " +
+                            "bei Rang-Änderung wird der Schadensbonus angepasst. " +
+                            "Karma kann zusätzlich auf den Schadenswurf eingesetzt werden. " +
+                            "Klauen können nicht durch Entwaffnen entfernt werden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Krallenhand' hinzugefügt.");
+        }
         if (talentRepo.findByName("Holzhaut").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Holzhaut")

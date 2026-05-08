@@ -73,6 +73,8 @@ export interface Equipment {
   mysticDefenseBonus: number;
   quantity: number;
   healStep: number;
+  /** Krallenhand-Marker: vom Talent verwaltet, kann nicht gelöscht werden, Karma-auf-Schaden möglich. */
+  clawWeapon?: boolean;
 }
 
 export interface SpellDefinition {

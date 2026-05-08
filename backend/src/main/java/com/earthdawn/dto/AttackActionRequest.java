@@ -15,6 +15,8 @@ public class AttackActionRequest {
     private Long weaponId;
     private int bonusSteps;
     private boolean spendKarma;
+    /** Karma zusätzlich auf den Schadenswurf einsetzen (nur erlaubt bei Krallenhand-Waffen). */
+    private boolean spendKarmaForDamage;
     private boolean aggressiveAttack;
     private boolean defensiveStance;
 }

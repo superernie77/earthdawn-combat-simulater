@@ -241,21 +241,38 @@ public class CombatService {
 
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
+            boolean weaponIsClaw = false;
             if (req.getWeaponId() != null) {
-                int weaponBonus = attacker.getCharacter().getEquipment().stream()
+                com.earthdawn.model.Equipment weapon = attacker.getCharacter().getEquipment().stream()
                         .filter(e -> e.getId().equals(req.getWeaponId()))
-                        .findFirst()
-                        .map(com.earthdawn.model.Equipment::getDamageBonus)
-                        .orElse(0);
-                damageStep += weaponBonus;
+                        .findFirst().orElse(null);
+                if (weapon != null) {
+                    damageStep += weapon.getDamageBonus();
+                    weaponIsClaw = weapon.isClawWeapon();
+                }
             }
             damageStep += extraSuccesses * 2;
 
             RollResult damageRoll = diceService.roll(damageStep);
 
-            // 6. Rüstung
+            // 6a. Karma auf Schaden — nur bei Krallenhand-Waffe erlaubt
+            RollResult damageKarmaRoll = null;
+            if (req.isSpendKarmaForDamage()) {
+                if (!weaponIsClaw) {
+                    throw new IllegalStateException(
+                            "Karma auf den Schadenswurf ist nur bei Krallenhand-Waffen erlaubt.");
+                }
+                if (attacker.getCurrentKarma() <= 0) {
+                    throw new IllegalStateException(attacker.getCharacter().getName() + " hat kein Karma mehr.");
+                }
+                damageKarmaRoll = diceService.roll(4);
+                attacker.setCurrentKarma(attacker.getCurrentKarma() - 1);
+            }
+            int damageTotal = damageRoll.getTotal() + (damageKarmaRoll != null ? damageKarmaRoll.getTotal() : 0);
+
+            // 6b. Rüstung
             int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
-            int netDamage = Math.max(0, damageRoll.getTotal() - armor);
+            int netDamage = Math.max(0, damageTotal - armor);
 
             // 7. Reaktionsmöglichkeiten des Verteidigers (Riposte und/oder Ausweichen)
             boolean defenderHasRiposte = req.getActionType() == ActionType.MELEE_ATTACK
@@ -284,6 +301,7 @@ public class CombatService {
                 // Wenn Ausweichen aktiv ist: regulärer Pfad — Schaden steht aus, Aktion ebenfalls verbraucht
                 attacker.setHasActedThisRound(true);
                 result.extraSuccesses(extraSuccesses).damageStep(damageStep).damageRoll(damageRoll)
+                      .damageKarmaRoll(damageKarmaRoll)
                       .armorValue(armor).netDamage(netDamage);
                 CombatActionResult actionResult = result.build();
                 actionResult.setDescription(buildDescription(actionResult));
@@ -313,6 +331,7 @@ public class CombatService {
             result.extraSuccesses(extraSuccesses)
                   .damageStep(damageStep)
                   .damageRoll(damageRoll)
+                  .damageKarmaRoll(damageKarmaRoll)
                   .armorValue(armor)
                   .netDamage(netDamage);
         }

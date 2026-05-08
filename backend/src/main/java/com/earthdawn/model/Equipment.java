@@ -63,4 +63,9 @@ public class Equipment {
     /** Trank: Heilungsstufe-Bonus (wird zur Zähigkeitsstufe addiert; z.B. 7 für Heiltrank) */
     @Builder.Default
     private int healStep = 0;
+
+    /** Krallenhand-Marker: vom gleichnamigen Talent automatisch verwaltete Waffe (kann nicht manuell entfernt werden, erlaubt Karma auf Schadenswurf). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean clawWeapon = false;
 }

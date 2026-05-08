@@ -115,6 +115,8 @@ export interface AttackActionRequest {
   weaponId?: number;
   bonusSteps: number;
   spendKarma: boolean;
+  /** Karma zusätzlich auf den Schadenswurf einsetzen (nur bei Krallenhand-Waffen). */
+  spendKarmaForDamage?: boolean;
   aggressiveAttack?: boolean;
   defensiveStance?: boolean;
 }
@@ -132,6 +134,8 @@ export interface CombatActionResult {
   extraSuccesses?: number;
   damageStep?: number;
   damageRoll?: RollResult;
+  /** Karma-Würfel auf den Schadenswurf (nur bei Krallenhand). */
+  damageKarmaRoll?: RollResult;
   armorValue?: number;
   netDamage?: number;
   woundDealt?: boolean;

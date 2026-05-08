@@ -23,6 +23,8 @@ public class CombatActionResult {
     private int extraSuccesses;
     private int damageStep;
     private RollResult damageRoll;
+    /** Karma-Würfel auf den Schadenswurf (nur bei Krallenhand möglich). */
+    private RollResult damageKarmaRoll;
     private int armorValue;
     private int netDamage;
     private boolean woundDealt;

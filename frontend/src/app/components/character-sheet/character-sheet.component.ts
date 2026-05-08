@@ -356,19 +356,25 @@ import { ProbeResult } from '../../models/dice.model';
               <div class="section-title">Waffen</div>
               <div class="equip-list">
                 <div class="equip-item" *ngFor="let e of weapons()">
-                  <div class="equip-name">{{ e.name }}</div>
+                  <div class="equip-name">
+                    <span *ngIf="e.clawWeapon" class="claw-icon" matTooltip="Magische Krallenhand (vom Talent verwaltet)">🐾</span>
+                    {{ e.name }}
+                  </div>
                   <div class="equip-stats">
                     <span class="equip-badge weapon">+{{ e.damageBonus }} Schaden</span>
+                    <span class="equip-badge claw-badge" *ngIf="e.clawWeapon" matTooltip="Krallenhand: ersetzt STR-Stufe, Karma auf Schaden möglich, nicht entwaffenbar">Krallenhand</span>
                     <span class="equip-badge secondary-weapon" *ngIf="character.secondaryWeaponId === e.id" matTooltip="Wird als Zweitwaffe verwendet">⚔ Zweitwaffe</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
-                  <button mat-icon-button
+                  <button mat-icon-button *ngIf="!e.clawWeapon"
                     [style.color]="character.secondaryWeaponId === e.id ? '#ce93d8' : '#555'"
                     (click)="toggleSecondaryWeapon(e)"
                     [matTooltip]="character.secondaryWeaponId === e.id ? 'Als Zweitwaffe abwählen' : 'Als Zweitwaffe festlegen'">
                     <mat-icon>{{ character.secondaryWeaponId === e.id ? 'join_full' : 'join_inner' }}</mat-icon>
                   </button>
-                  <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
+                  <button mat-icon-button color="warn" (click)="removeEquipment(e)"
+                          [disabled]="e.clawWeapon"
+                          [matTooltip]="e.clawWeapon ? 'Wird vom Krallenhand-Talent verwaltet' : 'Entfernen'">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -716,12 +722,14 @@ import { ProbeResult } from '../../models/dice.model';
       display: flex; align-items: center; gap: 10px;
       background: #1e1a16; border: 1px solid #3a3028; border-radius: 6px; padding: 8px 12px;
     }
-    .equip-name { font-weight: 600; color: #e0d5c0; min-width: 140px; }
+    .equip-name { font-weight: 600; color: #e0d5c0; min-width: 140px; display: flex; align-items: center; gap: 6px; }
+    .claw-icon { font-size: 1.1rem; }
     .equip-stats { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap; }
     .equip-badge {
       border-radius: 10px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700;
       &.weapon { background: rgba(255,112,67,0.15); color: #ff7043; }
       &.secondary-weapon { background: rgba(206,147,216,0.15); color: #ce93d8; border-color: #3a1a40; }
+      &.claw-badge { background: rgba(141,110,99,0.18); color: #d7ccc8; border: 1px solid #5d4037; }
       &.armor-phys { background: rgba(66,165,245,0.15); color: #42a5f5; }
       &.armor-myst { background: rgba(171,71,188,0.15); color: #ab47bc; }
       &.armor-init { background: rgba(255,167,38,0.15); color: #ffa726; }
@@ -1305,9 +1313,13 @@ export class CharacterSheetComponent implements OnInit {
 
   removeEquipment(e: Equipment): void {
     if (!this.character?.id || !e.id) return;
-    this.characterService.removeEquipment(this.character.id, e.id).subscribe(c => {
-      this.character = c;
-      this.loadDerived();
+    if (e.clawWeapon) {
+      this.snack.open('Krallenhand wird vom Talent verwaltet — entferne stattdessen das Talent.', 'OK', { duration: 3000 });
+      return;
+    }
+    this.characterService.removeEquipment(this.character.id, e.id).subscribe({
+      next: c => { this.character = c; this.loadDerived(); },
+      error: err => this.snack.open(err?.error?.message ?? 'Konnte nicht entfernt werden.', 'OK', { duration: 3000 })
     });
   }
 

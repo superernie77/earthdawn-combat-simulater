@@ -17,6 +17,7 @@ import com.earthdawn.model.SkillDefinition;
 import com.earthdawn.model.SpellDefinition;
 import com.earthdawn.model.TalentDefinition;
 import com.earthdawn.model.TalentNames;
+import com.earthdawn.model.enums.EquipmentType;
 import com.earthdawn.model.enums.StatType;
 import com.earthdawn.repository.CharacterRepository;
 import com.earthdawn.repository.SkillDefinitionRepository;
@@ -275,22 +276,63 @@ public class CharacterService {
                 .rank(rank)
                 .build();
         c.getTalents().add(talent);
+        syncClawWeapon(c, def.getName(), rank);
         return characterRepo.save(c);
     }
 
     public void updateTalentRank(Long characterId, Long talentId, int newRank) {
         GameCharacter c = findById(characterId);
+        int clamped = Math.max(1, Math.min(15, newRank));
         c.getTalents().stream()
                 .filter(t -> t.getId().equals(talentId))
                 .findFirst()
-                .ifPresent(t -> t.setRank(Math.max(1, Math.min(15, newRank))));
+                .ifPresent(t -> {
+                    t.setRank(clamped);
+                    syncClawWeapon(c, t.getTalentDefinition().getName(), clamped);
+                });
         characterRepo.save(c);
     }
 
     public void removeTalent(Long characterId, Long talentId) {
         GameCharacter c = findById(characterId);
+        c.getTalents().stream()
+                .filter(t -> t.getId().equals(talentId))
+                .findFirst()
+                .ifPresent(t -> {
+                    if (TalentNames.KRALLENHAND.equals(t.getTalentDefinition().getName())) {
+                        c.getEquipment().removeIf(Equipment::isClawWeapon);
+                    }
+                });
         c.getTalents().removeIf(t -> t.getId().equals(talentId));
         characterRepo.save(c);
+    }
+
+    /**
+     * Hält die Krallenhand-Waffe synchron zum Talent-Rang. Wird beim Hinzufügen oder
+     * Aktualisieren des Talents aufgerufen. Schadensbonus = Rang + 3 (entspricht der
+     * Krallenhandstufe = STR + Rang + 3 in Kombination mit der Standard-Schadensformel
+     * STR + weaponBonus).
+     */
+    private void syncClawWeapon(GameCharacter c, String talentName, int rank) {
+        if (!TalentNames.KRALLENHAND.equals(talentName)) return;
+        int newBonus = rank + 3;
+        Equipment claw = c.getEquipment().stream()
+                .filter(Equipment::isClawWeapon)
+                .findFirst()
+                .orElse(null);
+        if (claw == null) {
+            claw = Equipment.builder()
+                    .character(c)
+                    .name(TalentNames.CLAW_WEAPON_NAME)
+                    .type(EquipmentType.WEAPON)
+                    .description("Magische Klauenhände (vom Talent verwaltet, Karma auf Schaden möglich, kann nicht entwaffnet werden)")
+                    .damageBonus(newBonus)
+                    .clawWeapon(true)
+                    .build();
+            c.getEquipment().add(claw);
+        } else {
+            claw.setDamageBonus(newBonus);
+        }
     }
 
     public GameCharacter addSkill(Long characterId, Long skillDefinitionId, int rank) {
@@ -331,6 +373,16 @@ public class CharacterService {
 
     public GameCharacter removeEquipment(Long characterId, Long equipmentId) {
         GameCharacter c = findById(characterId);
+        c.getEquipment().stream()
+                .filter(e -> e.getId().equals(equipmentId))
+                .findFirst()
+                .ifPresent(e -> {
+                    if (e.isClawWeapon()) {
+                        throw new IllegalStateException(
+                                "Krallenhand wird vom Talent verwaltet und kann nicht manuell entfernt werden. " +
+                                "Entferne stattdessen das Krallenhand-Talent.");
+                    }
+                });
         c.getEquipment().removeIf(e -> e.getId().equals(equipmentId));
         return characterRepo.save(c);
     }

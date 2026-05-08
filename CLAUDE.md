@@ -99,6 +99,13 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 ### Charakterdatenblatt-Talente (außerhalb des Kampfsystems)
 - **Holzhaut**: Auf dem Charakterdatenblatt (Attribute-Tab) verfügbar, wenn der Charakter das Talent besitzt. Wurf: `ZÄH-Step + Talentrang` (`StepRollService.attributeToStep` + Rang). Das Wurfergebnis wird als `holzhautBonus` auf `GameCharacter` gespeichert und in `getDerivedStats()` auf Bewusstlosigkeits- und Todesschwelle addiert. Pro Charakter ist nur **ein** Holzhaut-Bonus gleichzeitig aktiv — erneutes Wirken überschreibt den alten Wert. Beim Beenden (`/holzhaut/end`) wird `currentDamage` um den aktiven Bonus reduziert (Puffer-Heilung) und `holzhautBonus` auf 0 zurückgesetzt. Endpoints: `POST /api/characters/{id}/holzhaut` und `POST /api/characters/{id}/holzhaut/end`. Gibt jeweils `HolzhautResult` zurück.
 
+### Krallenhand
+- **Krallenhand**: Verwandelt die Hände magisch in Klauen für den waffenlosen Kampf (STR-basiertes Talent).
+- **Modellierung**: Wird automatisch als Equipment vom Typ `WEAPON` mit Flag `clawWeapon=true` angelegt, wenn das Talent dem Charakter hinzugefügt wird. `damageBonus = rank + 3` — entspricht der Krallenhandstufe `STR + Rang + 3` in Kombination mit der Standardformel `damageStep = STR + weaponBonus`.
+- **Lifecycle**: `CharacterService.syncClawWeapon()` läuft in `addTalent`/`updateTalentRank`/`removeTalent` — bei Rang-Änderung wird der Schadensbonus angepasst, bei Talent-Entfernung verschwindet das Equipment.
+- **Schutz**: Manuelle Löschung über `removeEquipment` ist gesperrt (`IllegalStateException` mit Hinweis auf Talent-Entfernung).
+- **Karma auf Schaden**: `AttackActionRequest.spendKarmaForDamage` aktiviert einen zusätzlichen W6 (Stufe 4) auf den Schadenswurf. Nur erlaubt wenn die ausgewählte Waffe `clawWeapon=true` ist — sonst Backend-Fehler. Das Ergebnis wird als `damageKarmaRoll` in `CombatActionResult` zurückgegeben und im UI separat angezeigt.
+
 ### Passive / Reaction Talents
 - **Standhaftigkeit**: Passiv. Bei Niederschlagsprobe: STR-Step + Talentrang statt reiner STR-Step.
 - **Starrsinn**: Auto-Gegenprobe gegen Verspotten. WIL-Step + Rang vs. Verspotten-Ergebnis. Bei Erfolg: Effekt negiert.
@@ -270,7 +277,7 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER), Manövrieren (DEX)
 - Additional attacks: Zweitwaffe (DEX)
 - Initiative: Tigersprung (DEX, once/round, no roll)
-- Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH)
+- Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
 
 **Spells (~105 total):** Illusionist (Circles 1–8) + Geisterbeschwörer (Circles 1–8)
 
