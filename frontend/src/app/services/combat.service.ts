@@ -232,4 +232,9 @@ export class CombatService {
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/blattschuss-add-karma`, {}
     );
   }
+
+  /** Schließt das synchronisierte Result-Modal für ALLE Zuschauer der Session. */
+  dismissModal(sessionId: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(`${this.base}/sessions/${sessionId}/dismiss-modal`, {});
+  }
 }

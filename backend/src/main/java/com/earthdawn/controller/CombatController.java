@@ -254,4 +254,10 @@ public class CombatController {
                                                           @PathVariable Long combatantId) {
         return combatService.performBlattschussAddKarma(id, combatantId);
     }
+
+    /** Schließt das aktuell geöffnete Result-Modal für ALLE Zuschauer der Session (synchronisiert). */
+    @PostMapping("/sessions/{id}/dismiss-modal")
+    public CombatSession dismissModal(@PathVariable Long id) {
+        return combatService.dismissModal(id);
+    }
 }

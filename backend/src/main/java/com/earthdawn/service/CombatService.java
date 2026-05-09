@@ -30,6 +30,43 @@ public class CombatService {
     private final SimpMessagingTemplate websocket;
     private final ObjectMapper objectMapper;
 
+    // --- Live Modal State (in-memory, pro Session) ---
+
+    /** Synchronisierter Modal-Status pro Session — überlebt Server-Lifetime, nicht persistiert. */
+    private final java.util.Map<Long, LiveModalState> liveModals = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Setzt einen neuen Modal-Status für die Session und bumpt die Version. */
+    private void openLiveModal(Long sessionId, String type, Object payload) {
+        liveModals.compute(sessionId, (k, prev) -> {
+            int next = (prev == null ? 0 : prev.getVersion()) + 1;
+            return LiveModalState.builder().version(next).type(type).payload(payload).build();
+        });
+    }
+
+    /** Schließt das aktive Modal: bumpt Version, setzt type/payload auf null. */
+    private void closeLiveModal(Long sessionId) {
+        liveModals.compute(sessionId, (k, prev) -> {
+            int next = (prev == null ? 0 : prev.getVersion()) + 1;
+            return LiveModalState.builder().version(next).type(null).payload(null).build();
+        });
+    }
+
+    /** Hängt den aktuellen Modal-Status aus dem Cache an die Session (transientes Feld). */
+    private void attachLiveModal(CombatSession session) {
+        if (session != null && session.getId() != null) {
+            session.setLiveModal(liveModals.get(session.getId()));
+        }
+    }
+
+    /** Public Endpoint-Trigger: aktuelles Modal schließen + broadcasten. */
+    public CombatSession dismissModal(Long sessionId) {
+        CombatSession session = findById(sessionId);
+        closeLiveModal(sessionId);
+        attachLiveModal(session);
+        broadcast(session);
+        return session;
+    }
+
     // --- Session Management ---
 
     public List<CombatSession> findAll() {
@@ -58,6 +95,7 @@ public class CombatService {
                 c.setCurrentInitiativeStep(0);
             }
         }
+        attachLiveModal(session);
     }
 
     public CombatSession createSession(String name) {
@@ -470,7 +508,7 @@ public class CombatService {
                 addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                         req.getActionType(), actionResult.getDescription() + tag, hit);
                 sessionRepo.save(session);
-                broadcast(session);
+                broadcastWithModal(session, "ATTACK_RESULT", actionResult);
                 return actionResult;
             }
 
@@ -505,7 +543,7 @@ public class CombatService {
                 req.getActionType(), actionResult.getDescription(), hit);
 
         sessionRepo.save(session);
-        broadcast(session);
+        broadcastWithModal(session, "ATTACK_RESULT", actionResult);
         return actionResult;
     }
 
@@ -583,16 +621,26 @@ public class CombatService {
         boolean allDeclared = session.getCombatants().stream()
                 .filter(c -> !c.isDefeated())
                 .allMatch(CombatantState::isHasDeclared);
+        boolean initiativeJustRolled = false;
         if (allDeclared) {
             applyDeclaredStances(session);
             String summary = rerollInitiative(session);
             session.setPhase(CombatPhase.ACTION);
             addLog(session, null, null, ActionType.INITIATIVE,
                     "Alle Ansagen erfolgt. Initiative gewürfelt! " + summary, true);
+            initiativeJustRolled = true;
         }
 
         CombatSession saved = sessionRepo.save(session);
-        broadcast(saved);
+        if (initiativeJustRolled) {
+            // Initiative-Modal mit Detail-Liste für alle Zuschauer öffnen
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("rolls", saved.getLastInitiativeRolls());
+            payload.put("round", saved.getLastInitiativeRollRound());
+            broadcastWithModal(saved, "INITIATIVE", payload);
+        } else {
+            broadcast(saved);
+        }
         return saved;
     }
 
@@ -1173,8 +1221,10 @@ public class CombatService {
 
         addLog(session, actorName, targetName, ActionType.TAUNT, desc, success && !resisted);
         sessionRepo.save(session);
-        broadcast(session);
-        return result.build();
+
+        TauntResult tauntResult = result.build();
+        broadcastWithModal(session, "TAUNT", tauntResult);
+        return tauntResult;
     }
 
     // --- Akrobatische Verteidigung ---
@@ -1253,9 +1303,8 @@ public class CombatService {
 
         addLog(session, actorName, null, ActionType.ACROBATIC_DEFENSE, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return AcrobaticDefenseResult.builder()
+        AcrobaticDefenseResult result = AcrobaticDefenseResult.builder()
                 .actorName(actorName)
                 .rollStep(rollStep)
                 .roll(roll)
@@ -1267,6 +1316,8 @@ public class CombatService {
                 .damageTaken(1)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "ACROBATIC_DEFENSE", result);
+        return result;
     }
 
     // --- Kampfsinn ---
@@ -1396,9 +1447,8 @@ public class CombatService {
 
         addLog(session, actorName, targetName, ActionType.COMBAT_SENSE, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return CombatSenseResult.builder()
+        CombatSenseResult result = CombatSenseResult.builder()
                 .actorName(actorName)
                 .targetName(targetName)
                 .rollStep(rollStep)
@@ -1412,6 +1462,8 @@ public class CombatService {
                 .damageTaken(1)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "COMBAT_SENSE", result);
+        return result;
     }
 
     // --- Ablenken ---
@@ -1503,9 +1555,8 @@ public class CombatService {
 
         addLog(session, actorName, targetName, ActionType.DISTRACT, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return DistractResult.builder()
+        DistractResult result = DistractResult.builder()
                 .actorName(actorName)
                 .targetName(targetName)
                 .rollStep(rollStep)
@@ -1519,6 +1570,8 @@ public class CombatService {
                 .damageTaken(1)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "DISTRACT", result);
+        return result;
     }
 
     // --- Schwachstelle erkennen ---
@@ -1610,9 +1663,8 @@ public class CombatService {
 
         addLog(session, actorName, targetName, ActionType.SPOT_ARMOR_FLAW, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return SpotArmorFlawResult.builder()
+        SpotArmorFlawResult result = SpotArmorFlawResult.builder()
                 .actorName(actorName)
                 .targetName(targetName)
                 .rollStep(rollStep)
@@ -1628,6 +1680,8 @@ public class CombatService {
                 .strainCost(1)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "SPOT_ARMOR_FLAW", result);
+        return result;
     }
 
     // --- Eiserner Wille ---
@@ -1694,9 +1748,8 @@ public class CombatService {
 
         addLog(session, actorName, null, ActionType.IRON_WILL, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return IronWillResult.builder()
+        IronWillResult result = IronWillResult.builder()
                 .actorName(actorName)
                 .rollStep(rollStep)
                 .roll(roll)
@@ -1707,6 +1760,8 @@ public class CombatService {
                 .damageTaken(1)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "IRON_WILL", result);
+        return result;
     }
 
     // --- Helpers ---
@@ -2018,14 +2073,15 @@ public class CombatService {
 
         addLog(session, actorName, targetName, ActionType.MANOEUVER, desc, success);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return ManoeuverResult.builder()
+        ManoeuverResult result = ManoeuverResult.builder()
                 .actorName(actorName).targetName(targetName)
                 .rollStep(rollStep).roll(roll).karmaRoll(karmaRoll)
                 .defenseValue(pd).success(success).successes(successes)
                 .defenseBonus(bonus).attackBonus(bonus).damageTaken(1)
                 .description(desc).build();
+        broadcastWithModal(session, "MANOEUVER", result);
+        return result;
     }
 
     // --- Tigersprung ---
@@ -2071,12 +2127,13 @@ public class CombatService {
 
         addLog(session, actorName, null, ActionType.TIGERSPRUNG, desc, true);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return TigersprungResult.builder()
+        TigersprungResult result = TigersprungResult.builder()
                 .actorName(actorName).rank(rank)
                 .initiativeBonus(rank).newInitiative(actor.getInitiative())
                 .damageTaken(1).description(desc).build();
+        broadcastWithModal(session, "TIGERSPRUNG", result);
+        return result;
     }
 
     // --- Blattschuss ---
@@ -2251,15 +2308,16 @@ public class CombatService {
 
         addLog(session, actorName, null, ActionType.LUFTTANZ, desc, true);
         sessionRepo.save(session);
-        broadcast(session);
 
-        return LufttanzActivationResult.builder()
+        LufttanzActivationResult result = LufttanzActivationResult.builder()
                 .actorName(actorName)
                 .rank(rank)
                 .initiativeBonus(rank)
                 .damageTaken(2)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "LUFTTANZ", result);
+        return result;
     }
 
     /**
@@ -2459,6 +2517,17 @@ public class CombatService {
         } catch (Exception e) {
             log.warn("WebSocket broadcast fehlgeschlagen: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Broadcast mit gleichzeitigem Setzen des synchronisierten Modal-Status (für alle Zuschauer).
+     * Wird statt des einfachen broadcast() aufgerufen, wenn die Aktion ein Result-Modal öffnen soll.
+     */
+    private void broadcastWithModal(CombatSession session, String modalType, Object payload) {
+        if (session != null && session.getId() != null && modalType != null) {
+            openLiveModal(session.getId(), modalType, payload);
+        }
+        broadcast(session);
     }
 
     private String buildDescription(CombatActionResult r) {

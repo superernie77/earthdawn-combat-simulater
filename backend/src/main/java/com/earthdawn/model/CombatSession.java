@@ -1,6 +1,7 @@
 package com.earthdawn.model;
 
 import com.earthdawn.dto.InitiativeRollDetail;
+import com.earthdawn.dto.LiveModalState;
 import com.earthdawn.model.enums.CombatPhase;
 import com.earthdawn.model.enums.CombatStatus;
 import jakarta.persistence.*;
@@ -62,4 +63,12 @@ public class CombatSession {
     @Transient
     @Builder.Default
     private int lastInitiativeRollRound = 0;
+
+    /**
+     * Synchronisierter Modal-Status. Wird vor dem WebSocket-Broadcast aus dem CombatService-Cache
+     * angehängt — alle Zuschauer der Session sehen so dasselbe Modal und können es gemeinsam
+     * schließen.
+     */
+    @Transient
+    private LiveModalState liveModal;
 }

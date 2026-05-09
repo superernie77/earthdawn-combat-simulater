@@ -591,7 +591,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <mat-icon>auto_awesome</mat-icon>
             +1 Karma einsetzen ({{ blattschussActor()?.currentKarma ?? 0 }} verfügbar)
           </button>
-          <button mat-stroked-button (click)="resultModal.open = false">Aufgeben</button>
+          <button mat-stroked-button (click)="dismissModal()">Aufgeben</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap" *ngIf="r.hitPendingRiposte || r.hitPendingDodge; else closeOnly">
           <button mat-stroked-button style="flex:1;min-width:140px"
@@ -836,7 +836,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Manövrieren Result Modal -->
     <div class="result-modal" *ngIf="manoeuverModal.open">
-      <div class="dialog-backdrop" (click)="manoeuverModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="manoeuverModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'swap_horiz' : 'close' }}</mat-icon>
@@ -869,13 +869,13 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="manoeuverModal.open = false">Schließen</button>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
       </div>
     </div>
 
     <!-- Initiative Roll Modal — alle Kombattanten in einer Übersicht -->
     <div class="result-modal" *ngIf="initiativeModal.open">
-      <div class="dialog-backdrop" (click)="initiativeModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box initiative-modal-box">
         <div class="result-outcome hit">
           <mat-icon>casino</mat-icon>
@@ -905,7 +905,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </div>
         </div>
         <button mat-raised-button color="primary" style="width:100%;margin-top:16px"
-                (click)="initiativeModal.open = false">
+                (click)="dismissModal()">
           Auf zur Aktion!
         </button>
       </div>
@@ -913,7 +913,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Tigersprung Result Modal -->
     <div class="result-modal" *ngIf="tigersprungModal.open">
-      <div class="dialog-backdrop" (click)="tigersprungModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="tigersprungModal.result as r">
         <div class="result-outcome hit">
           <mat-icon>bolt</mat-icon>
@@ -934,13 +934,13 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="tigersprungModal.open = false">Schließen</button>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
       </div>
     </div>
 
     <!-- Lufttanz Activation Result Modal -->
     <div class="result-modal" *ngIf="lufttanzModal.open">
-      <div class="dialog-backdrop" (click)="lufttanzModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="lufttanzModal.result as r">
         <div class="result-outcome hit">
           <mat-icon>air</mat-icon>
@@ -966,7 +966,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="lufttanzModal.open = false">Schließen</button>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
       </div>
     </div>
 
@@ -1501,7 +1501,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Ablenken Result Modal -->
     <div class="result-modal" *ngIf="distractModal.open">
-      <div class="dialog-backdrop" (click)="distractModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="distractModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'record_voice_over' : 'close' }}</mat-icon>
@@ -1556,7 +1556,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="distractModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
           Schließen
         </button>
       </div>
@@ -1608,7 +1608,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Schwachstelle erkennen Result Modal -->
     <div class="result-modal" *ngIf="spotArmorFlawModal.open">
-      <div class="dialog-backdrop" (click)="spotArmorFlawModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="spotArmorFlawModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'biotech' : 'close' }}</mat-icon>
@@ -1663,7 +1663,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−{{ r.strainCost }}</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="spotArmorFlawModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
           Schließen
         </button>
       </div>
@@ -1707,7 +1707,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Eiserner Wille Result Modal -->
     <div class="result-modal" *ngIf="ironWillModal.open">
-      <div class="dialog-backdrop" (click)="ironWillModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="ironWillModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
           <mat-icon>{{ r.success ? 'psychology' : 'close' }}</mat-icon>
@@ -1755,7 +1755,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="ironWillModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
           Schließen
         </button>
       </div>
@@ -1996,7 +1996,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Taunt Result Modal -->
     <div class="result-modal" *ngIf="tauntModal.open">
-      <div class="dialog-backdrop" (click)="tauntModal.open = false"></div>
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="tauntModal.result as r">
         <div class="result-outcome" [class.hit]="r.success && !r.resisted" [class.miss]="!r.success || r.resisted">
           <mat-icon>{{ r.success && !r.resisted ? 'sentiment_very_dissatisfied' : 'close' }}</mat-icon>
@@ -2073,7 +2073,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-value" style="color:#ef5350">−1</span>
           </div>
         </div>
-        <button mat-raised-button style="width:100%;margin-top:16px" (click)="tauntModal.open = false">
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
           Schließen
         </button>
       </div>
@@ -2841,13 +2841,16 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   private shownInitiativeRound = 0;
   initiativeModal: { open: boolean; rolls?: InitiativeRollDetail[]; round?: number } = { open: false };
 
+  /** Letzte vom Backend empfangene Modal-Version — verhindert wiederholtes Öffnen + Out-of-Order-WS-Broadcasts. */
+  private lastSeenModalVersion = 0;
+
   ngOnInit(): void {
     const id = +this.route.snapshot.params['id'];
     this.combatService.findById(id).subscribe({
       next: s => {
         this.session = s;
         this.logEntries = s.log ?? [];
-        this.maybeOpenInitiativeModal(s);
+        this.syncLiveModal(s);
       },
       error: err => {
         this.loadError = `Session konnte nicht geladen werden (${err.status ?? err.message}).`;
@@ -2858,8 +2861,100 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.wsSub = this.wsService.subscribeToSession(id).subscribe(s => {
       this.session = s;
       this.logEntries = s.log ?? [];
-      this.maybeOpenInitiativeModal(s);
+      this.syncLiveModal(s);
       this.scheduleAutofight();
+    });
+  }
+
+  /**
+   * Synchronisiert lokale Modal-Sichtbarkeit mit dem Server-State. Wird bei jedem Session-Update
+   * (HTTP/WS) aufgerufen. Öffnet das passende Modal lokal oder schließt alle, wenn der Server
+   * dismiss meldet.
+   */
+  private syncLiveModal(s: CombatSession): void {
+    const m = s.liveModal;
+    if (!m) return;
+    // Out-of-order-Broadcasts ignorieren: nur Versionen größer als die zuletzt gesehene anwenden.
+    if (m.version <= this.lastSeenModalVersion) return;
+    this.lastSeenModalVersion = m.version;
+    if (!m.type) {
+      // Dismiss → alle Result-Modale lokal schließen
+      this.closeAllResultModals();
+      return;
+    }
+    this.openLocalModalForType(m.type, m.payload);
+  }
+
+  private openLocalModalForType(type: string, payload: any): void {
+    // Vorher alle anderen Modale schließen, damit kein Stack entsteht.
+    this.closeAllResultModals();
+    switch (type) {
+      case 'ATTACK_RESULT':
+        this.lastResult = payload;
+        this.resultModal = { open: true, result: payload };
+        break;
+      case 'INITIATIVE': {
+        const round = payload?.round ?? 0;
+        if (round > this.shownInitiativeRound) this.shownInitiativeRound = round;
+        this.initiativeModal = { open: true, rolls: payload?.rolls ?? [], round };
+        break;
+      }
+      case 'TIGERSPRUNG':
+        this.tigersprungModal = { open: true, result: payload };
+        break;
+      case 'LUFTTANZ':
+        this.lufttanzModal = { open: true, result: payload };
+        break;
+      case 'TAUNT':
+        this.tauntModal = { open: true, result: payload };
+        break;
+      case 'DISTRACT':
+        this.distractModal = { open: true, result: payload };
+        break;
+      case 'ACROBATIC_DEFENSE':
+        this.acrobaticModal = { open: true, result: payload };
+        break;
+      case 'COMBAT_SENSE':
+        this.combatSenseModal = { open: true, result: payload };
+        break;
+      case 'IRON_WILL':
+        this.ironWillModal = { open: true, result: payload };
+        break;
+      case 'MANOEUVER':
+        this.manoeuverModal = { open: true, result: payload };
+        break;
+      case 'SPOT_ARMOR_FLAW':
+        this.spotArmorFlawModal = { open: true, result: payload };
+        break;
+    }
+  }
+
+  private closeAllResultModals(): void {
+    this.resultModal.open = false;
+    this.initiativeModal.open = false;
+    this.tigersprungModal.open = false;
+    this.lufttanzModal.open = false;
+    if (this.tauntModal) this.tauntModal.open = false;
+    if (this.distractModal) this.distractModal.open = false;
+    if (this.acrobaticModal) this.acrobaticModal.open = false;
+    if (this.combatSenseModal) this.combatSenseModal.open = false;
+    if (this.ironWillModal) this.ironWillModal.open = false;
+    if (this.manoeuverModal) this.manoeuverModal.open = false;
+    if (this.spotArmorFlawModal) this.spotArmorFlawModal.open = false;
+    if (this.dodgeModal) this.dodgeModal.open = false;
+    if (this.standUpModal) this.standUpModal.open = false;
+    if (this.threadweaveModal) this.threadweaveModal.open = false;
+    if (this.spellCastModal) this.spellCastModal.open = false;
+  }
+
+  /** Wird von allen "Schließen"-Buttons der Result-Modale aufgerufen. Backend bumpt Version → alle Clients schließen. */
+  dismissModal(): void {
+    if (!this.session) return;
+    // Sofortiges lokales Schließen für UX-Schnelligkeit; Server-Broadcast bestätigt es.
+    this.closeAllResultModals();
+    this.combatService.dismissModal(this.session.id).subscribe({
+      next: s => { this.session = s; this.lastSeenModalVersion = s.liveModal?.version ?? this.lastSeenModalVersion; },
+      error: err => { console.warn('Modal-Dismiss fehlgeschlagen:', err); }
     });
   }
 
@@ -2979,7 +3074,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   confirmDeclaration(c: CombatantState): void {
     if (!this.session) return;
     this.combatService.declareAction(this.session.id, c.id, c.declaredStance, c.declaredActionType)
-      .subscribe(s => { this.session = s; this.maybeOpenInitiativeModal(s); });
+      .subscribe(s => { this.session = s; this.syncLiveModal(s); });
   }
 
   undeclare(c: CombatantState): void {
@@ -3778,6 +3873,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   dismissAutofightModal(modal: { open: boolean }): void {
     if (!modal.open) return;
     modal.open = false;
+    // Synchronisiert: andere Zuschauer schließen ihr Modal ebenfalls über WS-Broadcast.
+    if (this.session) {
+      this.combatService.dismissModal(this.session.id).subscribe({
+        next: s => { this.session = s; this.lastSeenModalVersion = s.liveModal?.version ?? this.lastSeenModalVersion; },
+        error: () => { /* lokal bleibt geschlossen */ }
+      });
+    }
     this.scheduleAutofight();
   }
 

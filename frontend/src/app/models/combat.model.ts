@@ -120,6 +120,14 @@ export interface InitiativeRollDetail {
   bonusNotes?: string[];
 }
 
+export interface LiveModalState {
+  version: number;
+  /** null = aktuell kein Modal offen; string = Modal-Typ-Diskriminator (z.B. "ATTACK_RESULT"). */
+  type: string | null;
+  /** Result-DTO (varianten-typisiert je nach `type`). */
+  payload?: any;
+}
+
 export interface CombatSession {
   id: number;
   name: string;
@@ -133,6 +141,8 @@ export interface CombatSession {
   lastInitiativeRolls?: InitiativeRollDetail[];
   /** Rundennummer der letzten Initiative-Probe — Frontend triggert Modal bei Änderung. */
   lastInitiativeRollRound?: number;
+  /** Synchronisierter Modal-Status für alle Zuschauer (öffnen/schließen via WS). */
+  liveModal?: LiveModalState;
 }
 
 export interface AttackActionRequest {
