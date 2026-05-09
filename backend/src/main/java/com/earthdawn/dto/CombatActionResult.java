@@ -36,6 +36,8 @@ public class CombatActionResult {
     private List<String> attackBonusNotes;
     /** Notizen zu Schadensboni (z.B. "Schwachstelle erkennen +6 (noch 2 Runden)"). */
     private List<String> damageBonusNotes;
+    /** Notizen zur Verteidigung des Ziels (z.B. "Defensive Haltung +3", "Akrobatische Verteidigung +4"). */
+    private List<String> defenseNotes;
 
     /** Treffer, aber Schaden noch nicht angewandt — Ziel kann Ausweichen versuchen. */
     private boolean hitPendingDodge;

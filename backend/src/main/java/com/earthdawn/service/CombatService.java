@@ -224,6 +224,9 @@ public class CombatService {
                 attackBonusNotes.add(effect.getName() + " " + (v >= 0 ? "+" : "") + v);
             }
         }
+        if (attacker.getWounds() > 0) {
+            attackBonusNotes.add("Wunden −" + attacker.getWounds());
+        }
         int attackStep = modifiers.getEffectiveValue(attacker, StatType.ATTACK_STEP, atkCtx);
 
         if (req.getTalentId() != null) {
@@ -282,11 +285,26 @@ public class CombatService {
         // 4. Verteidigung
         TriggerContext defCtx = req.getActionType() == ActionType.RANGED_ATTACK
                 ? TriggerContext.ON_RANGED_DEFENSE : TriggerContext.ON_MELEE_DEFENSE;
+
+        // Verteidigungs-Effekte des Verteidigers sammeln (zur Anzeige)
+        java.util.List<String> defenseNotes = new java.util.ArrayList<>();
+        for (ActiveEffect effect : defender.getActiveEffects()) {
+            for (ModifierEntry mod : effect.getModifiers()) {
+                if (mod.getTargetStat() != StatType.PHYSICAL_DEFENSE) continue;
+                TriggerContext tc = mod.getTriggerContext();
+                if (tc != TriggerContext.ALWAYS && tc != defCtx) continue;
+                int v = (int) mod.getValue();
+                defenseNotes.add(effect.getName() + " " + (v >= 0 ? "+" : "") + v);
+            }
+        }
+
         int pd = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_DEFENSE, defCtx);
 
-        // Ausstehenden Verteidigungsbonus (z.B. Defensive Haltung) verbrauchen
+        // Ausstehenden Verteidigungsbonus (z.B. aus Manövrieren) verbrauchen — auch in Notes aufnehmen
         if (defender.getPendingDefenseBonus() != 0) {
-            pd += defender.getPendingDefenseBonus();
+            int pending = defender.getPendingDefenseBonus();
+            pd += pending;
+            defenseNotes.add("Manövrieren " + (pending >= 0 ? "+" : "") + pending);
             defender.setPendingDefenseBonus(0);
         }
 
@@ -303,6 +321,7 @@ public class CombatService {
                 .defenseValue(pd)
                 .hit(hit)
                 .attackBonusNotes(attackBonusNotes)
+                .defenseNotes(defenseNotes)
                 .blattschussActive(blattschussActive)
                 .blattschussRank(blattschussRank);
 
@@ -338,29 +357,37 @@ public class CombatService {
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
 
-            // Ziel-spezifische Schadensboni (Schwachstelle erkennen) — nur bei physischen Angriffen.
-            // Zauberwürfe laufen über SpellService und sind dadurch automatisch ausgeschlossen.
+            // Schadensboni sammeln und (für ziel-spezifische Effekte) auch auf damageStep addieren.
+            // Nicht-zielgebundene DAMAGE_STEP-Modifikatoren sind bereits via ModifierAggregator
+            // in damageStep eingerechnet — wir listen sie nur zur Anzeige.
             java.util.List<String> damageBonusNotes = new java.util.ArrayList<>();
-            if (req.getActionType() == ActionType.MELEE_ATTACK || req.getActionType() == ActionType.RANGED_ATTACK) {
-                Long defenderId = defender.getId();
-                for (ActiveEffect eff : attacker.getActiveEffects()) {
-                    if (eff.getTargetCombatantId() == null) continue;
-                    if (!eff.getTargetCombatantId().equals(defenderId)) continue;
-                    int effectBonus = 0;
-                    for (ModifierEntry mod : eff.getModifiers()) {
-                        if (mod.getTargetStat() != StatType.DAMAGE_STEP) continue;
-                        TriggerContext tc = mod.getTriggerContext();
-                        if (tc != TriggerContext.ALWAYS && tc != TriggerContext.ON_DAMAGE_DEALT) continue;
-                        effectBonus += (int) mod.getValue();
-                    }
-                    if (effectBonus != 0) {
-                        damageStep += effectBonus;
-                        String suffix = eff.getRemainingRounds() > 0
-                                ? " (noch " + eff.getRemainingRounds() + " Runden)"
-                                : eff.getRemainingRounds() < 0 ? " (permanent)" : "";
-                        damageBonusNotes.add(eff.getName() + " " + (effectBonus >= 0 ? "+" : "") + effectBonus + suffix);
-                    }
+            for (ActiveEffect eff : attacker.getActiveEffects()) {
+                int effectBonus = 0;
+                for (ModifierEntry mod : eff.getModifiers()) {
+                    if (mod.getTargetStat() != StatType.DAMAGE_STEP) continue;
+                    TriggerContext tc = mod.getTriggerContext();
+                    if (tc != TriggerContext.ALWAYS && tc != TriggerContext.ON_DAMAGE_DEALT) continue;
+                    effectBonus += (int) mod.getValue();
                 }
+                if (effectBonus == 0) continue;
+
+                boolean isTargetSpecific = eff.getTargetCombatantId() != null;
+                if (isTargetSpecific) {
+                    // Ziel-spezifisch: nur anwenden, wenn das Ziel passt UND nur bei physischen Angriffen
+                    if (req.getActionType() != ActionType.MELEE_ATTACK && req.getActionType() != ActionType.RANGED_ATTACK) continue;
+                    if (!eff.getTargetCombatantId().equals(defender.getId())) continue;
+                    damageStep += effectBonus;
+                    String suffix = eff.getRemainingRounds() > 0
+                            ? " (noch " + eff.getRemainingRounds() + " Runden)"
+                            : eff.getRemainingRounds() < 0 ? " (permanent)" : "";
+                    damageBonusNotes.add(eff.getName() + " " + (effectBonus >= 0 ? "+" : "") + effectBonus + suffix);
+                } else {
+                    // Nicht-zielgebunden: bereits in damageStep — nur Notiz hinzufügen
+                    damageBonusNotes.add(eff.getName() + " " + (effectBonus >= 0 ? "+" : "") + effectBonus);
+                }
+            }
+            if (attacker.getWounds() > 0) {
+                damageBonusNotes.add("Wunden −" + attacker.getWounds());
             }
             result.damageBonusNotes(damageBonusNotes);
 

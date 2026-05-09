@@ -495,6 +495,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <div class="roll-effect-notes" *ngIf="r.attackBonusNotes?.length">
               <span class="effect-note" *ngFor="let note of r.attackBonusNotes">✦ {{ note }}</span>
             </div>
+            <div class="roll-effect-notes" *ngIf="r.defenseNotes?.length">
+              <span class="effect-note defense-note" *ngFor="let note of r.defenseNotes">🛡 {{ note }}</span>
+            </div>
           </div>
           <ng-container *ngIf="r.hit && r.damageRoll && !r.hitPendingDodge">
             <div class="roll-divider"></div>
@@ -2431,6 +2434,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .roll-effect-notes { display: flex; flex-wrap: wrap; gap: 4px; }
     .effect-note { font-size: 0.75rem; color: #c9a84c; background: rgba(201,168,76,0.08); border-radius: 10px; padding: 1px 8px; }
     .effect-note.damage-note { color: #80cbc4; background: rgba(128,203,196,0.1); }
+    .effect-note.defense-note { color: #90caf9; background: rgba(144,202,249,0.1); }
 
     .aggressive-active-badge {
       display: flex; align-items: center; gap: 6px;

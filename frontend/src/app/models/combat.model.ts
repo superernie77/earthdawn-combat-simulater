@@ -177,6 +177,8 @@ export interface CombatActionResult {
   attackBonusNotes?: string[];
   /** Notizen zu Schadensboni (z.B. "Schwachstelle erkennen vs X +6 (noch 2 Runden)"). */
   damageBonusNotes?: string[];
+  /** Notizen zur Verteidigung des Ziels (z.B. "Defensive Haltung +3"). */
+  defenseNotes?: string[];
   hitPendingDodge?: boolean;
   dodgeDefenderId?: number;
   pendingDodgeDamage?: number;
