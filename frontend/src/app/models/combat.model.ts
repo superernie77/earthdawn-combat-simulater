@@ -164,6 +164,12 @@ export interface CombatActionResult {
   hit: boolean;
   extraSuccesses?: number;
   damageStep?: number;
+  /** STR-Stufe nach Wundenabzug (ohne Effekte). */
+  damageStrengthStep?: number;
+  /** Waffenbonus auf Schadensstufe. */
+  damageWeaponBonus?: number;
+  /** Waffenname (zur Anzeige). */
+  damageWeaponName?: string;
   damageRoll?: RollResult;
   /** Karma-Würfel auf den Schadenswurf (nur bei Krallenhand). */
   damageKarmaRoll?: RollResult;

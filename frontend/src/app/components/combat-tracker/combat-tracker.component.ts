@@ -510,8 +510,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               <div class="roll-block-header">
                 <span class="roll-block-label">
                   Schaden · Step {{ r.damageStep }}
-                  <span class="step-calc" *ngIf="r.extraSuccesses && r.extraSuccesses > 0">
-                    ({{ r.damageStep! - r.extraSuccesses * 2 }} + {{ r.extraSuccesses * 2 }} Übererfolge)
+                  <span class="step-calc">
+                    ({{ r.damageStrengthStep ?? 0 }} STR<span *ngIf="(r.damageWeaponBonus ?? 0) !== 0">
+                      + {{ r.damageWeaponBonus }}<span *ngIf="r.damageWeaponName"> {{ r.damageWeaponName }}</span></span><span *ngIf="r.extraSuccesses && r.extraSuccesses > 0">
+                      + {{ r.extraSuccesses * 2 }} Übererfolge</span>)
                   </span>
                 </span>
                 <div class="roll-block-totals">

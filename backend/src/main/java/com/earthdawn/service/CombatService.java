@@ -356,6 +356,9 @@ public class CombatService {
 
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
+            // STR-Stufe (nach Wundenabzug, ohne Aktive-Effekte) zur Anzeige festhalten
+            int damageStrengthStep = Math.max(1,
+                    diceService.attributeToStep(attacker.getCharacter().getStrength()) - attacker.getWounds());
 
             // Schadensboni sammeln und (für ziel-spezifische Effekte) auch auf damageStep addieren.
             // Nicht-zielgebundene DAMAGE_STEP-Modifikatoren sind bereits via ModifierAggregator
@@ -392,15 +395,22 @@ public class CombatService {
             result.damageBonusNotes(damageBonusNotes);
 
             boolean weaponIsClaw = false;
+            int weaponBonus = 0;
+            String weaponName = null;
             if (req.getWeaponId() != null) {
                 com.earthdawn.model.Equipment weapon = attacker.getCharacter().getEquipment().stream()
                         .filter(e -> e.getId().equals(req.getWeaponId()))
                         .findFirst().orElse(null);
                 if (weapon != null) {
                     damageStep += weapon.getDamageBonus();
+                    weaponBonus = weapon.getDamageBonus();
+                    weaponName = weapon.getName();
                     weaponIsClaw = weapon.isClawWeapon();
                 }
             }
+            result.damageStrengthStep(damageStrengthStep)
+                  .damageWeaponBonus(weaponBonus)
+                  .damageWeaponName(weaponName);
             damageStep += extraSuccesses * 2;
 
             RollResult damageRoll = diceService.roll(damageStep);

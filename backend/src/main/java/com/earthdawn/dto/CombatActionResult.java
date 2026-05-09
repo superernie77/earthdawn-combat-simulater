@@ -22,6 +22,12 @@ public class CombatActionResult {
 
     private int extraSuccesses;
     private int damageStep;
+    /** Anteil der Schadensstufe aus der Stärkestufe (nach Wundenabzug). */
+    private int damageStrengthStep;
+    /** Anteil der Schadensstufe aus dem Waffenbonus. */
+    private int damageWeaponBonus;
+    /** Waffenname (zur Anzeige), falls eine Waffe gewählt wurde. */
+    private String damageWeaponName;
     private RollResult damageRoll;
     /** Karma-Würfel auf den Schadenswurf (nur bei Krallenhand möglich). */
     private RollResult damageKarmaRoll;
