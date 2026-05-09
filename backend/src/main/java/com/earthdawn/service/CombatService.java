@@ -147,6 +147,30 @@ public class CombatService {
             if (c.isDefeated()) continue;
             RollResult roll = rollsById.get(c.getId());
             if (roll == null) continue;
+
+            // Aktive Effekte sammeln, die ON_INITIATIVE/ALWAYS auf INITIATIVE_STEP wirken
+            java.util.List<String> bonusNotes = new java.util.ArrayList<>();
+            for (ActiveEffect effect : c.getActiveEffects()) {
+                for (ModifierEntry mod : effect.getModifiers()) {
+                    if (mod.getTargetStat() != StatType.INITIATIVE_STEP) continue;
+                    TriggerContext tc = mod.getTriggerContext();
+                    if (tc != TriggerContext.ALWAYS && tc != TriggerContext.ON_INITIATIVE) continue;
+                    int v = (int) mod.getValue();
+                    bonusNotes.add(effect.getName() + " " + (v >= 0 ? "+" : "") + v);
+                }
+            }
+            // Wunden + Rüstungs-/Schild-Initiative-Malus zur Anzeige
+            if (c.getWounds() > 0) {
+                bonusNotes.add("Wunden −" + c.getWounds());
+            }
+            int armorPenalty = c.getCharacter().getEquipment().stream()
+                    .filter(e -> e.getType() == EquipmentType.ARMOR || e.getType() == EquipmentType.SHIELD)
+                    .mapToInt(Equipment::getInitiativePenalty)
+                    .sum();
+            if (armorPenalty > 0) {
+                bonusNotes.add("Rüstungsmalus −" + armorPenalty);
+            }
+
             details.add(InitiativeRollDetail.builder()
                     .combatantId(c.getId())
                     .combatantName(c.getCharacter().getName())
@@ -155,6 +179,7 @@ public class CombatService {
                     .roll(roll)
                     .total(roll.getTotal())
                     .order(c.getInitiativeOrder())
+                    .bonusNotes(bonusNotes)
                     .build());
         }
         session.setLastInitiativeRolls(details);

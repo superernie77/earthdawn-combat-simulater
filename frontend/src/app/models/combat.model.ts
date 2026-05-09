@@ -116,6 +116,8 @@ export interface InitiativeRollDetail {
   roll: RollResult;
   total: number;
   order: number;
+  /** Aktive Effekte mit Auswirkung auf die Initiative-Probe (z.B. "Tigersprung +3"). */
+  bonusNotes?: string[];
 }
 
 export interface CombatSession {

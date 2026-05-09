@@ -891,6 +891,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <span *ngIf="d.exploded" class="explode-mini">💥</span>
                 </div>
               </div>
+              <div class="init-effects" *ngIf="r.bonusNotes?.length">
+                <span class="init-effect-chip" *ngFor="let n of r.bonusNotes">✦ {{ n }}</span>
+              </div>
             </div>
             <div class="init-total">{{ r.total }}</div>
           </div>
@@ -2536,6 +2539,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .init-total {
       font-size: 1.6rem; font-weight: 800; color: #ffcc00;
       min-width: 56px; text-align: right;
+    }
+    .init-effects { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .init-effect-chip {
+      font-size: 0.72rem; color: #c9a84c;
+      background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.3);
+      border-radius: 10px; padding: 1px 8px;
     }
     .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
