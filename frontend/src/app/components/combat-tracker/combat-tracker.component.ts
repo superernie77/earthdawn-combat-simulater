@@ -512,7 +512,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   Schaden · Step {{ r.damageStep }}
                   <span class="step-calc">
                     ({{ r.damageStrengthStep ?? 0 }} STR<span *ngIf="(r.damageWeaponBonus ?? 0) !== 0">
-                      + {{ r.damageWeaponBonus }}<span *ngIf="r.damageWeaponName"> {{ r.damageWeaponName }}</span></span><span *ngIf="r.extraSuccesses && r.extraSuccesses > 0">
+                      + {{ r.damageWeaponBonus }}<span *ngIf="r.damageWeaponName"> {{ r.damageWeaponName }}</span></span><span *ngIf="(r.damageWoundPenalty ?? 0) > 0">
+                      − {{ r.damageWoundPenalty }} Wunden</span><span *ngIf="r.extraSuccesses && r.extraSuccesses > 0">
                       + {{ r.extraSuccesses * 2 }} Übererfolge</span>)
                   </span>
                 </span>

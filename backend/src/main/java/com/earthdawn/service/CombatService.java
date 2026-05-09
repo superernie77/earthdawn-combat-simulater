@@ -356,9 +356,9 @@ public class CombatService {
 
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
-            // STR-Stufe (nach Wundenabzug, ohne Aktive-Effekte) zur Anzeige festhalten
-            int damageStrengthStep = Math.max(1,
-                    diceService.attributeToStep(attacker.getCharacter().getStrength()) - attacker.getWounds());
+            // Rohe STR-Stufe + Wundenabzug separat (für Klammer-Breakdown im UI)
+            int damageStrengthStepRaw = diceService.attributeToStep(attacker.getCharacter().getStrength());
+            int damageWoundPenalty = attacker.getWounds();
 
             // Schadensboni sammeln und (für ziel-spezifische Effekte) auch auf damageStep addieren.
             // Nicht-zielgebundene DAMAGE_STEP-Modifikatoren sind bereits via ModifierAggregator
@@ -389,9 +389,7 @@ public class CombatService {
                     damageBonusNotes.add(eff.getName() + " " + (effectBonus >= 0 ? "+" : "") + effectBonus);
                 }
             }
-            if (attacker.getWounds() > 0) {
-                damageBonusNotes.add("Wunden −" + attacker.getWounds());
-            }
+            // Wundenabzug NICHT als Chip hinzufügen — wird im Klammer-Breakdown unter dem Schaden-Step gezeigt.
             result.damageBonusNotes(damageBonusNotes);
 
             boolean weaponIsClaw = false;
@@ -408,7 +406,8 @@ public class CombatService {
                     weaponIsClaw = weapon.isClawWeapon();
                 }
             }
-            result.damageStrengthStep(damageStrengthStep)
+            result.damageStrengthStep(damageStrengthStepRaw)
+                  .damageWoundPenalty(damageWoundPenalty)
                   .damageWeaponBonus(weaponBonus)
                   .damageWeaponName(weaponName);
             damageStep += extraSuccesses * 2;

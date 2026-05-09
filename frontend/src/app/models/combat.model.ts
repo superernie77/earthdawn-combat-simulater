@@ -164,8 +164,10 @@ export interface CombatActionResult {
   hit: boolean;
   extraSuccesses?: number;
   damageStep?: number;
-  /** STR-Stufe nach Wundenabzug (ohne Effekte). */
+  /** Rohe STR-Stufe (ohne Wundenabzug — wird separat angezeigt). */
   damageStrengthStep?: number;
+  /** Wundenabzug auf den Schaden. */
+  damageWoundPenalty?: number;
   /** Waffenbonus auf Schadensstufe. */
   damageWeaponBonus?: number;
   /** Waffenname (zur Anzeige). */

@@ -22,8 +22,10 @@ public class CombatActionResult {
 
     private int extraSuccesses;
     private int damageStep;
-    /** Anteil der Schadensstufe aus der Stärkestufe (nach Wundenabzug). */
+    /** Roher STR-Step (ohne Wundenabzug) — die Wunden werden separat im Breakdown angezeigt. */
     private int damageStrengthStep;
+    /** Wundenabzug auf den Schaden (Anzeige in der Klammer). */
+    private int damageWoundPenalty;
     /** Anteil der Schadensstufe aus dem Waffenbonus. */
     private int damageWeaponBonus;
     /** Waffenname (zur Anzeige), falls eine Waffe gewählt wurde. */
