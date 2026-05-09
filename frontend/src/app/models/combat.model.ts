@@ -108,6 +108,16 @@ export interface CombatLog {
   success: boolean;
 }
 
+export interface InitiativeRollDetail {
+  combatantId: number;
+  combatantName: string;
+  npc: boolean;
+  step: number;
+  roll: RollResult;
+  total: number;
+  order: number;
+}
+
 export interface CombatSession {
   id: number;
   name: string;
@@ -117,6 +127,10 @@ export interface CombatSession {
   createdAt: string;
   combatants: CombatantState[];
   log: CombatLog[];
+  /** Letzte Initiative-Probe (Detail-Liste für UI-Modal). */
+  lastInitiativeRolls?: InitiativeRollDetail[];
+  /** Rundennummer der letzten Initiative-Probe — Frontend triggert Modal bei Änderung. */
+  lastInitiativeRollRound?: number;
 }
 
 export interface AttackActionRequest {

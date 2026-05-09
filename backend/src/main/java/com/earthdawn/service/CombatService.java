@@ -124,11 +124,16 @@ public class CombatService {
     }
 
     private String rerollInitiative(CombatSession session) {
+        // Würfeln pro Kombattant + temporär Rolls speichern für UI-Modal
+        java.util.Map<Long, RollResult> rollsById = new java.util.HashMap<>();
+        java.util.Map<Long, Integer> stepsById = new java.util.HashMap<>();
         for (CombatantState combatant : session.getCombatants()) {
             if (combatant.isDefeated()) continue;
             int initStep = modifiers.getEffectiveValue(combatant, StatType.INITIATIVE_STEP, TriggerContext.ON_INITIATIVE);
             RollResult roll = diceService.roll(initStep);
             combatant.setInitiative(roll.getTotal());
+            rollsById.put(combatant.getId(), roll);
+            stepsById.put(combatant.getId(), initStep);
         }
         session.getCombatants().sort(Comparator
                 .comparingInt(CombatantState::getInitiative).reversed()
@@ -136,6 +141,24 @@ public class CombatService {
         for (int i = 0; i < session.getCombatants().size(); i++) {
             session.getCombatants().get(i).setInitiativeOrder(i);
         }
+        // Detail-Liste für UI in finaler Reihenfolge bauen
+        java.util.List<InitiativeRollDetail> details = new java.util.ArrayList<>();
+        for (CombatantState c : session.getCombatants()) {
+            if (c.isDefeated()) continue;
+            RollResult roll = rollsById.get(c.getId());
+            if (roll == null) continue;
+            details.add(InitiativeRollDetail.builder()
+                    .combatantId(c.getId())
+                    .combatantName(c.getCharacter().getName())
+                    .npc(c.isNpc())
+                    .step(stepsById.getOrDefault(c.getId(), 0))
+                    .roll(roll)
+                    .total(roll.getTotal())
+                    .order(c.getInitiativeOrder())
+                    .build());
+        }
+        session.setLastInitiativeRolls(details);
+        session.setLastInitiativeRollRound(session.getRound());
         // Zusammenfassung für den Log
         StringBuilder sb = new StringBuilder("Reihenfolge: ");
         session.getCombatants().stream()

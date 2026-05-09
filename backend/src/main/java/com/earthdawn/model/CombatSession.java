@@ -1,5 +1,6 @@
 package com.earthdawn.model;
 
+import com.earthdawn.dto.InitiativeRollDetail;
 import com.earthdawn.model.enums.CombatPhase;
 import com.earthdawn.model.enums.CombatStatus;
 import jakarta.persistence.*;
@@ -48,4 +49,17 @@ public class CombatSession {
     @OrderBy("id DESC")
     @Builder.Default
     private List<CombatLog> log = new ArrayList<>();
+
+    /**
+     * Letzte Initiative-Probe (pro Kombattant: Würfel + Total + Reihenfolge). Wird bei jeder
+     * Initiative-Probe gesetzt und über WebSocket mit der Session verteilt — damit das Frontend
+     * ein Detail-Modal zeigen kann. Nicht persistiert.
+     */
+    @Transient
+    private List<InitiativeRollDetail> lastInitiativeRolls;
+
+    /** Rundennummer, in der die letzte Initiative-Probe gewürfelt wurde — für UI-Trigger. Nicht persistiert. */
+    @Transient
+    @Builder.Default
+    private int lastInitiativeRollRound = 0;
 }

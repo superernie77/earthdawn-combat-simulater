@@ -32,7 +32,8 @@ import {
   TigersprungResult,
   ZweitwaffeRequest,
   SpotArmorFlawRequest, SpotArmorFlawResult,
-  LufttanzActivationResult, LufttanzAttackRequest
+  LufttanzActivationResult, LufttanzAttackRequest,
+  InitiativeRollDetail
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -863,6 +864,41 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </div>
         </div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="manoeuverModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Initiative Roll Modal — alle Kombattanten in einer Übersicht -->
+    <div class="result-modal" *ngIf="initiativeModal.open">
+      <div class="dialog-backdrop" (click)="initiativeModal.open = false"></div>
+      <div class="dialog-box result-box initiative-modal-box">
+        <div class="result-outcome hit">
+          <mat-icon>casino</mat-icon>
+          INITIATIVE — Runde {{ initiativeModal.round }}
+        </div>
+        <div class="initiative-list">
+          <div class="initiative-row" *ngFor="let r of initiativeModal.rolls; let i = index">
+            <div class="init-order">#{{ i + 1 }}</div>
+            <div class="init-info">
+              <div class="init-name" [style.color]="nameColor(r.combatantName)">
+                {{ r.combatantName }}
+                <span class="init-tag" [class.npc]="r.npc" [class.hero]="!r.npc">{{ r.npc ? 'NPC' : 'Held' }}</span>
+              </div>
+              <div class="init-step">Stufe {{ r.step }} ({{ r.roll.diceExpression }})</div>
+              <div class="dice-breakdown-mini init-dice">
+                <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                  <span class="die-mini-sides">W{{ d.sides }}</span>
+                  <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                  <span *ngIf="d.exploded" class="explode-mini">💥</span>
+                </div>
+              </div>
+            </div>
+            <div class="init-total">{{ r.total }}</div>
+          </div>
+        </div>
+        <button mat-raised-button color="primary" style="width:100%;margin-top:16px"
+                (click)="initiativeModal.open = false">
+          Auf zur Aktion!
+        </button>
       </div>
     </div>
 
@@ -2482,6 +2518,25 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.blattschuss-pending-btn { color: #fff; background: #66bb6a; }
     .combat-option-btn.blattschuss-pending-btn:hover:not([disabled]) { background: #4caf50; }
     .karma-toggle.blattschuss-toggle.active { color: #a5d6a7; border-color: #a5d6a7; background: rgba(165,214,167,0.15); }
+
+    .initiative-modal-box { max-width: 640px; }
+    .initiative-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 60vh; overflow-y: auto; }
+    .initiative-row {
+      display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center;
+      background: #1e1a16; border: 1px solid #2a2218; border-radius: 8px; padding: 10px 14px;
+    }
+    .init-order { font-size: 1.1rem; font-weight: 700; color: #c9a84c; text-align: center; }
+    .init-info { min-width: 0; }
+    .init-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+    .init-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; font-weight: 700; }
+    .init-tag.hero { color: #66bb6a; background: rgba(102,187,106,0.12); }
+    .init-tag.npc { color: #ef5350; background: rgba(239,83,80,0.12); }
+    .init-step { font-size: 0.78rem; color: #888; margin: 2px 0 4px; }
+    .init-dice { gap: 6px; flex-wrap: wrap; }
+    .init-total {
+      font-size: 1.6rem; font-weight: 800; color: #ffcc00;
+      min-width: 56px; text-align: right;
+    }
     .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
@@ -2766,12 +2821,17 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     private snack: MatSnackBar
   ) {}
 
+  /** Letzte Runde, für die das Initiative-Modal bereits angezeigt wurde — verhindert Doppel-Trigger (HTTP + WS). */
+  private shownInitiativeRound = 0;
+  initiativeModal: { open: boolean; rolls?: InitiativeRollDetail[]; round?: number } = { open: false };
+
   ngOnInit(): void {
     const id = +this.route.snapshot.params['id'];
     this.combatService.findById(id).subscribe({
       next: s => {
         this.session = s;
         this.logEntries = s.log ?? [];
+        this.maybeOpenInitiativeModal(s);
       },
       error: err => {
         this.loadError = `Session konnte nicht geladen werden (${err.status ?? err.message}).`;
@@ -2782,8 +2842,21 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.wsSub = this.wsService.subscribeToSession(id).subscribe(s => {
       this.session = s;
       this.logEntries = s.log ?? [];
+      this.maybeOpenInitiativeModal(s);
       this.scheduleAutofight();
     });
+  }
+
+  /**
+   * Öffnet das Initiative-Modal, wenn die Session eine neue Initiative-Probe meldet
+   * (lastInitiativeRollRound > zuletzt gezeigte Runde + Rolls vorhanden).
+   */
+  private maybeOpenInitiativeModal(s: CombatSession): void {
+    const round = s.lastInitiativeRollRound ?? 0;
+    if (round > this.shownInitiativeRound && (s.lastInitiativeRolls?.length ?? 0) > 0) {
+      this.shownInitiativeRound = round;
+      this.initiativeModal = { open: true, rolls: s.lastInitiativeRolls, round };
+    }
   }
 
   ngOnDestroy(): void {
@@ -2890,7 +2963,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   confirmDeclaration(c: CombatantState): void {
     if (!this.session) return;
     this.combatService.declareAction(this.session.id, c.id, c.declaredStance, c.declaredActionType)
-      .subscribe(s => this.session = s);
+      .subscribe(s => { this.session = s; this.maybeOpenInitiativeModal(s); });
   }
 
   undeclare(c: CombatantState): void {
