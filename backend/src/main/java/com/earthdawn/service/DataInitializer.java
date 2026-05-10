@@ -49,6 +49,7 @@ public class DataInitializer {
             migrateGeisterbeschwoererSpells();
             cleanupUnimplementedTalents();
             migrateExtraSuccessEffects();
+            migrateUtilityTalents();
             return;
         }
         log.info("Initialisiere Earthdawn Referenzdaten...");
@@ -360,7 +361,7 @@ public class DataInitializer {
      */
     private void cleanupUnimplementedTalents() {
         java.util.List<String> toRemove = java.util.List.of(
-            "Initiative", "Schlossknacken", "Schleichen", "Klettern",
+            "Initiative", "Schlossknacken", "Schleichen",
             "Schwimmen", "Zähigkeit", "Arkane Waffe", "Fadenmagie", "Erste Hilfe",
             "Tiergespür", "Überzeugung", "Einschüchterung", "Meditation",
             "Standhalten", "Wissensmagie"
@@ -1124,6 +1125,94 @@ public class DataInitializer {
                 StatType.INITIATIVE_STEP, ModifierOperation.ADD, -4.0, TriggerContext.ALWAYS, 3));
 
         log.info("50 Geisterbeschwörer-Zauber migriert.");
+    }
+
+    /**
+     * Idempotente Migration: fügt Utility-Talente hinzu, die nicht kampfrelevant sind,
+     * aber im Dice Roller zur Auswahl stehen sollen.
+     */
+    private void migrateUtilityTalents() {
+        if (talentRepo.findByName("Aufmerksamkeit").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Aufmerksamkeit")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Bemerkt Details und verborgene Dinge in der Umgebung. WAH + Rang vs. Schwierigkeitswert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Aufmerksamkeit' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Heimlicher Schritt").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Heimlicher Schritt")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Bewegt sich lautlos und unbemerkt. GES + Rang vs. Wahrnehmung des Beobachters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Heimlicher Schritt' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Mystische Verfolgung").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Mystische Verfolgung")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Verfolgt magische Spuren und Astrallinien. WAH + Rang vs. Schwierigkeitswert der Spur.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Mystische Verfolgung' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Klettern").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Klettern")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Erklettert Oberflächen und Hindernisse. GES + Rang vs. Schwierigkeitswert der Oberfläche.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Klettern' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Spurenlesen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Spurenlesen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Findet und verfolgt physische Spuren. WAH + Rang vs. Schwierigkeitswert der Spur.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Spurenlesen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Wildnis Überleben").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Wildnis Überleben")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Überlebt in der Wildnis: Nahrung, Unterschlupf, Navigation. WAH + Rang vs. Schwierigkeitswert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Wildnis Überleben' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Waffen Schmieden").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Waffen Schmieden")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Fertigt und repariert Waffen. STR + Rang vs. Schwierigkeitswert der Waffe.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Waffen Schmieden' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Tierfreundschaft").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Tierfreundschaft")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Beruhigt und beeinflusst Tiere. CHA + Rang vs. Soziale Verteidigung des Tieres.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Tierfreundschaft' hinzugefügt.");
+        }
+        log.info("Utility-Talente migriert.");
     }
 
 }
