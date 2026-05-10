@@ -57,6 +57,10 @@ import { Character } from '../../models/character.model';
               <div class="discipline-info">
                 Karma: W6 (fix)
               </div>
+              <div class="wound-status" *ngIf="woundPenalty() > 0">
+                <mat-icon style="font-size:14px;height:14px;width:14px">bolt</mat-icon>
+                {{ woundPenalty() }} {{ woundPenalty() === 1 ? 'Wunde' : 'Wunden' }} → −{{ woundPenalty() }} auf alle Würfe
+              </div>
             </div>
           </div>
         </div>
@@ -206,6 +210,9 @@ import { Character } from '../../models/character.model';
               <div>Step {{ lastProbeResult.step }} · {{ lastProbeResult.diceExpression }}
                 <span *ngIf="lastProbeResult.karmaUsed" style="color:#c9a84c"> + Karma W6</span>
               </div>
+              <div *ngIf="(lastProbeResult.woundPenalty ?? 0) > 0" class="wound-chip">
+                Wunden −{{ lastProbeResult.woundPenalty }}
+              </div>
               <div>TN {{ lastProbeResult.targetNumber }}</div>
               <div class="success-degree" [ngClass]="degreeClass(lastProbeResult)">
                 {{ lastProbeResult.successDegree }}
@@ -237,6 +244,9 @@ import { Character } from '../../models/character.model';
             <div class="result-meta">
               <div>Step {{ lastRoll.step }} · {{ lastRoll.diceExpression }}
                 <span *ngIf="lastKarmaRoll" style="color:#c9a84c"> + Karma W6</span>
+              </div>
+              <div *ngIf="woundPenalty() > 0" class="wound-chip">
+                Wunden −{{ woundPenalty() }} (auf Step {{ step }} → roll {{ lastRoll.step }})
               </div>
               <div *ngIf="lastKarmaRoll" class="karma-breakdown">
                 Basis: {{ lastRoll.total }} + Karma: {{ lastKarmaRoll.total }} = {{ totalWithKarma() }}
@@ -359,6 +369,15 @@ import { Character } from '../../models/character.model';
       &.low { color: #f44336; }
     }
     .discipline-info { font-size: 0.75rem; color: #666; margin-top: 2px; }
+    .wound-status {
+      display: flex; align-items: center; gap: 4px; font-size: 0.78rem;
+      color: #ef5350; margin-top: 4px;
+    }
+    .wound-chip {
+      display: inline-block; font-size: 0.78rem; color: #ef5350;
+      background: rgba(239,83,80,0.1); border: 1px solid rgba(239,83,80,0.3);
+      border-radius: 10px; padding: 2px 8px; margin-top: 4px;
+    }
 
     .karma-section { }
     .karma-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -597,7 +616,8 @@ export class DiceRollerComponent implements OnInit {
 
   roll(): void {
     const stepBonus = this.aggressiveAttack ? 3 : this.defensiveStance ? -3 : 0;
-    const rollStep = Math.max(1, this.step + stepBonus);
+    const wounds = this.woundPenalty();
+    const rollStep = Math.max(1, this.step + stepBonus - wounds);
     const wasAggressive = this.aggressiveAttack;
     const wasDefensive = this.defensiveStance;
     this.aggressiveAttack = false;
@@ -671,7 +691,13 @@ export class DiceRollerComponent implements OnInit {
   }
 
   probeStepFor(attribute: string, rank: number): number {
-    return this.attrToStep(this.attrValue(attribute)) + rank;
+    const wounds = this.activeChar?.wounds ?? 0;
+    return Math.max(1, this.attrToStep(this.attrValue(attribute)) + rank - wounds);
+  }
+
+  /** Wunden des aktiven Charakters zur Anzeige (Wundenmalus auf Würfe). */
+  woundPenalty(): number {
+    return this.activeChar?.wounds ?? 0;
   }
 
   selectProbe(type: 'talent' | 'skill', id: number, name: string, step: number): void {

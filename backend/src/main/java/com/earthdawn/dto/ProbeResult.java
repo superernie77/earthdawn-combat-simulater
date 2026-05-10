@@ -20,4 +20,6 @@ public class ProbeResult {
     private String successDegree;
     private boolean karmaUsed;
     private RollResult karmaRoll;
+    /** Wundenmalus, der bereits in 'step' eingerechnet wurde — zur Anzeige im Result-Panel. */
+    private int woundPenalty;
 }

@@ -25,6 +25,7 @@ public class ProbeService {
 
         int baseStep;
         String probeName;
+        int wounds = character.getWounds();
 
         if (req.getTalentId() != null) {
             CharacterTalent ct = character.getTalents().stream()
@@ -33,7 +34,7 @@ public class ProbeService {
                     .orElseThrow(() -> new EntityNotFoundException("Talent nicht auf Charakter: " + req.getTalentId()));
 
             int attrValue = getAttributeValue(character, ct.getTalentDefinition().getAttribute());
-            baseStep = diceService.attributeToStep(attrValue) + ct.getRank() + req.getBonusSteps();
+            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + ct.getRank() + req.getBonusSteps() - wounds);
             probeName = ct.getTalentDefinition().getName() + " (Rang " + ct.getRank() + ")";
 
         } else if (req.getSkillId() != null) {
@@ -43,7 +44,7 @@ public class ProbeService {
                     .orElseThrow(() -> new EntityNotFoundException("Fertigkeit nicht auf Charakter: " + req.getSkillId()));
 
             int attrValue = getAttributeValue(character, cs.getSkillDefinition().getAttribute());
-            baseStep = diceService.attributeToStep(attrValue) + cs.getRank() + req.getBonusSteps();
+            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + cs.getRank() + req.getBonusSteps() - wounds);
             probeName = cs.getSkillDefinition().getName() + " (Rang " + cs.getRank() + ")";
 
         } else {
@@ -77,6 +78,7 @@ public class ProbeService {
                 .successDegree(getSuccessDegree(success, extraSuccesses))
                 .karmaUsed(karmaRoll != null)
                 .karmaRoll(karmaRoll)
+                .woundPenalty(wounds)
                 .build();
     }
 

@@ -34,4 +34,6 @@ export interface ProbeResult {
   successDegree: string;
   karmaUsed: boolean;
   karmaRoll?: RollResult;
+  /** Wundenmalus, der bereits in 'step' eingerechnet wurde — zur Anzeige. */
+  woundPenalty?: number;
 }
