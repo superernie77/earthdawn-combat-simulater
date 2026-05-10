@@ -14,6 +14,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DiceService } from '../../services/dice.service';
 import { CharacterService } from '../../services/character.service';
 import { ActiveCharacterService } from '../../services/active-character.service';
+import { ActiveUserService } from '../../services/active-user.service';
 import { RollResult, ProbeResult } from '../../models/dice.model';
 import { Character } from '../../models/character.model';
 
@@ -531,11 +532,16 @@ export class DiceRollerComponent implements OnInit {
     private diceService: DiceService,
     private characterService: CharacterService,
     private activeCharService: ActiveCharacterService,
+    private activeUserService: ActiveUserService,
     private snack: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    this.characterService.findAll().subscribe(c => this.allCharacters = c);
+    this.characterService.findAll().subscribe(c => {
+      // Spielleiter-Charaktere für Nicht-GMs ausblenden (analog zur Charakter-Liste)
+      const isGm = this.activeUserService.activeUser?.gamemaster === true;
+      this.allCharacters = isGm ? c : c.filter(ch => !ch.gmCharacter);
+    });
 
     // Aktiven Charakter aus globalem Service übernehmen — immer frisch vom Backend laden.
     // KEIN activeCharService.update() hier aufrufen, sonst entsteht ein Subscription-Loop.
