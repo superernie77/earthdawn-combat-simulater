@@ -161,6 +161,8 @@ export interface Character {
 
   // Erholungsproben – verbleibende Proben heute (null = voll)
   recoveryTestsRemaining?: number | null;
+  // Ausstehender Bonus auf nächste reguläre Erholungsprobe (durch Erholungstrank)
+  pendingRecoveryBonus?: number;
 
   // Spielleiter
   gmCharacter?: boolean;
@@ -211,6 +213,15 @@ export interface RecoveryTestResult {
   recoveryTestsMax: number;
   usedExtraSlot: boolean;
   potionName: string | null;
+}
+
+export interface DrinkPotionResult {
+  extraRecovery: boolean;
+  potionName: string;
+  /** Für Erholungstrank: kumulierter ausstehender Bonus. */
+  pendingBonus: number;
+  /** Für Heiltrank: Ergebnis der sofortigen Extra-Probe (null bei Erholungstrank). */
+  recovery: RecoveryTestResult | null;
 }
 
 export function emptyCharacter(): Character {

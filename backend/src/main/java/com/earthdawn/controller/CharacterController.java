@@ -1,6 +1,7 @@
 package com.earthdawn.controller;
 
 import com.earthdawn.dto.DerivedStats;
+import com.earthdawn.dto.DrinkPotionResult;
 import com.earthdawn.dto.FieldUpdateRequest;
 import com.earthdawn.dto.HolzhautResult;
 import com.earthdawn.dto.RecoveryTestResult;
@@ -156,11 +157,16 @@ public class CharacterController {
 
     // --- Erholungsproben ---
 
+    /** Reguläre Erholungsprobe: verbraucht einen Tages-Slot, wendet ausstehenden Bonus an. */
     @PostMapping("/{id}/recovery-test")
-    public RecoveryTestResult performRecoveryTest(@PathVariable Long id,
-                                                   @RequestBody(required = false) Map<String, Long> body) {
-        Long potionId = body != null ? body.get("potionId") : null;
-        return characterService.performRecoveryTest(id, potionId);
+    public RecoveryTestResult performRecoveryTest(@PathVariable Long id) {
+        return characterService.performRecoveryTest(id);
+    }
+
+    /** Trank trinken: Erholungstrank setzt Pending-Bonus, Heiltrank gibt sofortige Extra-Probe. */
+    @PostMapping("/{id}/drink-potion")
+    public DrinkPotionResult drinkPotion(@PathVariable Long id, @RequestBody Map<String, Long> body) {
+        return characterService.drinkPotion(id, body.get("potionId"));
     }
 
     @PostMapping("/{id}/recovery-test/reset")

@@ -16,7 +16,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
+import { Character, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -557,11 +557,20 @@ import { ProbeResult } from '../../models/dice.model';
               <span style="font-size:13px;color:#ccc">{{ getRecoveryTestsRemaining() }} / {{ getRecoveryTestsMax() }}</span>
             </div>
 
+            <!-- Ausstehender Erholungstrank-Bonus -->
+            <div *ngIf="(character.pendingRecoveryBonus ?? 0) > 0"
+              style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:#1a3a2a;border-radius:6px;border:1px solid #2e7d52">
+              <mat-icon style="color:#66bb6a">local_drink</mat-icon>
+              <span style="color:#a5d6a7;font-size:13px">
+                Erholungstrank aktiv: <strong>+{{ character.pendingRecoveryBonus }} Stufen</strong> auf nächste Probe
+              </span>
+            </div>
+
             <div style="display:flex;gap:8px;margin-bottom:20px">
               <button mat-raised-button color="primary"
                 [disabled]="getRecoveryTestsRemaining() <= 0"
                 (click)="doRecoveryTest()"
-                matTooltip="Würfelt ZÄH-Stufe minus Wunden und heilt LP">
+                [matTooltip]="'Würfelt ZÄH-Stufe ' + getRecoveryRollStep() + (( character.pendingRecoveryBonus ?? 0) > 0 ? ' +' + character.pendingRecoveryBonus + ' Bonus' : '') + ' und heilt LP'">
                 <mat-icon>healing</mat-icon> Erholungsprobe würfeln
               </button>
               <button mat-stroked-button (click)="resetRecoveryTests()" matTooltip="Neuer Tag — Proben auffüllen">
@@ -606,9 +615,9 @@ import { ProbeResult } from '../../models/dice.model';
                   <button mat-icon-button (click)="adjustPotionQty(p, 1)"><mat-icon>add</mat-icon></button>
                 </div>
                 <button mat-raised-button color="accent"
-                  [disabled]="p.quantity <= 0 || (!p.extraRecovery && getRecoveryTestsRemaining() <= 0)"
+                  [disabled]="p.quantity <= 0"
                   (click)="drinkPotion(p)"
-                  [matTooltip]="p.extraRecovery ? 'Extra-Erholungsprobe + +' + p.healStep + ' Stufen Bonus' : 'Erholungsprobe mit +' + p.healStep + ' Stufen Bonus (verbraucht Probe)'">
+                  [matTooltip]="p.extraRecovery ? 'Sofortige Extra-Probe + +' + p.healStep + ' Stufen (kein Slot-Verbrauch)' : '+' + p.healStep + ' Stufen Bonus auf nächste reguläre Probe'">
                   <mat-icon>healing</mat-icon> Trinken
                 </button>
                 <button mat-icon-button color="warn" (click)="removeEquipment(p)" matTooltip="Entfernen">
@@ -1322,12 +1331,16 @@ export class CharacterSheetComponent implements OnInit {
 
   drinkPotion(potion: Equipment): void {
     if (!this.character?.id || !potion.id || potion.quantity <= 0) return;
-    this.characterService.performRecoveryTest(this.character.id, potion.id).subscribe({
-      next: result => {
-        this.lastRecovery = result;
+    this.characterService.drinkPotion(this.character.id, potion.id).subscribe({
+      next: (result: DrinkPotionResult) => {
         this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
-        const bonus = result.bonusSteps > 0 ? ` +${result.bonusSteps} Bonus` : '';
-        this.snack.open(`${potion.name}: ${result.healed} LP geheilt (Stufe ${result.rollStep}${bonus}, Wurf: ${result.roll?.total})`, 'OK', { duration: 4000 });
+        if (result.extraRecovery && result.recovery) {
+          this.lastRecovery = result.recovery;
+          const bonus = result.recovery.bonusSteps > 0 ? ` +${result.recovery.bonusSteps} Bonus` : '';
+          this.snack.open(`${potion.name}: ${result.recovery.healed} LP geheilt (Stufe ${result.recovery.rollStep}${bonus}, Wurf: ${result.recovery.roll?.total})`, 'OK', { duration: 4000 });
+        } else {
+          this.snack.open(`${potion.name}: +${result.pendingBonus} Stufen Bonus für nächste Erholungsprobe`, 'OK', { duration: 3000 });
+        }
       },
       error: err => this.snack.open(err?.error?.message ?? 'Fehler beim Trinken', 'OK', { duration: 3000 })
     });

@@ -90,6 +90,10 @@ public class GameCharacter {
     /** Verbleibende Erholungsproben für heute (null = voll, Tageslimit aus ZÄH berechnet). */
     private Integer recoveryTestsRemaining;
 
+    /** Ausstehender Bonus auf die nächste reguläre Erholungsprobe (gesetzt durch Erholungstrank, 0 = kein Bonus). */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int pendingRecoveryBonus = 0;
+
     // --- Spielleiter ---
     /** true = nur für den Spielleiter sichtbar */
     @Column(columnDefinition = "boolean default false")

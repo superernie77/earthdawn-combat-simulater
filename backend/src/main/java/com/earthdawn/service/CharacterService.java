@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.earthdawn.dto.DerivedStats;
+import com.earthdawn.dto.DrinkPotionResult;
 import com.earthdawn.dto.FieldUpdateRequest;
 import com.earthdawn.dto.HolzhautResult;
 import com.earthdawn.dto.RecoveryTestResult;
@@ -447,39 +448,24 @@ public class CharacterService {
                 : getRecoveryTestsMax(c.getToughness());
     }
 
-    public RecoveryTestResult performRecoveryTest(Long characterId, Long potionId) {
+    /** Reguläre Erholungsprobe: verbraucht einen Tages-Slot, wendet pendingRecoveryBonus an und löscht ihn. */
+    public RecoveryTestResult performRecoveryTest(Long characterId) {
         GameCharacter c = findById(characterId);
+
+        int max = getRecoveryTestsMax(c.getToughness());
+        int remaining = getRecoveryTestsRemaining(c);
+        if (remaining <= 0) {
+            throw new IllegalStateException("Keine Erholungsproben mehr für heute übrig.");
+        }
 
         int touStep = stepRollService.attributeToStep(c.getToughness());
         int woundPenalty = c.getWounds();
         int rollStep = Math.max(1, touStep - woundPenalty);
-        int bonusSteps = 0;
-        boolean extraSlot = false;
-        String potionName = null;
+        int bonusSteps = c.getPendingRecoveryBonus();
 
-        if (potionId != null) {
-            Equipment potion = c.getEquipment().stream()
-                    .filter(e -> e.getId().equals(potionId)
-                            && EquipmentType.POTION.equals(e.getType())
-                            && e.getQuantity() > 0)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Trank nicht gefunden oder aufgebraucht."));
-            bonusSteps = potion.getHealStep();
-            extraSlot = potion.isExtraRecovery();
-            potionName = potion.getName();
-            potion.setQuantity(potion.getQuantity() - 1);
-        }
-
-        int max = getRecoveryTestsMax(c.getToughness());
-        int remaining = getRecoveryTestsRemaining(c);
-
-        if (!extraSlot) {
-            if (remaining <= 0) {
-                throw new IllegalStateException("Keine Erholungsproben mehr für heute übrig.");
-            }
-            remaining--;
-            c.setRecoveryTestsRemaining(remaining);
-        }
+        remaining--;
+        c.setRecoveryTestsRemaining(remaining);
+        c.setPendingRecoveryBonus(0);
 
         RollResult roll = stepRollService.roll(rollStep + bonusSteps);
         int healed = Math.min(roll.getTotal(), c.getCurrentDamage());
@@ -496,8 +482,72 @@ public class CharacterService {
                 .remainingDamage(c.getCurrentDamage())
                 .recoveryTestsRemaining(remaining)
                 .recoveryTestsMax(max)
-                .usedExtraSlot(extraSlot)
-                .potionName(potionName)
+                .usedExtraSlot(false)
+                .potionName(null)
+                .build();
+    }
+
+    /**
+     * Trank trinken.
+     * Erholungstrank (extraRecovery=false): setzt pendingRecoveryBonus += healStep, kein Wurf.
+     * Heiltrank (extraRecovery=true): sofortige Extra-Erholungsprobe + healStep Bonus, kein Slot-Verbrauch.
+     */
+    public DrinkPotionResult drinkPotion(Long characterId, Long potionId) {
+        GameCharacter c = findById(characterId);
+
+        Equipment potion = c.getEquipment().stream()
+                .filter(e -> e.getId().equals(potionId)
+                        && EquipmentType.POTION.equals(e.getType())
+                        && e.getQuantity() > 0)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Trank nicht gefunden oder aufgebraucht."));
+
+        potion.setQuantity(potion.getQuantity() - 1);
+
+        if (!potion.isExtraRecovery()) {
+            // Erholungstrank: pending bonus akkumulieren, kein Wurf
+            c.setPendingRecoveryBonus(c.getPendingRecoveryBonus() + potion.getHealStep());
+            characterRepo.save(c);
+            return DrinkPotionResult.builder()
+                    .extraRecovery(false)
+                    .potionName(potion.getName())
+                    .pendingBonus(c.getPendingRecoveryBonus())
+                    .recovery(null)
+                    .build();
+        }
+
+        // Heiltrank: sofortige Extra-Erholungsprobe
+        int touStep = stepRollService.attributeToStep(c.getToughness());
+        int woundPenalty = c.getWounds();
+        int rollStep = Math.max(1, touStep - woundPenalty);
+        int bonusSteps = potion.getHealStep();
+        int max = getRecoveryTestsMax(c.getToughness());
+        int remaining = getRecoveryTestsRemaining(c);
+
+        RollResult roll = stepRollService.roll(rollStep + bonusSteps);
+        int healed = Math.min(roll.getTotal(), c.getCurrentDamage());
+        c.setCurrentDamage(c.getCurrentDamage() - healed);
+        characterRepo.save(c);
+
+        RecoveryTestResult recovery = RecoveryTestResult.builder()
+                .toughnessStep(touStep)
+                .woundPenalty(woundPenalty)
+                .rollStep(rollStep)
+                .bonusSteps(bonusSteps)
+                .roll(roll)
+                .healed(healed)
+                .remainingDamage(c.getCurrentDamage())
+                .recoveryTestsRemaining(remaining)
+                .recoveryTestsMax(max)
+                .usedExtraSlot(true)
+                .potionName(potion.getName())
+                .build();
+
+        return DrinkPotionResult.builder()
+                .extraRecovery(true)
+                .potionName(potion.getName())
+                .pendingBonus(c.getPendingRecoveryBonus())
+                .recovery(recovery)
                 .build();
     }
 
