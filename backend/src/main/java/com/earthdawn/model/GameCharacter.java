@@ -87,6 +87,9 @@ public class GameCharacter {
     @Column(columnDefinition = "integer default 0")
     @Builder.Default private int holzhautBonus = 0;
 
+    /** Verbleibende Erholungsproben für heute (null = voll, Tageslimit aus ZÄH berechnet). */
+    private Integer recoveryTestsRemaining;
+
     // --- Spielleiter ---
     /** true = nur für den Spielleiter sichtbar */
     @Column(columnDefinition = "boolean default false")

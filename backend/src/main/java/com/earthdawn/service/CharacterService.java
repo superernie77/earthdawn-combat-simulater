@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
 import com.earthdawn.dto.HolzhautResult;
+import com.earthdawn.dto.RecoveryTestResult;
 import com.earthdawn.dto.RollResult;
 import com.earthdawn.model.CharacterSkill;
 import com.earthdawn.model.CharacterSpell;
@@ -428,6 +429,82 @@ public class CharacterService {
 
     public List<SpellDefinition> getSpellsByDiscipline(String discipline) {
         return spellDefRepo.findByDisciplineOrderByCircleAscNameAsc(discipline);
+    }
+
+    // --- Erholungsproben ---
+
+    private int getRecoveryTestsMax(int toughness) {
+        if (toughness <= 6)  return 1;
+        if (toughness <= 12) return 2;
+        if (toughness <= 18) return 3;
+        if (toughness <= 24) return 4;
+        return 5;
+    }
+
+    private int getRecoveryTestsRemaining(GameCharacter c) {
+        return c.getRecoveryTestsRemaining() != null
+                ? c.getRecoveryTestsRemaining()
+                : getRecoveryTestsMax(c.getToughness());
+    }
+
+    public RecoveryTestResult performRecoveryTest(Long characterId, Long potionId) {
+        GameCharacter c = findById(characterId);
+
+        int touStep = stepRollService.attributeToStep(c.getToughness());
+        int woundPenalty = c.getWounds();
+        int rollStep = Math.max(1, touStep - woundPenalty);
+        int bonusSteps = 0;
+        boolean extraSlot = false;
+        String potionName = null;
+
+        if (potionId != null) {
+            Equipment potion = c.getEquipment().stream()
+                    .filter(e -> e.getId().equals(potionId)
+                            && EquipmentType.POTION.equals(e.getType())
+                            && e.getQuantity() > 0)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Trank nicht gefunden oder aufgebraucht."));
+            bonusSteps = potion.getHealStep();
+            extraSlot = potion.isExtraRecovery();
+            potionName = potion.getName();
+            potion.setQuantity(potion.getQuantity() - 1);
+        }
+
+        int max = getRecoveryTestsMax(c.getToughness());
+        int remaining = getRecoveryTestsRemaining(c);
+
+        if (!extraSlot) {
+            if (remaining <= 0) {
+                throw new IllegalStateException("Keine Erholungsproben mehr für heute übrig.");
+            }
+            remaining--;
+            c.setRecoveryTestsRemaining(remaining);
+        }
+
+        RollResult roll = stepRollService.roll(rollStep + bonusSteps);
+        int healed = Math.min(roll.getTotal(), c.getCurrentDamage());
+        c.setCurrentDamage(c.getCurrentDamage() - healed);
+        characterRepo.save(c);
+
+        return RecoveryTestResult.builder()
+                .toughnessStep(touStep)
+                .woundPenalty(woundPenalty)
+                .rollStep(rollStep)
+                .bonusSteps(bonusSteps)
+                .roll(roll)
+                .healed(healed)
+                .remainingDamage(c.getCurrentDamage())
+                .recoveryTestsRemaining(remaining)
+                .recoveryTestsMax(max)
+                .usedExtraSlot(extraSlot)
+                .potionName(potionName)
+                .build();
+    }
+
+    public GameCharacter resetRecoveryTests(Long characterId) {
+        GameCharacter c = findById(characterId);
+        c.setRecoveryTestsRemaining(getRecoveryTestsMax(c.getToughness()));
+        return characterRepo.save(c);
     }
 
     public void delete(Long id) {

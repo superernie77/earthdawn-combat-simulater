@@ -3,6 +3,7 @@ package com.earthdawn.controller;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.FieldUpdateRequest;
 import com.earthdawn.dto.HolzhautResult;
+import com.earthdawn.dto.RecoveryTestResult;
 import com.earthdawn.model.Equipment;
 import com.earthdawn.model.GameCharacter;
 import com.earthdawn.model.SpellDefinition;
@@ -151,6 +152,20 @@ public class CharacterController {
     @PostMapping("/{id}/holzhaut/end")
     public HolzhautResult endHolzhaut(@PathVariable Long id) {
         return characterService.endHolzhaut(id);
+    }
+
+    // --- Erholungsproben ---
+
+    @PostMapping("/{id}/recovery-test")
+    public RecoveryTestResult performRecoveryTest(@PathVariable Long id,
+                                                   @RequestBody(required = false) Map<String, Long> body) {
+        Long potionId = body != null ? body.get("potionId") : null;
+        return characterService.performRecoveryTest(id, potionId);
+    }
+
+    @PostMapping("/{id}/recovery-test/reset")
+    public GameCharacter resetRecoveryTests(@PathVariable Long id) {
+        return characterService.resetRecoveryTests(id);
     }
 
     @DeleteMapping("/{id}")

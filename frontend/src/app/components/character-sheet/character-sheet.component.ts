@@ -16,7 +16,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, SpellDefinition, RACES } from '../../models/character.model';
+import { Character, DerivedStats, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -536,18 +536,67 @@ import { ProbeResult } from '../../models/dice.model';
           </div>
         </mat-tab>
 
-        <!-- Tränke -->
-        <mat-tab label="Tränke">
+        <!-- Erholung -->
+        <mat-tab label="Erholung">
           <div class="tab-content">
-            <div class="section-title" style="margin-bottom:12px">Tränke &amp; Verbrauchsgegenstände</div>
+            <div class="section-title" style="margin-bottom:12px">Erholungsproben</div>
+
+            <div class="recovery-info" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:14px">
+              <span>ZÄH-Stufe: <strong>{{ attrToStep(character.toughness) }}</strong></span>
+              <span *ngIf="character.wounds > 0" style="color:#ef5350">Wunden-Abzug: −{{ character.wounds }}</span>
+              <span>Effektive Stufe: <strong>{{ getRecoveryRollStep() }}</strong></span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <span style="font-size:13px;color:#aaa">Heute verbleibend:</span>
+              <span *ngFor="let i of recoverySlotArray()">
+                <mat-icon [style.color]="i < getRecoveryTestsRemaining() ? '#66bb6a' : '#555'" style="font-size:20px;height:20px;width:20px">
+                  {{ i < getRecoveryTestsRemaining() ? 'radio_button_checked' : 'radio_button_unchecked' }}
+                </mat-icon>
+              </span>
+              <span style="font-size:13px;color:#ccc">{{ getRecoveryTestsRemaining() }} / {{ getRecoveryTestsMax() }}</span>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:20px">
+              <button mat-raised-button color="primary"
+                [disabled]="getRecoveryTestsRemaining() <= 0"
+                (click)="doRecoveryTest()"
+                matTooltip="Würfelt ZÄH-Stufe minus Wunden und heilt LP">
+                <mat-icon>healing</mat-icon> Erholungsprobe würfeln
+              </button>
+              <button mat-stroked-button (click)="resetRecoveryTests()" matTooltip="Neuer Tag — Proben auffüllen">
+                <mat-icon>refresh</mat-icon> Neuer Tag
+              </button>
+            </div>
+
+            <!-- Letztes Ergebnis -->
+            <div class="heal-result" *ngIf="lastRecovery">
+              <mat-icon style="color:#66bb6a">healing</mat-icon>
+              <div>
+                <div class="heal-name" *ngIf="lastRecovery.potionName">{{ lastRecovery.potionName }}</div>
+                <div class="heal-detail">
+                  Stufe {{ lastRecovery.rollStep }}<ng-container *ngIf="lastRecovery.bonusSteps > 0"> +{{ lastRecovery.bonusSteps }} Bonus</ng-container>
+                  ({{ lastRecovery.roll?.diceExpression }}) → <strong class="heal-amount">{{ lastRecovery.healed }} LP geheilt</strong>
+                  <span *ngIf="lastRecovery.remainingDamage > 0"> · {{ lastRecovery.remainingDamage }} LP verbleibend</span>
+                  <span *ngIf="lastRecovery.remainingDamage === 0"> · Vollständig geheilt!</span>
+                  <em *ngIf="lastRecovery.usedExtraSlot" style="color:#90caf9"> · Extra-Probe</em>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider style="margin:20px 0"></mat-divider>
+
+            <!-- Tränke -->
+            <div class="section-title" style="margin-bottom:12px">Tränke</div>
 
             <div class="potion-list">
               <div class="potion-item" *ngFor="let p of potions()">
                 <div class="potion-info">
-                  <mat-icon class="potion-icon">local_drink</mat-icon>
+                  <mat-icon class="potion-icon">{{ p.extraRecovery ? 'local_pharmacy' : 'local_drink' }}</mat-icon>
                   <div>
                     <div class="potion-name">{{ p.name }}</div>
-                    <div class="potion-formula">Zähigkeitsstufe + {{ p.healStep }} Stufen → heilt LP</div>
+                    <div class="potion-formula" *ngIf="p.extraRecovery">Extra-Probe + +{{ p.healStep }} Stufen</div>
+                    <div class="potion-formula" *ngIf="!p.extraRecovery">+{{ p.healStep }} Stufen (verbraucht Probe)</div>
                     <div class="potion-desc" *ngIf="p.description">{{ p.description }}</div>
                   </div>
                 </div>
@@ -557,9 +606,9 @@ import { ProbeResult } from '../../models/dice.model';
                   <button mat-icon-button (click)="adjustPotionQty(p, 1)"><mat-icon>add</mat-icon></button>
                 </div>
                 <button mat-raised-button color="accent"
-                  [disabled]="p.quantity <= 0"
+                  [disabled]="p.quantity <= 0 || (!p.extraRecovery && getRecoveryTestsRemaining() <= 0)"
                   (click)="drinkPotion(p)"
-                  matTooltip="Trank trinken: würfelt Heilung und reduziert Schaden">
+                  [matTooltip]="p.extraRecovery ? 'Extra-Erholungsprobe + +' + p.healStep + ' Stufen Bonus' : 'Erholungsprobe mit +' + p.healStep + ' Stufen Bonus (verbraucht Probe)'">
                   <mat-icon>healing</mat-icon> Trinken
                 </button>
                 <button mat-icon-button color="warn" (click)="removeEquipment(p)" matTooltip="Entfernen">
@@ -569,36 +618,27 @@ import { ProbeResult } from '../../models/dice.model';
               <div class="equip-empty" *ngIf="!potions().length">Keine Tränke im Inventar</div>
             </div>
 
-            <!-- Letztes Heilungsergebnis -->
-            <div class="heal-result" *ngIf="lastHeal">
-              <mat-icon style="color:#66bb6a">healing</mat-icon>
-              <div>
-                <div class="heal-name">{{ lastHeal.potionName }}</div>
-                <div class="heal-detail">
-                  Stufe {{ lastHeal.step }} ({{ lastHeal.diceExpression }}) → <strong class="heal-amount">{{ lastHeal.amount }} LP geheilt</strong>
-                  <span *ngIf="lastHeal.remaining > 0"> · {{ lastHeal.remaining }} LP verbleibend</span>
-                  <span *ngIf="lastHeal.remaining === 0"> · Vollständig geheilt!</span>
-                </div>
-              </div>
-            </div>
-
             <mat-divider style="margin:20px 0"></mat-divider>
 
-            <!-- Neuen Trank hinzufügen -->
+            <!-- Trank hinzufügen -->
             <div class="section-title" style="margin-bottom:8px">Trank hinzufügen</div>
             <div class="equip-add-form">
               <mat-form-field appearance="fill" style="flex:2">
                 <mat-label>Name</mat-label>
                 <input matInput [(ngModel)]="newPotion.name" placeholder="z.B. Heiltrank">
               </mat-form-field>
-              <mat-form-field appearance="fill" style="width:130px" matTooltip="Wird zur Zähigkeitsstufe addiert (Heiltrank = 7)">
-                <mat-label>Heilungsstufen-Bonus</mat-label>
+              <mat-form-field appearance="fill" style="width:130px" matTooltip="Bonus-Stufen auf die Erholungsprobe (Standard: 7)">
+                <mat-label>Bonus-Stufen</mat-label>
                 <input matInput type="number" [(ngModel)]="newPotion.healStep" min="0">
               </mat-form-field>
               <mat-form-field appearance="fill" style="width:90px">
                 <mat-label>Anzahl</mat-label>
                 <input matInput type="number" [(ngModel)]="newPotion.quantity" min="1">
               </mat-form-field>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;white-space:nowrap">
+                <input type="checkbox" [(ngModel)]="newPotion.extraRecovery">
+                Heiltrank (Extra-Probe)
+              </label>
               <mat-form-field appearance="fill" style="flex:3">
                 <mat-label>Beschreibung (optional)</mat-label>
                 <input matInput [(ngModel)]="newPotion.description">
@@ -826,8 +866,8 @@ export class CharacterSheetComponent implements OnInit {
   newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
-  newPotion: { name: string; healStep: number; quantity: number; description: string } = { name: 'Heiltrank', healStep: 7, quantity: 1, description: '' };
-  lastHeal?: { potionName: string; step: number; diceExpression: string; amount: number; remaining: number };
+  newPotion: { name: string; healStep: number; quantity: number; extraRecovery: boolean; description: string } = { name: 'Heiltrank', healStep: 7, quantity: 1, extraRecovery: true, description: '' };
+  lastRecovery?: RecoveryTestResult;
   lastHolzhaut?: HolzhautResult;
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
@@ -1259,38 +1299,69 @@ export class CharacterSheetComponent implements OnInit {
       damageBonus: 0, physicalArmor: 0, mysticalArmor: 0,
       initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0,
       quantity: this.newPotion.quantity, healStep: this.newPotion.healStep,
+      extraRecovery: this.newPotion.extraRecovery,
       description: this.newPotion.description
     };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newPotion = { name: 'Heiltrank', healStep: 7, quantity: 1, description: '' };
+      this.newPotion = { name: 'Heiltrank', healStep: 7, quantity: 1, extraRecovery: true, description: '' };
+    });
+  }
+
+  doRecoveryTest(): void {
+    if (!this.character?.id) return;
+    this.characterService.performRecoveryTest(this.character.id).subscribe({
+      next: result => {
+        this.lastRecovery = result;
+        this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
+        this.snack.open(`Erholungsprobe: ${result.healed} LP geheilt (Stufe ${result.rollStep}, Wurf: ${result.roll?.total})`, 'OK', { duration: 4000 });
+      },
+      error: err => this.snack.open(err?.error?.message ?? 'Fehler bei Erholungsprobe', 'OK', { duration: 3000 })
     });
   }
 
   drinkPotion(potion: Equipment): void {
-    if (!this.character?.id || potion.quantity <= 0) return;
-    const toughnessStep = this.attrToStep(this.character.toughness);
-    const rollStep = toughnessStep + potion.healStep;
-    this.diceService.roll(rollStep).subscribe(result => {
-      const healed = result.total;
-      const before = this.character!.currentDamage;
-      const after = Math.max(0, before - healed);
-      const actualHealed = before - after;
-      this.lastHeal = {
-        potionName: potion.name,
-        step: rollStep,
-        diceExpression: result.diceExpression,
-        amount: actualHealed,
-        remaining: after
-      };
-      // Schaden reduzieren
-      this.characterService.updateField(this.character!.id!, 'damage', -healed).subscribe(c => {
-        this.character = c;
-      });
-      // Anzahl dekrementieren
-      this.adjustPotionQty(potion, -1);
-      this.snack.open(`${potion.name}: ${actualHealed} LP geheilt (Wurf: ${result.total})`, 'OK', { duration: 3000 });
+    if (!this.character?.id || !potion.id || potion.quantity <= 0) return;
+    this.characterService.performRecoveryTest(this.character.id, potion.id).subscribe({
+      next: result => {
+        this.lastRecovery = result;
+        this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
+        const bonus = result.bonusSteps > 0 ? ` +${result.bonusSteps} Bonus` : '';
+        this.snack.open(`${potion.name}: ${result.healed} LP geheilt (Stufe ${result.rollStep}${bonus}, Wurf: ${result.roll?.total})`, 'OK', { duration: 4000 });
+      },
+      error: err => this.snack.open(err?.error?.message ?? 'Fehler beim Trinken', 'OK', { duration: 3000 })
     });
+  }
+
+  resetRecoveryTests(): void {
+    if (!this.character?.id) return;
+    this.characterService.resetRecoveryTests(this.character.id).subscribe(c => {
+      this.character = c;
+      this.snack.open('Erholungsproben für neuen Tag aufgefüllt.', 'OK', { duration: 2000 });
+    });
+  }
+
+  getRecoveryTestsMax(): number {
+    const t = this.character?.toughness ?? 0;
+    if (t <= 6)  return 1;
+    if (t <= 12) return 2;
+    if (t <= 18) return 3;
+    if (t <= 24) return 4;
+    return 5;
+  }
+
+  getRecoveryTestsRemaining(): number {
+    const r = this.character?.recoveryTestsRemaining;
+    return r != null ? r : this.getRecoveryTestsMax();
+  }
+
+  getRecoveryRollStep(): number {
+    if (!this.character) return 1;
+    return Math.max(1, this.attrToStep(this.character.toughness) - this.character.wounds);
+  }
+
+  recoverySlotArray(): number[] {
+    return Array.from({ length: this.getRecoveryTestsMax() }, (_, i) => i);
   }
 
   adjustPotionQty(potion: Equipment, delta: number): void {

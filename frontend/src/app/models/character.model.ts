@@ -75,6 +75,8 @@ export interface Equipment {
   healStep: number;
   /** Krallenhand-Marker: vom Talent verwaltet, kann nicht gelöscht werden, Karma-auf-Schaden möglich. */
   clawWeapon?: boolean;
+  /** Heiltrank-Marker: gibt Extra-Erholungsprobe (true) oder verbraucht normale Probe (false). */
+  extraRecovery?: boolean;
 }
 
 export interface SpellDefinition {
@@ -157,6 +159,9 @@ export interface Character {
   // Holzhaut – aktiver Bonus auf Bewusstlosigkeits-/Todesschwelle (0 = nicht aktiv)
   holzhautBonus?: number;
 
+  // Erholungsproben – verbleibende Proben heute (null = voll)
+  recoveryTestsRemaining?: number | null;
+
   // Spielleiter
   gmCharacter?: boolean;
 
@@ -192,6 +197,20 @@ export interface HolzhautResult {
   previousBonus: number;
   /** Bei /end: Anzahl der durch Holzhaut geheilten Schadenspunkte. */
   healed: number;
+}
+
+export interface RecoveryTestResult {
+  toughnessStep: number;
+  woundPenalty: number;
+  rollStep: number;
+  bonusSteps: number;
+  roll: RollResult | null;
+  healed: number;
+  remainingDamage: number;
+  recoveryTestsRemaining: number;
+  recoveryTestsMax: number;
+  usedExtraSlot: boolean;
+  potionName: string | null;
 }
 
 export function emptyCharacter(): Character {

@@ -68,4 +68,9 @@ public class Equipment {
     @Column(columnDefinition = "boolean default false")
     @Builder.Default
     private boolean clawWeapon = false;
+
+    /** Heiltrank-Marker: gibt eine Extra-Erholungsprobe (ignoriert Tageslimit). false = Erholungstrank (verbraucht einen normalen Slot). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean extraRecovery = false;
 }
