@@ -267,7 +267,7 @@ import { ProbeResult } from '../../models/dice.model';
                   </mat-form-field>
                 </div>
                 <div class="talent-list">
-                  <div class="talent-item" *ngFor="let ct of character.talents">
+                  <div class="talent-item" *ngFor="let ct of sortedTalents()">
                     <div class="talent-info">
                       <span class="talent-name">{{ ct.talentDefinition.name }}</span>
                       <span class="talent-attr">{{ ct.talentDefinition.attribute }}</span>
@@ -1251,6 +1251,10 @@ export class CharacterSheetComponent implements OnInit {
   degreeClass(p: ProbeResult): string {
     if (!p.success) return 'failure';
     return `success-${Math.min(p.extraSuccesses, 4)}`;
+  }
+
+  sortedTalents() {
+    return [...(this.character?.talents ?? [])].sort((a, b) => b.rank - a.rank);
   }
 
   weapons(): Equipment[] {
