@@ -42,6 +42,7 @@ Test classes (plain Mockito, no Spring context — fast):
 - `StepRollServiceTest` — dice step table, attribute→step mapping, explosion flag
 - `ModifierAggregatorTest` — ADD/MULTIPLY/OVERRIDE/SET_MIN/SET_MAX, trigger context filtering
 - `CombatServiceDamageTest` — `applyDamageToDefender`: damage, wounds, defeat, knockdown
+- `CharacterServiceRecoveryTest` — ZÄH→max-table, slot consumption, wound penalty, Erholungstrank/Heiltrank, reset
 
 ## Production Deployment
 ```bash
@@ -153,18 +154,21 @@ Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, Casca
 | WEAPON | `damageBonus` | Shown on character sheet; used manually in combat |
 | ARMOR | `physicalArmor`, `mysticalArmor`, `initiativePenalty` | `initiativePenalty` subtracted from `INITIATIVE_STEP` via `ModifierAggregator` |
 | SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty` | Bonuses added to defenses via `ModifierAggregator` |
-| POTION | `quantity`, `healStep` | See Healing Potions below |
+| POTION | `quantity`, `healStep`, `extraRecovery` | See Erholungsproben below |
 
-The "Ausrüstung" tab on the character sheet has separate sections per type. The "Tränke" section is a distinct sub-tab.
+The "Ausrüstung" tab on the character sheet has separate sections per type. The "Erholung" tab handles recovery tests and potions.
 
 **API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
 
-### Healing Potions (Heiltränke)
-- **Mechanic**: Roll `Zähigkeitsstufe + healStep` steps → result reduces `currentDamage`.
-- **Default Heiltrank**: `healStep = 7`, so roll = TOUGHNESSstep + 7 (matches ED4 standard healing potion).
-- **Quantity**: Decrements by 1 on use via `PATCH .../equipment/{id}?quantity=N`. Trinken-button disabled at 0.
-- **Frontend**: `drinkPotion()` in `CharacterSheetComponent` rolls dice, applies damage reduction, decrements quantity, shows result in `lastHeal` display panel.
-- **`healStep`** is the bonus on top of the character's toughness step, not a fixed value — potions with `healStep=0` heal pure toughness step only.
+### Erholungsproben (Recovery Tests)
+- **Roll**: ZÄH-Step − wounds (min 1). Result reduces `currentDamage`.
+- **Daily limit** from ZÄH: 1–6→1, 7–12→2, 13–18→3, 19–24→4, 25+→5. Stored as `recoveryTestsRemaining` (Integer, null = full) on `GameCharacter`.
+- **Wound penalty**: −1 step per wound, clamped to minimum 1.
+- **Erholungstrank** (`extraRecovery=false`): +`healStep` bonus steps, consumes one daily slot.
+- **Heiltrank** (`extraRecovery=true`): +`healStep` bonus steps, grants an extra test (ignores daily limit).
+- **`healStep`** default 7 for both types (ED4 standard). Quantity decrements by 1 on use.
+- **Reset**: `POST /api/characters/{id}/recovery-test/reset` → sets `recoveryTestsRemaining = max` (new day).
+- **Frontend**: Tab "Erholung" shows slot dots, "Erholungsprobe würfeln" button, "Neuer Tag" reset, potion list with Trinken-button. `lastRecovery` (type `RecoveryTestResult`) displays last result.
 
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
@@ -233,6 +237,8 @@ PATCH  /api/characters/{id}/equipment/{equipmentId}  ?quantity=N
 DELETE /api/characters/{id}/equipment/{equipmentId}
 POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speichert als holzhautBonus (überschreibt)
 POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
+POST   /api/characters/{id}/recovery-test         { potionId? } → Erholungsprobe würfeln (optionaler Trank-Bonus); gibt RecoveryTestResult
+POST   /api/characters/{id}/recovery-test/reset   → Neuer Tag: setzt recoveryTestsRemaining auf Max (aus ZÄH)
 
 GET    /api/reference/disciplines
 GET    /api/reference/talents
