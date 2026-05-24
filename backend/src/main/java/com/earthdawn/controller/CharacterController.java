@@ -1,5 +1,6 @@
 package com.earthdawn.controller;
 
+import com.earthdawn.dto.ArztResult;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.DrinkPotionResult;
 import com.earthdawn.dto.FieldUpdateRequest;
@@ -172,6 +173,12 @@ public class CharacterController {
     @PostMapping("/{id}/recovery-test/reset")
     public GameCharacter resetRecoveryTests(@PathVariable Long id) {
         return characterService.resetRecoveryTests(id);
+    }
+
+    /** Arzt-Fertigkeit: Heiler behandelt den Verwundeten. Body: { healerCharacterId } */
+    @PostMapping("/{id}/arzt")
+    public ArztResult applyArzt(@PathVariable Long id, @RequestBody Map<String, Long> body) {
+        return characterService.applyArzt(id, body.get("healerCharacterId"));
     }
 
     @DeleteMapping("/{id}")

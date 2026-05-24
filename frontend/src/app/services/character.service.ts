@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Character, DerivedStats, DrinkPotionResult, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition } from '../models/character.model';
+import { ArztResult, Character, DerivedStats, DrinkPotionResult, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition } from '../models/character.model';
 
 @Injectable({ providedIn: 'root' })
 export class CharacterService {
@@ -144,6 +144,10 @@ export class CharacterService {
 
   resetRecoveryTests(characterId: number): Observable<Character> {
     return this.http.post<Character>(`${this.base}/${characterId}/recovery-test/reset`, {});
+  }
+
+  applyArzt(woundedCharacterId: number, healerCharacterId: number): Observable<ArztResult> {
+    return this.http.post<ArztResult>(`${this.base}/${woundedCharacterId}/arzt`, { healerCharacterId });
   }
 
   delete(id: number): Observable<void> {

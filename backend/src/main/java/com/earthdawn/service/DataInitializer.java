@@ -50,6 +50,7 @@ public class DataInitializer {
             cleanupUnimplementedTalents();
             migrateExtraSuccessEffects();
             migrateUtilityTalents();
+            migrateArztSkill();
             return;
         }
         log.info("Initialisiere Earthdawn Referenzdaten...");
@@ -1213,6 +1214,19 @@ public class DataInitializer {
             log.info("Talent 'Tierfreundschaft' hinzugefügt.");
         }
         log.info("Utility-Talente migriert.");
+    }
+
+    private void migrateArztSkill() {
+        if (!skillRepo.existsByName("Arzt")) {
+            skillRepo.save(SkillDefinition.builder()
+                    .name("Arzt")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Behandelt Wunden und verbessert Erholungsproben. WN + Rang vs. 6 × Wunden des Patienten. " +
+                            "Erfolg: +Rang Bonus-Stufen auf die nächste Erholungsprobe des Patienten.")
+                    .category("Handwerk")
+                    .build());
+            log.info("Fertigkeit 'Arzt' hinzugefügt.");
+        }
     }
 
 }

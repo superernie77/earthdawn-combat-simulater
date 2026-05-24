@@ -5,7 +5,9 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "private": true,
   "dependencies": {
@@ -29,7 +31,11 @@
     "@angular-devkit/build-angular": "^20.0.0",
     "@angular/cli": "^20.0.0",
     "@angular/compiler-cli": "^20.0.0",
+    "@types/jest": "^30.0.0",
     "@types/sockjs-client": "^1.5.4",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
+    "jest-preset-angular": "^16.1.5",
     "typescript": "~5.8.0"
   }
 }

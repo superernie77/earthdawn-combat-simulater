@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.earthdawn.dto.ArztResult;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.DrinkPotionResult;
 import com.earthdawn.dto.FieldUpdateRequest;
@@ -555,6 +556,54 @@ public class CharacterService {
         GameCharacter c = findById(characterId);
         c.setRecoveryTestsRemaining(getRecoveryTestsMax(c.getToughness()));
         return characterRepo.save(c);
+    }
+
+    /**
+     * Arzt-Fertigkeit: Heiler behandelt einen verwundeten Charakter.
+     * Wurf: WN-Stufe + Rang vs. 6 × Wunden. Erfolg: +Rang Bonus-Stufen auf nächste Erholungsprobe.
+     */
+    public ArztResult applyArzt(Long woundedCharId, Long healerCharId) {
+        GameCharacter wounded = findById(woundedCharId);
+        GameCharacter healer = findById(healerCharId);
+
+        if (wounded.getWounds() <= 0) {
+            throw new IllegalStateException("Charakter hat keine Wunden — Arztbehandlung nicht möglich.");
+        }
+
+        CharacterSkill arztSkill = healer.getSkills().stream()
+                .filter(s -> "Arzt".equals(s.getSkillDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(healer.getName() + " hat keine Arzt-Fertigkeit."));
+
+        int wounds = wounded.getWounds();
+        int targetNumber = 6 * wounds;
+        int perStep = stepRollService.attributeToStep(healer.getPerception());
+        int skillRank = arztSkill.getRank();
+        int rollStep = perStep + skillRank;
+
+        RollResult roll = stepRollService.roll(rollStep);
+        boolean success = roll.getTotal() >= targetNumber;
+
+        int bonusGranted = 0;
+        if (success) {
+            bonusGranted = skillRank;
+            wounded.setPendingRecoveryBonus(wounded.getPendingRecoveryBonus() + bonusGranted);
+            characterRepo.save(wounded);
+        }
+
+        return ArztResult.builder()
+                .healerName(healer.getName())
+                .woundedName(wounded.getName())
+                .wounds(wounds)
+                .targetNumber(targetNumber)
+                .perStep(perStep)
+                .skillRank(skillRank)
+                .rollStep(rollStep)
+                .roll(roll)
+                .success(success)
+                .bonusGranted(bonusGranted)
+                .newPendingBonus(wounded.getPendingRecoveryBonus())
+                .build();
     }
 
     public void delete(Long id) {

@@ -16,7 +16,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { Character, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
+import { ArztResult, Character, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -646,6 +646,59 @@ import { ProbeResult } from '../../models/dice.model';
           </div>
         </mat-tab>
 
+        <!-- Arzt -->
+        <mat-tab label="Arzt">
+          <div class="tab-content">
+            <div class="section-title" style="margin-bottom:12px">Arzt-Fertigkeit anwenden</div>
+
+            <div style="font-size:13px;color:#aaa;margin-bottom:16px">
+              Ein Charakter mit der <strong style="color:#c9a84c">Arzt</strong>-Fertigkeit behandelt diesen Charakter.
+              <br>Wurf: WN-Stufe + Rang vs. <strong style="color:#ef9a9a">{{ 6 * (character?.wounds ?? 0) }}</strong>
+              (6 × {{ character?.wounds ?? 0 }} Wunden).
+            </div>
+
+            <div *ngIf="(character?.wounds ?? 0) === 0"
+              style="padding:12px;background:#1e1a16;border:1px solid #3a3028;border-radius:6px;color:#777;font-size:13px;margin-bottom:16px">
+              Kein Verwundeter — Arztbehandlung nur bei Wunden möglich.
+            </div>
+
+            <ng-container *ngIf="(character?.wounds ?? 0) > 0">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+                <mat-form-field appearance="fill" style="flex:1;min-width:200px">
+                  <mat-label>Behandelnder Charakter</mat-label>
+                  <mat-select [(ngModel)]="selectedHealerId">
+                    <mat-option *ngFor="let c of healerCandidates()" [value]="c.id">
+                      {{ c.name }} (Arzt Rang {{ arztRankOf(c) }})
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button mat-raised-button color="accent"
+                  [disabled]="!selectedHealerId"
+                  (click)="doArzt()"
+                  [matTooltip]="'WN-Stufe + Rang vs. ' + (6 * (character?.wounds ?? 0))">
+                  <mat-icon>medical_services</mat-icon> Arztprobe
+                </button>
+              </div>
+
+              <div class="arzt-result" *ngIf="lastArzt">
+                <mat-icon [style.color]="lastArzt.success ? '#66bb6a' : '#ef5350'">
+                  {{ lastArzt.success ? 'check_circle' : 'cancel' }}
+                </mat-icon>
+                <div>
+                  <div class="arzt-name">{{ lastArzt.healerName }} behandelt {{ lastArzt.woundedName }}</div>
+                  <div class="arzt-detail">
+                    Stufe {{ lastArzt.rollStep }} (WN {{ lastArzt.perStep }} + Rang {{ lastArzt.skillRank }})
+                    vs. MW {{ lastArzt.targetNumber }}
+                    → <strong [style.color]="lastArzt.success ? '#66bb6a' : '#ef5350'">{{ lastArzt.roll?.total }}</strong>
+                    <span *ngIf="lastArzt.success"> · <strong class="arzt-bonus">+{{ lastArzt.bonusGranted }} Bonus-Stufen</strong> auf nächste Erholungsprobe</span>
+                    <span *ngIf="!lastArzt.success"> · Fehlschlag</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </mat-tab>
+
         <!-- Notizen -->
         <mat-tab label="Notizen">
           <div class="tab-content">
@@ -844,6 +897,16 @@ import { ProbeResult } from '../../models/dice.model';
     }
     .holzhaut-detail { font-size: 0.82rem; color: #999; }
     .holzhaut-total { color: #81c784; font-size: 0.95rem; }
+
+    .arzt-result {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(102,187,106,0.08); border: 1px solid rgba(102,187,106,0.25);
+      border-radius: 8px; padding: 12px 16px; margin-top: 8px;
+      mat-icon { font-size: 1.8rem; height: 1.8rem; width: 1.8rem; }
+    }
+    .arzt-name { font-weight: 600; color: #e0d5c0; font-size: 0.9rem; }
+    .arzt-detail { font-size: 0.85rem; color: #999; margin-top: 2px; }
+    .arzt-bonus { color: #66bb6a; }
   `]
 })
 export class CharacterSheetComponent implements OnInit {
@@ -865,6 +928,9 @@ export class CharacterSheetComponent implements OnInit {
   newPotionQty: number = 1;
   lastRecovery?: RecoveryTestResult;
   lastHolzhaut?: HolzhautResult;
+  lastArzt?: ArztResult;
+  allCharacters: Character[] = [];
+  selectedHealerId?: number;
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
   attributeFields = [
@@ -931,6 +997,7 @@ export class CharacterSheetComponent implements OnInit {
     this.refService.getTalents().subscribe(t => this.availableTalents = t);
     this.refService.getSkills().subscribe(s => this.availableSkills = s);
     this.refService.getDisciplines().subscribe(d => this.disciplines = d);
+    this.characterService.findAll().subscribe(all => this.allCharacters = all);
   }
 
   isGm(): boolean {
@@ -1065,8 +1132,16 @@ export class CharacterSheetComponent implements OnInit {
     return Math.min(6, Math.max(0, Math.floor(wil / 5)));
   }
 
+  shieldKVBonus(): number {
+    return this.shields().reduce((sum, s) => sum + (s.physicalDefenseBonus ?? 0), 0);
+  }
+
   /** Kleiner Hinweistext, der unter dem Label angezeigt wird. */
   derivedNote(key: string): string | null {
+    if (key === 'physicalDefense') {
+      const bonus = this.shieldKVBonus();
+      return bonus > 0 ? `+${bonus} Schild` : null;
+    }
     if (key === 'mysticArmor') {
       const nat = this.naturalMysticArmor();
       return nat > 0 ? `+${nat} aus WIL` : null;
@@ -1079,6 +1154,15 @@ export class CharacterSheetComponent implements OnInit {
 
   /** Tooltip mit ausführlicher Erklärung. */
   derivedTooltip(key: string): string {
+    if (key === 'physicalDefense') {
+      const bonus = this.shieldKVBonus();
+      if (bonus <= 0) return '';
+      const names = this.shields()
+        .filter(s => (s.physicalDefenseBonus ?? 0) > 0)
+        .map(s => `${s.name} +${s.physicalDefenseBonus}`)
+        .join(', ');
+      return `Schildbonus auf KV: ${names}`;
+    }
     if (key === 'mysticArmor') {
       const wil = this.character?.willpower ?? 0;
       const nat = this.naturalMysticArmor();
@@ -1251,6 +1335,39 @@ export class CharacterSheetComponent implements OnInit {
   degreeClass(p: ProbeResult): string {
     if (!p.success) return 'failure';
     return `success-${Math.min(p.extraSuccesses, 4)}`;
+  }
+
+  healerCandidates(): Character[] {
+    return this.allCharacters.filter(c =>
+      c.id !== this.character?.id &&
+      c.skills?.some(s => s.skillDefinition.name === 'Arzt')
+    );
+  }
+
+  arztRankOf(c: Character): number {
+    return c.skills?.find(s => s.skillDefinition.name === 'Arzt')?.rank ?? 0;
+  }
+
+  doArzt(): void {
+    if (!this.character?.id || !this.selectedHealerId) return;
+    this.characterService.applyArzt(this.character.id, this.selectedHealerId).subscribe({
+      next: result => {
+        this.lastArzt = result;
+        if (result.success) {
+          this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
+          this.snack.open(
+            `${result.healerName}: Erfolg! +${result.bonusGranted} Bonus-Stufen auf nächste Erholungsprobe (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
+            'OK', { duration: 4000 }
+          );
+        } else {
+          this.snack.open(
+            `${result.healerName}: Fehlschlag (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
+            'OK', { duration: 3000 }
+          );
+        }
+      },
+      error: err => this.snack.open(err?.error?.message ?? 'Fehler bei Arztprobe', 'OK', { duration: 3000 })
+    });
   }
 
   sortedTalents() {

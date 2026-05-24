@@ -224,6 +224,20 @@ export interface DrinkPotionResult {
   recovery: RecoveryTestResult | null;
 }
 
+export interface ArztResult {
+  healerName: string;
+  woundedName: string;
+  wounds: number;
+  targetNumber: number;
+  perStep: number;
+  skillRank: number;
+  rollStep: number;
+  roll: RollResult;
+  success: boolean;
+  bonusGranted: number;
+  newPendingBonus: number;
+}
+
 export function emptyCharacter(): Character {
   return {
     name: '',
