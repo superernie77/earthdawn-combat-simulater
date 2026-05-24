@@ -631,29 +631,16 @@ import { ProbeResult } from '../../models/dice.model';
 
             <!-- Trank hinzufügen -->
             <div class="section-title" style="margin-bottom:8px">Trank hinzufügen</div>
-            <div class="equip-add-form">
-              <mat-form-field appearance="fill" style="flex:2">
-                <mat-label>Name</mat-label>
-                <input matInput [(ngModel)]="newPotion.name" placeholder="z.B. Heiltrank">
-              </mat-form-field>
-              <mat-form-field appearance="fill" style="width:130px" matTooltip="Bonus-Stufen auf die Erholungsprobe (Standard: 7)">
-                <mat-label>Bonus-Stufen</mat-label>
-                <input matInput type="number" [(ngModel)]="newPotion.healStep" min="0">
-              </mat-form-field>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
               <mat-form-field appearance="fill" style="width:90px">
                 <mat-label>Anzahl</mat-label>
-                <input matInput type="number" [(ngModel)]="newPotion.quantity" min="1">
+                <input matInput type="number" [(ngModel)]="newPotionQty" min="1">
               </mat-form-field>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;white-space:nowrap">
-                <input type="checkbox" [(ngModel)]="newPotion.extraRecovery">
-                Heiltrank (Extra-Probe)
-              </label>
-              <mat-form-field appearance="fill" style="flex:3">
-                <mat-label>Beschreibung (optional)</mat-label>
-                <input matInput [(ngModel)]="newPotion.description">
-              </mat-form-field>
-              <button mat-stroked-button [disabled]="!newPotion.name.trim()" (click)="addPotion()">
-                <mat-icon>add</mat-icon> Hinzufügen
+              <button mat-stroked-button (click)="addErholungstrank()" matTooltip="+7 Stufen Bonus auf nächste reguläre Erholungsprobe">
+                <mat-icon>local_drink</mat-icon> Erholungstrank
+              </button>
+              <button mat-stroked-button (click)="addHeiltrank()" matTooltip="Sofortige Extra-Erholungsprobe + +7 Stufen">
+                <mat-icon>local_pharmacy</mat-icon> Heiltrank
               </button>
             </div>
           </div>
@@ -875,7 +862,7 @@ export class CharacterSheetComponent implements OnInit {
   newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
-  newPotion: { name: string; healStep: number; quantity: number; extraRecovery: boolean; description: string } = { name: 'Heiltrank', healStep: 7, quantity: 1, extraRecovery: true, description: '' };
+  newPotionQty: number = 1;
   lastRecovery?: RecoveryTestResult;
   lastHolzhaut?: HolzhautResult;
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
@@ -1301,19 +1288,33 @@ export class CharacterSheetComponent implements OnInit {
     });
   }
 
-  addPotion(): void {
-    if (!this.character?.id || !this.newPotion.name.trim()) return;
+  addErholungstrank(): void {
+    if (!this.character?.id) return;
     const eq: Equipment = {
-      name: this.newPotion.name.trim(), type: 'POTION',
+      name: 'Erholungstrank', type: 'POTION',
       damageBonus: 0, physicalArmor: 0, mysticalArmor: 0,
       initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0,
-      quantity: this.newPotion.quantity, healStep: this.newPotion.healStep,
-      extraRecovery: this.newPotion.extraRecovery,
-      description: this.newPotion.description
+      quantity: Math.max(1, this.newPotionQty), healStep: 7,
+      extraRecovery: false
     };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newPotion = { name: 'Heiltrank', healStep: 7, quantity: 1, extraRecovery: true, description: '' };
+      this.newPotionQty = 1;
+    });
+  }
+
+  addHeiltrank(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Heiltrank', type: 'POTION',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0,
+      initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0,
+      quantity: Math.max(1, this.newPotionQty), healStep: 7,
+      extraRecovery: true
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
+      this.character = c;
+      this.newPotionQty = 1;
     });
   }
 

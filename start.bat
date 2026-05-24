@@ -20,7 +20,7 @@ popd
 echo Warte 3 Sekunden, bis PostgreSQL bereit ist...
 timeout /t 3 /nobreak >nul
 
-start "Earthdawn Backend"  cmd /k "cd /d %ROOT%backend && .\mvnw.cmd spring-boot:run"
+start "Earthdawn Backend"  cmd /k "cd /d %ROOT%backend && .\mvnw.cmd clean spring-boot:run"
 start "Earthdawn Frontend" cmd /k "cd /d %ROOT%frontend && (if not exist node_modules npm install) && npx ng serve --open"
 
 endlocal
