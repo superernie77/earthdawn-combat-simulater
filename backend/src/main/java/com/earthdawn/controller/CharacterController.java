@@ -118,6 +118,13 @@ public class CharacterController {
         return characterService.updateEquipmentQuantity(id, equipmentId, quantity);
     }
 
+    @PatchMapping("/{id}/equipment/{equipmentId}/active")
+    public GameCharacter setEquipmentActive(@PathVariable Long id,
+                                             @PathVariable Long equipmentId,
+                                             @RequestParam boolean active) {
+        return characterService.setEquipmentActive(id, equipmentId, active);
+    }
+
     @DeleteMapping("/{id}/equipment/{equipmentId}")
     public GameCharacter removeEquipment(@PathVariable Long id, @PathVariable Long equipmentId) {
         return characterService.removeEquipment(id, equipmentId);

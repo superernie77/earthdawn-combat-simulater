@@ -405,12 +405,20 @@ import { ProbeResult } from '../../models/dice.model';
             <div class="equip-section">
               <div class="section-title">Rüstungen</div>
               <div class="equip-list">
-                <div class="equip-item" *ngFor="let e of armors()">
+                <div class="equip-item" *ngFor="let e of armors()"
+                     [style.opacity]="e.active === false ? '0.45' : '1'">
+                  <button mat-icon-button
+                          [style.color]="e.active !== false ? '#81c784' : '#666'"
+                          (click)="toggleEquipmentActive(e)"
+                          [matTooltip]="e.active !== false ? 'Angelegt (klicken zum Ablegen)' : 'Abgelegt (klicken zum Anlegen)'">
+                    <mat-icon>{{ e.active !== false ? 'shield' : 'shield_outline' }}</mat-icon>
+                  </button>
                   <div class="equip-name">{{ e.name }}</div>
                   <div class="equip-stats">
                     <span class="equip-badge armor-phys" matTooltip="Physische Rüstung">{{ e.physicalArmor }} phys.</span>
                     <span class="equip-badge armor-myst" matTooltip="Mystische Rüstung (gegen Zauber)">{{ e.mysticalArmor }} myst.</span>
                     <span class="equip-badge armor-init" *ngIf="e.initiativePenalty > 0" matTooltip="Initiativemalus der Rüstung">−{{ e.initiativePenalty }} Init.</span>
+                    <span class="equip-badge inactive-badge" *ngIf="e.active === false" matTooltip="Dieses Rüstungsstück ist abgelegt und wird nicht gewertet">abgelegt</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
                   <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
@@ -452,12 +460,20 @@ import { ProbeResult } from '../../models/dice.model';
             <div class="equip-section">
               <div class="section-title">Schilde</div>
               <div class="equip-list">
-                <div class="equip-item" *ngFor="let e of shields()">
+                <div class="equip-item" *ngFor="let e of shields()"
+                     [style.opacity]="e.active === false ? '0.45' : '1'">
+                  <button mat-icon-button
+                          [style.color]="e.active !== false ? '#81c784' : '#666'"
+                          (click)="toggleEquipmentActive(e)"
+                          [matTooltip]="e.active !== false ? 'Ausgerüstet (klicken zum Ablegen)' : 'Abgelegt (klicken zum Ausrüsten)'">
+                    <mat-icon>{{ e.active !== false ? 'security' : 'security' }}</mat-icon>
+                  </button>
                   <div class="equip-name">{{ e.name }}</div>
                   <div class="equip-stats">
                     <span class="equip-badge shield-phys" *ngIf="e.physicalDefenseBonus > 0" matTooltip="+KV (Körperliche Verteidigung)">+{{ e.physicalDefenseBonus }} KV</span>
                     <span class="equip-badge shield-myst" *ngIf="e.mysticDefenseBonus > 0" matTooltip="+MV (Mystische Verteidigung)">+{{ e.mysticDefenseBonus }} MV</span>
                     <span class="equip-badge armor-init" *ngIf="e.initiativePenalty > 0" matTooltip="Initiativemalus">−{{ e.initiativePenalty }} Init.</span>
+                    <span class="equip-badge inactive-badge" *ngIf="e.active === false" matTooltip="Dieses Schild ist abgelegt und wird nicht gewertet">abgelegt</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
                   <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
@@ -824,6 +840,7 @@ import { ProbeResult } from '../../models/dice.model';
       &.armor-init { background: rgba(255,167,38,0.15); color: #ffa726; }
       &.shield-phys { background: rgba(102,187,106,0.15); color: #66bb6a; }
       &.shield-myst { background: rgba(171,71,188,0.15); color: #ce93d8; }
+      &.inactive-badge { background: rgba(120,120,120,0.15); color: #888; border-color: #555; font-style: italic; }
     }
 
     .defense-bonus-row {
@@ -1514,6 +1531,19 @@ export class CharacterSheetComponent implements OnInit {
       this.character = c;
       this.newShield = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
       this.loadDerived();
+    });
+  }
+
+  /**
+   * Schaltet eine Rüstung/Schild zwischen aktiv (angelegt) und inaktiv (abgelegt) um.
+   * Aktiv-Setzen deaktiviert automatisch alle anderen Stücke desselben Typs (Exklusivität).
+   */
+  toggleEquipmentActive(e: Equipment): void {
+    if (!this.character?.id || !e.id) return;
+    const newActive = e.active === false; // false → true; true/undefined → false
+    this.characterService.setEquipmentActive(this.character.id, e.id, newActive).subscribe({
+      next: c => { this.character = c; this.loadDerived(); },
+      error: err => this.snack.open(err?.error?.message ?? 'Konnte nicht geändert werden.', 'OK', { duration: 3000 })
     });
   }
 

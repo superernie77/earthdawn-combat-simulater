@@ -101,6 +101,15 @@ export class CharacterService {
     );
   }
 
+  /** Setzt Rüstung/Schild auf aktiv oder inaktiv. Aktiv-Setzen deaktiviert andere Stücke desselben Typs. */
+  setEquipmentActive(characterId: number, equipmentId: number, active: boolean): Observable<Character> {
+    return this.http.patch<Character>(
+      `${this.base}/${characterId}/equipment/${equipmentId}/active`,
+      null,
+      { params: { active } }
+    );
+  }
+
   // --- Zauber ---
 
   getSpells(discipline?: string): Observable<SpellDefinition[]> {

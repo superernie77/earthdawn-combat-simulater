@@ -2,6 +2,7 @@ package com.earthdawn.service;
 
 import com.earthdawn.model.*;
 import com.earthdawn.model.enums.*;
+import com.earthdawn.model.enums.EquipmentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -231,5 +232,138 @@ class ModifierAggregatorTest {
         state.setWounds(99);
         assertThat(aggregator.getEffectiveValue(state, StatType.ATTACK_STEP, TriggerContext.ALWAYS))
                 .isGreaterThanOrEqualTo(1);
+    }
+
+    // --- Equipment active/inactive ---
+
+    private Equipment armorWith(int phys, int myst, int initPenalty, boolean active) {
+        return Equipment.builder()
+                .name("Testrüstung")
+                .type(EquipmentType.ARMOR)
+                .physicalArmor(phys)
+                .mysticalArmor(myst)
+                .initiativePenalty(initPenalty)
+                .active(active)
+                .build();
+    }
+
+    private Equipment shieldWith(int physDef, int mystDef, int initPenalty, boolean active) {
+        return Equipment.builder()
+                .name("Testschild")
+                .type(EquipmentType.SHIELD)
+                .physicalDefenseBonus(physDef)
+                .mysticDefenseBonus(mystDef)
+                .initiativePenalty(initPenalty)
+                .active(active)
+                .build();
+    }
+
+    @Test
+    void activeArmor_contributesToPhysicalArmor() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        c.getEquipment().add(armorWith(5, 2, 2, true));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_ARMOR, TriggerContext.ALWAYS))
+                .isEqualTo(5);
+    }
+
+    @Test
+    void inactiveArmor_doesNotContributeToPhysicalArmor() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        c.getEquipment().add(armorWith(5, 2, 2, false));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_ARMOR, TriggerContext.ALWAYS))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void inactiveArmor_doesNotContributeToMysticArmor() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // wil=10 → natural mystic armor = 2
+        c.getEquipment().add(armorWith(0, 4, 0, false));
+        CombatantState state = stateFor(c);
+        // Only natural mystic armor from willpower (10/5 = 2), no equipment bonus
+        assertThat(aggregator.getEffectiveValue(state, StatType.MYSTIC_ARMOR, TriggerContext.ALWAYS))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void inactiveArmor_doesNotApplyInitiativePenalty() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // dex=10 → initiative step=5
+        c.getEquipment().add(armorWith(5, 2, 3, false));
+        CombatantState state = stateFor(c);
+        // No initiative penalty from inactive armor
+        assertThat(aggregator.getEffectiveValue(state, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS))
+                .isEqualTo(5);
+    }
+
+    @Test
+    void activeArmor_appliesInitiativePenalty() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // dex=10 → step=5
+        c.getEquipment().add(armorWith(5, 2, 3, true));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS))
+                .isEqualTo(2); // 5 - 3 = 2
+    }
+
+    @Test
+    void onlyActiveArmorCounts_whenMultiplePresent() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        c.getEquipment().add(armorWith(5, 0, 0, false)); // inactive
+        c.getEquipment().add(armorWith(8, 0, 0, true));  // active
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_ARMOR, TriggerContext.ALWAYS))
+                .isEqualTo(8);
+    }
+
+    @Test
+    void activeShield_contributesToPhysicalDefense() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base PD = 6
+        c.getEquipment().add(shieldWith(2, 0, 0, true));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
+                .isEqualTo(8);
+    }
+
+    @Test
+    void inactiveShield_doesNotContributeToPhysicalDefense() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base PD = 6
+        c.getEquipment().add(shieldWith(2, 0, 0, false));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
+                .isEqualTo(6);
+    }
+
+    @Test
+    void inactiveShield_doesNotApplyInitiativePenalty() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // dex=10 → step=5
+        c.getEquipment().add(shieldWith(2, 0, 2, false));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS))
+                .isEqualTo(5);
+    }
+
+    @Test
+    void onlyActiveShieldCounts_whenMultiplePresent() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base PD = 6
+        c.getEquipment().add(shieldWith(3, 0, 0, false)); // inactive
+        c.getEquipment().add(shieldWith(1, 0, 0, true));  // active
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
+                .isEqualTo(7); // 6 + 1
+    }
+
+    @Test
+    void activeArmorAndShieldBothApply_ifBothActive() {
+        // Rüstung und Schild sind verschiedene Typen — beide können gleichzeitig aktiv sein
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base PD = 6, base PA = 0
+        c.getEquipment().add(armorWith(4, 0, 2, true));
+        c.getEquipment().add(shieldWith(2, 0, 1, true));
+        CombatantState state = stateFor(c);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_ARMOR, TriggerContext.ALWAYS))
+                .isEqualTo(4);
+        assertThat(aggregator.getEffectiveValue(state, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS))
+                .isEqualTo(8); // 6 + 2
+        assertThat(aggregator.getEffectiveValue(state, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS))
+                .isEqualTo(2); // 5 - 2 (armor) - 1 (shield) = 2
     }
 }

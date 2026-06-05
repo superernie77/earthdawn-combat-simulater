@@ -77,6 +77,12 @@ export interface Equipment {
   clawWeapon?: boolean;
   /** Heiltrank-Marker: gibt Extra-Erholungsprobe (true) oder verbraucht normale Probe (false). */
   extraRecovery?: boolean;
+  /**
+   * Nur für ARMOR und SHIELD: Ist das Stück gerade angelegt (aktiv)?
+   * Nur das aktive Stück trägt zur Rüstung/Verteidigung/Initiativemalus bei.
+   * Default: true (neu hinzugefügte Stücke sind automatisch aktiv).
+   */
+  active?: boolean;
 }
 
 export interface SpellDefinition {

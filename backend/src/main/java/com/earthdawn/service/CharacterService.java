@@ -370,7 +370,40 @@ public class CharacterService {
     public GameCharacter addEquipment(Long characterId, Equipment equipment) {
         GameCharacter c = findById(characterId);
         equipment.setCharacter(c);
+        // Beim Hinzufügen von Rüstung/Schild: neues Stück wird aktiv, vorhandene deaktivieren
+        if (equipment.getType() == EquipmentType.ARMOR || equipment.getType() == EquipmentType.SHIELD) {
+            equipment.setActive(true);
+            c.getEquipment().stream()
+                    .filter(e -> e.getType() == equipment.getType())
+                    .forEach(e -> e.setActive(false));
+        }
         c.getEquipment().add(equipment);
+        return characterRepo.save(c);
+    }
+
+    /**
+     * Setzt ein Rüstungs- oder Schildstück auf aktiv oder inaktiv.
+     * Wird ein Stück aktiviert, werden alle anderen Stücke desselben Typs automatisch deaktiviert
+     * (es kann immer nur ein Stück pro Typ gleichzeitig aktiv sein).
+     */
+    public GameCharacter setEquipmentActive(Long characterId, Long equipmentId, boolean active) {
+        GameCharacter c = findById(characterId);
+        Equipment target = c.getEquipment().stream()
+                .filter(e -> e.getId().equals(equipmentId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Ausrüstung nicht gefunden: " + equipmentId));
+
+        if (target.getType() != EquipmentType.ARMOR && target.getType() != EquipmentType.SHIELD) {
+            throw new IllegalArgumentException("Aktiv/inaktiv gilt nur für Rüstungen und Schilde.");
+        }
+
+        if (active) {
+            // Alle anderen Stücke desselben Typs deaktivieren (Exklusivität)
+            c.getEquipment().stream()
+                    .filter(e -> e.getType() == target.getType())
+                    .forEach(e -> e.setActive(false));
+        }
+        target.setActive(active);
         return characterRepo.save(c);
     }
 

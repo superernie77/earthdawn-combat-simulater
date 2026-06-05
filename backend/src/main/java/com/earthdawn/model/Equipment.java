@@ -73,4 +73,13 @@ public class Equipment {
     @Column(columnDefinition = "boolean default false")
     @Builder.Default
     private boolean extraRecovery = false;
+
+    /**
+     * Nur für ARMOR und SHIELD: Gibt an, ob dieses Stück gerade angelegt ist.
+     * Nur das aktive Stück trägt zur Rüstung/Verteidigung/Initiativemalus bei.
+     * Für andere Typen (WEAPON, POTION) immer true.
+     */
+    @Column(columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean active = true;
 }
