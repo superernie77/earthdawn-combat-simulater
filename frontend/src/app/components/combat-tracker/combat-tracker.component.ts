@@ -80,6 +80,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             {{ session.phase === 'DECLARATION' ? '📢 Ansagephase' : '⚔ Aktionsphase' }}
             <span *ngIf="session.phase === 'DECLARATION'"> ({{ declarationProgress() }})</span>
           </span>
+          <button mat-stroked-button *ngIf="session.status === 'ACTIVE'" (click)="openGmEffectDialog()"
+                  matTooltip="Beliebigen Bonus/Malus-Effekt auf einen Kombattanten anwenden">
+            <mat-icon>auto_fix_normal</mat-icon> GM-Effekt
+          </button>
           <button mat-stroked-button *ngIf="session.status === 'ACTIVE'" (click)="nextRound()">
             <mat-icon>skip_next</mat-icon> Nächste Runde
           </button>
@@ -1172,6 +1176,87 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
           <button mat-stroked-button (click)="effectDialog.open = false">Abbrechen</button>
           <button mat-raised-button color="primary" (click)="addEffect()">Hinzufügen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GM-Effekt Dialog -->
+    <div class="attack-dialog" *ngIf="gmEffectDialog.open">
+      <div class="dialog-backdrop" (click)="closeGmEffectDialog()"></div>
+      <div class="dialog-box" style="max-width:440px">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#80deea">auto_fix_normal</mat-icon>GM-Effekt hinzufügen</h3>
+
+        <!-- Ziel -->
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="gmEffectDialog.targetId">
+            <mat-option *ngFor="let c of allCombatants()" [value]="c.id">
+              {{ cn(c) }}{{ c.defeated ? ' (besiegt)' : '' }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Bonus/Malus Toggle + Stärke -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <label class="karma-toggle" style="flex:0 0 auto"
+            [class.active]="!gmEffectDialog.isMalus"
+            (click)="gmEffectDialog.isMalus = false">
+            <mat-icon>trending_up</mat-icon> Bonus
+          </label>
+          <label class="karma-toggle" style="flex:0 0 auto;border-color:#ef9a9a"
+            [class.active]="gmEffectDialog.isMalus"
+            [style.color]="gmEffectDialog.isMalus ? '#ef9a9a' : ''"
+            (click)="gmEffectDialog.isMalus = true">
+            <mat-icon>trending_down</mat-icon> Malus
+          </label>
+          <mat-form-field appearance="fill" style="flex:1">
+            <mat-label>Stärke</mat-label>
+            <input matInput type="number" [(ngModel)]="gmEffectDialog.magnitude" min="1" max="20">
+          </mat-form-field>
+        </div>
+
+        <!-- Betroffenes Attribut -->
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Betroffenes Attribut</mat-label>
+          <mat-select [(ngModel)]="gmEffectDialog.statKey">
+            <mat-optgroup label="Verteidigungen">
+              <mat-option value="PHYSICAL_DEFENSE">KV – Körperliche Verteidigung</mat-option>
+              <mat-option value="MYSTIC_DEFENSE">MV – Mystische Verteidigung</mat-option>
+              <mat-option value="SOCIAL_DEFENSE">SV – Soziale Verteidigung</mat-option>
+              <mat-option value="ALL_DEFENSES">Alle Verteidigungen (KV + MV + SV)</mat-option>
+            </mat-optgroup>
+            <mat-optgroup label="Angriff & Schaden">
+              <mat-option value="ATTACK_STEP">Angriffsstufe</mat-option>
+              <mat-option value="DAMAGE_STEP">Schadensstufe</mat-option>
+            </mat-optgroup>
+            <mat-optgroup label="Sonstiges">
+              <mat-option value="INITIATIVE_STEP">Initiativestufe</mat-option>
+              <mat-option value="ALL_ACTIONS">Malus auf alle Proben (Angriff + alle VK)</mat-option>
+              <mat-option value="MYSTIC_ARMOR">Mystische Rüstung</mat-option>
+              <mat-option value="PHYSICAL_ARMOR">Physische Rüstung</mat-option>
+            </mat-optgroup>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Name + Dauer -->
+        <div style="display:flex;gap:8px">
+          <mat-form-field appearance="fill" style="flex:2">
+            <mat-label>Name (optional)</mat-label>
+            <input matInput [(ngModel)]="gmEffectDialog.name" placeholder="z.B. Blindheit, Segen">
+          </mat-form-field>
+          <mat-form-field appearance="fill" style="flex:1">
+            <mat-label>Runden (−1 = permanent)</mat-label>
+            <input matInput type="number" [(ngModel)]="gmEffectDialog.rounds">
+          </mat-form-field>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="closeGmEffectDialog()">Abbrechen</button>
+          <button mat-raised-button color="primary"
+                  [disabled]="!gmEffectDialog.targetId || !gmEffectDialog.statKey || !gmEffectDialog.magnitude"
+                  (click)="performGmEffect()">
+            <mat-icon>auto_fix_normal</mat-icon> Anwenden
+          </button>
         </div>
       </div>
     </div>
@@ -2712,6 +2797,16 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     rounds: number;
     negative: boolean;
   } = { open: false, name: '', description: '', rounds: -1, negative: false };
+
+  gmEffectDialog: {
+    open: boolean;
+    targetId?: number;
+    isMalus: boolean;
+    magnitude: number;
+    statKey: string;
+    name: string;
+    rounds: number;
+  } = { open: false, isMalus: false, magnitude: 3, statKey: '', name: '', rounds: 1 };
 
   magischeMarkierungDialog: {
     open: boolean;
@@ -4397,6 +4492,119 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
     });
+  }
+
+  // =====================================================================
+  // GM-Effekt  (Meister trägt beliebige Boni/Mali auf Kombattanten ein)
+  // =====================================================================
+
+  /** Alle Kombattanten der Session (auch besiegte, GM kann alles). */
+  allCombatants(): CombatantState[] {
+    return this.session?.combatants ?? [];
+  }
+
+  openGmEffectDialog(): void {
+    this.gmEffectDialog = {
+      open: true,
+      targetId: undefined,
+      isMalus: false,
+      magnitude: 3,
+      statKey: 'PHYSICAL_DEFENSE',
+      name: '',
+      rounds: 1
+    };
+  }
+
+  closeGmEffectDialog(): void {
+    this.gmEffectDialog.open = false;
+  }
+
+  performGmEffect(): void {
+    if (!this.session || !this.gmEffectDialog.targetId || !this.gmEffectDialog.statKey) return;
+
+    const sign = this.gmEffectDialog.isMalus ? -1 : 1;
+    const val  = sign * Math.abs(this.gmEffectDialog.magnitude || 1);
+
+    // Stat-Schlüssel → ModifierEntry-Liste
+    const modifiers: Array<{ targetStat: string; triggerContext: string }> =
+      this.gmStatToModifiers(this.gmEffectDialog.statKey);
+
+    const statLabel = this.gmStatLabel(this.gmEffectDialog.statKey);
+    const signLabel = this.gmEffectDialog.isMalus ? '−' : '+';
+    const name = this.gmEffectDialog.name.trim()
+      || `GM: ${signLabel}${Math.abs(val)} ${statLabel}`;
+
+    const effect: ActiveEffect = {
+      name,
+      description: `GM-Effekt: ${signLabel}${Math.abs(val)} auf ${statLabel}`,
+      sourceType: 'MANUAL',
+      negative: this.gmEffectDialog.isMalus,
+      remainingRounds: this.gmEffectDialog.rounds,
+      modifiers: modifiers.map(m => ({
+        targetStat: m.targetStat,
+        operation: 'ADD' as const,
+        value: val,
+        triggerContext: m.triggerContext
+      }))
+    };
+
+    this.combatService.addEffect(this.session.id, this.gmEffectDialog.targetId, effect)
+      .subscribe({
+        next: s => {
+          this.session = s;
+          this.closeGmEffectDialog();
+          const targetName = this.combatantNameById(this.gmEffectDialog.targetId);
+          this.snack.open(
+            `${name} auf ${targetName ?? '?'} angewendet.`, 'OK', { duration: 3000 }
+          );
+        },
+        error: err => this.snack.open(
+          'Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 }
+        )
+      });
+  }
+
+  /** Baut die ModifierEntry-Definitionen für den gewählten Stat-Schlüssel. */
+  private gmStatToModifiers(key: string): Array<{ targetStat: string; triggerContext: string }> {
+    switch (key) {
+      case 'PHYSICAL_DEFENSE': return [{ targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' }];
+      case 'MYSTIC_DEFENSE':   return [{ targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' }];
+      case 'SOCIAL_DEFENSE':   return [{ targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }];
+      case 'ALL_DEFENSES':     return [
+        { targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' },
+        { targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' },
+        { targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }
+      ];
+      case 'ATTACK_STEP':     return [{ targetStat: 'ATTACK_STEP',     triggerContext: 'ALWAYS' }];
+      case 'DAMAGE_STEP':     return [{ targetStat: 'DAMAGE_STEP',     triggerContext: 'ON_DAMAGE_DEALT' }];
+      case 'INITIATIVE_STEP': return [{ targetStat: 'INITIATIVE_STEP', triggerContext: 'ALWAYS' }];
+      case 'ALL_ACTIONS':     return [
+        { targetStat: 'ATTACK_STEP',      triggerContext: 'ALWAYS' },
+        { targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' },
+        { targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' },
+        { targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }
+      ];
+      case 'MYSTIC_ARMOR':    return [{ targetStat: 'MYSTIC_ARMOR',    triggerContext: 'ALWAYS' }];
+      case 'PHYSICAL_ARMOR':  return [{ targetStat: 'PHYSICAL_ARMOR',  triggerContext: 'ALWAYS' }];
+      default: return [{ targetStat: key, triggerContext: 'ALWAYS' }];
+    }
+  }
+
+  /** Lesbarer Name für einen Stat-Schlüssel (für Auto-Naming). */
+  private gmStatLabel(key: string): string {
+    const map: Record<string, string> = {
+      'PHYSICAL_DEFENSE': 'KV',
+      'MYSTIC_DEFENSE':   'MV',
+      'SOCIAL_DEFENSE':   'SV',
+      'ALL_DEFENSES':     'alle VK',
+      'ATTACK_STEP':      'Angriff',
+      'DAMAGE_STEP':      'Schaden',
+      'INITIATIVE_STEP':  'Initiative',
+      'ALL_ACTIONS':      'Angriff+VK',
+      'MYSTIC_ARMOR':     'myst. Rüstung',
+      'PHYSICAL_ARMOR':   'phys. Rüstung'
+    };
+    return map[key] ?? key;
   }
 
   // =====================================================================
