@@ -36,6 +36,10 @@ export interface TalentDefinition {
   freeActionTestStat?: string;
   freeActionEffectTarget?: 'SELF' | 'TARGET';
   freeActionDamageCost?: number;
+  /** Wie oft dieses Talent separat gelernt werden kann (Standard: 1). Zaubermatritze = 3. */
+  maxInstances?: number;
+  /** Rang wird automatisch aus dem Kreis des Charakters abgeleitet, nicht manuell setzbar. */
+  rankFromCircle?: boolean;
 }
 
 export interface SkillDefinition {

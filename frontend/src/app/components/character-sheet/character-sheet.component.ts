@@ -264,20 +264,27 @@ import { ProbeResult } from '../../models/dice.model';
                   <mat-form-field appearance="fill" style="width:200px">
                     <mat-label>Talent hinzufügen</mat-label>
                     <mat-select [(ngModel)]="selectedTalentId" (ngModelChange)="addTalent()">
-                      <mat-option *ngFor="let t of availableTalents" [value]="t.id">{{ t.name }}</mat-option>
+                      <mat-option *ngFor="let t of availableTalentsForDropdown()" [value]="t.id"
+                        [disabled]="isTalentMaxed(t)">
+                        {{ t.name }}{{ talentInstanceLabel(t) }}
+                      </mat-option>
                     </mat-select>
                   </mat-form-field>
                 </div>
                 <div class="talent-list">
-                  <div class="talent-item" *ngFor="let ct of sortedTalents()">
+                  <div class="talent-item" *ngFor="let ct of sortedTalents(); let i = index">
                     <div class="talent-info">
-                      <span class="talent-name">{{ ct.talentDefinition.name }}</span>
+                      <span class="talent-name">{{ ct.talentDefinition.name }}{{ talentInstanceSuffix(ct) }}</span>
                       <span class="talent-attr">{{ ct.talentDefinition.attribute }}</span>
                     </div>
-                    <div class="rank-ctrl">
+                    <div class="rank-ctrl" *ngIf="!ct.talentDefinition.rankFromCircle">
                       <button mat-icon-button (click)="updateTalentRank(ct, ct.rank - 1)"><mat-icon>remove</mat-icon></button>
                       <span class="rank-val">Rang {{ ct.rank }}</span>
                       <button mat-icon-button (click)="updateTalentRank(ct, ct.rank + 1)"><mat-icon>add</mat-icon></button>
+                    </div>
+                    <div class="rank-ctrl" *ngIf="ct.talentDefinition.rankFromCircle"
+                         style="opacity:0.6" matTooltip="Rang entspricht immer dem Kreis des Charakters">
+                      <span class="rank-val">Rang {{ ct.rank }} <span style="font-size:0.75em;color:#888">(= Kreis)</span></span>
                     </div>
                     <button mat-icon-button (click)="rollProbe(ct.talentDefinition.id, null)"
                       [disabled]="!ct.talentDefinition.testable" matTooltip="Probe würfeln" color="accent">
@@ -1389,6 +1396,42 @@ export class CharacterSheetComponent implements OnInit {
 
   sortedTalents() {
     return [...(this.character?.talents ?? [])].sort((a, b) => b.rank - a.rank);
+  }
+
+  /** Dropdown-Liste: normale Talente nur wenn noch nicht gelernt; Multi-Instance-Talente immer, solange unter maxInstances. */
+  availableTalentsForDropdown(): TalentDefinition[] {
+    const learnedIds = new Set(this.character?.talents?.map(ct => ct.talentDefinition.id) ?? []);
+    return this.availableTalents.filter(t => {
+      const max = t.maxInstances ?? 1;
+      if (max === 1) return !learnedIds.has(t.id);
+      // Multi-instance: zeige immer, Deaktivierung via isTalentMaxed()
+      return true;
+    });
+  }
+
+  /** Wie viele Instanzen des Talents der Charakter bereits hat. */
+  talentInstanceCount(t: TalentDefinition): number {
+    return this.character?.talents?.filter(ct => ct.talentDefinition.id === t.id).length ?? 0;
+  }
+
+  /** Ist das maxInstances-Limit erreicht? */
+  isTalentMaxed(t: TalentDefinition): boolean {
+    return this.talentInstanceCount(t) >= (t.maxInstances ?? 1);
+  }
+
+  /** Label im Dropdown z.B. " (1/3)" für Zaubermatritze. */
+  talentInstanceLabel(t: TalentDefinition): string {
+    if ((t.maxInstances ?? 1) <= 1) return '';
+    return ` (${this.talentInstanceCount(t)}/${t.maxInstances})`;
+  }
+
+  /** Suffix in der Talentliste z.B. " II" wenn mehrere Instanzen vorhanden. */
+  talentInstanceSuffix(ct: CharacterTalent): string {
+    if ((ct.talentDefinition.maxInstances ?? 1) <= 1) return '';
+    const instances = this.character?.talents?.filter(t => t.talentDefinition.id === ct.talentDefinition.id) ?? [];
+    if (instances.length <= 1) return '';
+    const idx = instances.findIndex(t => t.id === ct.id);
+    return ' ' + (['I', 'II', 'III'][idx] ?? '');
   }
 
   weapons(): Equipment[] {

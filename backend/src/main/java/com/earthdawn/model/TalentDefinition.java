@@ -96,4 +96,20 @@ public class TalentDefinition {
     @Column(columnDefinition = "integer default 0")
     @Builder.Default
     private int freeActionDamageCost = 0;
+
+    /**
+     * Wie oft dieses Talent separat gelernt werden kann (Standard: 1).
+     * Zaubermatritze z.B. = 3 (3 separate CharacterTalent-Einträge möglich).
+     */
+    @Column(columnDefinition = "integer default 1")
+    @Builder.Default
+    private int maxInstances = 1;
+
+    /**
+     * Wenn true: der Rang dieses Talents wird immer automatisch auf den Kreis des Charakters gesetzt
+     * und kann nicht manuell verändert werden. (Beispiel: Zaubermatritze)
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean rankFromCircle = false;
 }

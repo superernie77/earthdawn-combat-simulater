@@ -145,7 +145,14 @@ public class CharacterService {
             case "karmaMax"      -> c.setKarmaMax(Math.max(0, value));
             case "damage"        -> c.setCurrentDamage(Math.max(0, value));
             case "wounds"        -> c.setWounds(Math.max(0, value));
-            case "circle"        -> c.setCircle(Math.max(1, value));
+            case "circle"        -> {
+                c.setCircle(Math.max(1, value));
+                // Alle rankFromCircle-Talente (z.B. Zaubermatritze) auf neuen Kreis synchronisieren
+                int newCircle = Math.max(1, value);
+                c.getTalents().stream()
+                        .filter(t -> t.getTalentDefinition().isRankFromCircle())
+                        .forEach(t -> t.setRank(newCircle));
+            }
             case "dexterity"             -> c.setDexterity(Math.max(1, value));
             case "strength"              -> c.setStrength(Math.max(1, value));
             case "toughness"             -> c.setToughness(Math.max(1, value));
@@ -273,13 +280,26 @@ public class CharacterService {
         TalentDefinition def = talentDefRepo.findById(talentDefinitionId)
                 .orElseThrow(() -> new EntityNotFoundException("Talent nicht gefunden: " + talentDefinitionId));
 
+        // Mehrfachinstanz-Prüfung: maxInstances begrenzt, wie oft ein Talent gelernt werden darf
+        long existingCount = c.getTalents().stream()
+                .filter(t -> t.getTalentDefinition().getId().equals(def.getId()))
+                .count();
+        if (existingCount >= def.getMaxInstances()) {
+            throw new IllegalStateException(
+                "Talent '" + def.getName() + "' kann maximal " + def.getMaxInstances() +
+                " Mal gelernt werden (bereits " + existingCount + " vorhanden).");
+        }
+
+        // rankFromCircle: Rang wird immer aus dem Kreis des Charakters abgeleitet
+        int effectiveRank = def.isRankFromCircle() ? c.getCircle() : rank;
+
         CharacterTalent talent = CharacterTalent.builder()
                 .character(c)
                 .talentDefinition(def)
-                .rank(rank)
+                .rank(effectiveRank)
                 .build();
         c.getTalents().add(talent);
-        syncClawWeapon(c, def.getName(), rank);
+        syncClawWeapon(c, def.getName(), effectiveRank);
         return characterRepo.save(c);
     }
 

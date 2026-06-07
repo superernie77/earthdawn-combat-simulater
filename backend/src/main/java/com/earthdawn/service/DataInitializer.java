@@ -183,6 +183,21 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Holzhaut' hinzugefügt.");
         }
+        if (talentRepo.findByName(TalentNames.ZAUBERMATRITZE).isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name(TalentNames.ZAUBERMATRITZE)
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Eine Zaubermatritze hält einen eingewobenen Zauber bereit. " +
+                            "Der Rang entspricht immer dem Kreis des Adepten. " +
+                            "Kann bis zu 3-mal separat gelernt werden (3 Matrizen). " +
+                            "Probe: WN + Rang zum Einweben.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .maxInstances(3)
+                    .rankFromCircle(true)
+                    .build());
+            log.info("Talent 'Zaubermatritze' hinzugefügt.");
+        }
         if (talentRepo.findByName("Magische Markierung").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Magische Markierung")
