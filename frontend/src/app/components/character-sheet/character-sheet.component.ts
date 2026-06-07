@@ -549,6 +549,11 @@ import { ProbeResult } from '../../models/dice.model';
                     </span>
                     <span class="spell-threads" *ngIf="m.assignedSpell.threads === 0">Sofortzauber</span>
                   </div>
+                  <button mat-icon-button color="accent"
+                          (click)="rollProbe(m.talentDefinition.id, null)"
+                          matTooltip="Zaubermatritze-Probe würfeln (WN + Rang {{ m.rank }})">
+                    <mat-icon>casino</mat-icon>
+                  </button>
                 </div>
               </div>
               <mat-divider style="margin:16px 0"></mat-divider>
