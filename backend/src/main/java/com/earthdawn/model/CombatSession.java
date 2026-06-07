@@ -1,5 +1,6 @@
 package com.earthdawn.model;
 
+import com.earthdawn.dto.DialogState;
 import com.earthdawn.dto.InitiativeRollDetail;
 import com.earthdawn.dto.LiveModalState;
 import com.earthdawn.model.enums.CombatPhase;
@@ -9,7 +10,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "combat_sessions")
@@ -71,4 +74,13 @@ public class CombatSession {
      */
     @Transient
     private LiveModalState liveModal;
+
+    /**
+     * Aktive Dialog-Zustände pro Kombattant (combatantId → DialogState). Zeigt Mitspielern welche
+     * Aktion ein Spieler gerade plant (Ziel, Waffe, Zauber). Nicht persistiert — wird vor jedem
+     * WebSocket-Broadcast aus dem CombatService-Cache angehängt.
+     */
+    @Transient
+    @Builder.Default
+    private Map<Long, DialogState> activeDialogs = new HashMap<>();
 }

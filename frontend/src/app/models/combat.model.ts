@@ -128,6 +128,14 @@ export interface LiveModalState {
   payload?: any;
 }
 
+export interface DialogState {
+  /** Aktionstyp: "ATTACK", "RANGED_ATTACK", "SPELL", "TAUNT", "DISTRACT" etc. — null = Dialog geschlossen. */
+  actionType: string | null;
+  targetName?: string;
+  weaponName?: string;
+  spellName?: string;
+}
+
 export interface CombatSession {
   id: number;
   name: string;
@@ -143,6 +151,8 @@ export interface CombatSession {
   lastInitiativeRollRound?: number;
   /** Synchronisierter Modal-Status für alle Zuschauer (öffnen/schließen via WS). */
   liveModal?: LiveModalState;
+  /** Aktive Dialog-Zustände: combatantId → was ein Spieler gerade plant. */
+  activeDialogs?: { [combatantId: number]: DialogState };
 }
 
 export interface AttackActionRequest {

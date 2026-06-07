@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  CombatSession, AttackActionRequest, CombatActionResult,
+  CombatSession, DialogState, AttackActionRequest, CombatActionResult,
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
@@ -236,5 +236,16 @@ export class CombatService {
   /** Schließt das synchronisierte Result-Modal für ALLE Zuschauer der Session. */
   dismissModal(sessionId: number): Observable<CombatSession> {
     return this.http.post<CombatSession>(`${this.base}/sessions/${sessionId}/dismiss-modal`, {});
+  }
+
+  /**
+   * Setzt den Dialog-Status eines Kombattanten (welches Ziel/Waffe/Zauber er plant) und
+   * broadcastet ihn via WebSocket an alle Zuschauer. state=null → Dialog geschlossen.
+   */
+  updateDialogState(sessionId: number, combatantId: number, state: DialogState | null): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/dialog-state`,
+      state ?? { actionType: null }
+    );
   }
 }

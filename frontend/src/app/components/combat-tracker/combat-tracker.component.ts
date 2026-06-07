@@ -33,7 +33,7 @@ import {
   ZweitwaffeRequest,
   SpotArmorFlawRequest, SpotArmorFlawResult,
   LufttanzActivationResult, LufttanzAttackRequest,
-  InitiativeRollDetail
+  InitiativeRollDetail, DialogState
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
 
@@ -160,6 +160,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Zauber vorbereitet: {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }} Fäden)">
                   ⟡ {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }})
                 </span>
+                <span *ngIf="dialogStateBadge(c) as badge" class="dialog-state-badge"
+                  [matTooltip]="'Plant: ' + badge">{{ badge }}</span>
               </div>
               <div class="comb-actions">
                 <mat-checkbox
@@ -734,7 +736,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Riposte Dialog -->
     <div class="attack-dialog" *ngIf="riposteDialog.open">
-      <div class="dialog-backdrop" (click)="riposteDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeRiposteDialog()"></div>
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ff8a65">sports_martial_arts</mat-icon>Riposte: {{ riposteDialog.defender?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
@@ -750,7 +752,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="riposteDialog.open = false; skipRiposte()">Schaden annehmen</button>
+          <button mat-stroked-button (click)="closeRiposteDialog(); skipRiposte()">Schaden annehmen</button>
           <button mat-raised-button color="accent" (click)="performRiposte()">
             <mat-icon>sports_martial_arts</mat-icon> Riposte würfeln
           </button>
@@ -1071,7 +1073,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Attack Dialog -->
     <div class="attack-dialog" *ngIf="attackDialog.open">
-      <div class="dialog-backdrop" (click)="attackDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeAttackDialog()"></div>
       <div class="dialog-box">
         <h3>Angriff: {{ attackDialog.attacker?.character?.name }}</h3>
         <div class="dialog-stance-info" *ngIf="attackDialog.attacker?.declaredStance === 'AGGRESSIVE'">
@@ -1082,7 +1084,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
-          <mat-select [(ngModel)]="attackDialog.defenderId">
+          <mat-select [(ngModel)]="attackDialog.defenderId" (ngModelChange)="onAttackTargetChange($event)">
             <mat-option *ngFor="let c of possibleTargets()" [value]="c.id">
               {{ cn(c) }}
             </mat-option>
@@ -1139,7 +1141,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="attackDialog.open = false">Abbrechen</button>
+          <button mat-stroked-button (click)="closeAttackDialog()">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performAttack()">⚔ Angreifen</button>
         </div>
       </div>
@@ -1340,7 +1342,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Threadweave Dialog -->
     <div class="attack-dialog" *ngIf="threadweaveDialog.open">
-      <div class="dialog-backdrop" (click)="threadweaveDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeThreadweaveDialog()"></div>
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">all_inclusive</mat-icon>Faden weben: {{ threadweaveDialog.caster?.character?.name }}</h3>
         <div *ngIf="threadweaveDialog.caster?.preparingSpellId" style="color:#b39ddb;font-size:0.85rem;margin-bottom:12px;display:flex;align-items:center;gap:6px">
@@ -1368,7 +1370,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="threadweaveDialog.open = false">Abbrechen</button>
+          <button mat-stroked-button (click)="closeThreadweaveDialog()">Abbrechen</button>
           <button mat-raised-button color="primary" (click)="performThreadweave()" [disabled]="!threadweaveDialog.spellId">
             <mat-icon>all_inclusive</mat-icon> Faden weben
           </button>
@@ -1430,7 +1432,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Spell Cast Dialog -->
     <div class="attack-dialog" *ngIf="spellCastDialog.open">
-      <div class="dialog-backdrop" (click)="spellCastDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeSpellCastDialog()"></div>
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ce93d8">auto_fix_high</mat-icon>Zauber wirken: {{ spellCastDialog.caster?.character?.name }}</h3>
         <mat-form-field appearance="fill" style="width:100%">
@@ -1447,7 +1449,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </mat-form-field>
         <mat-form-field appearance="fill" style="width:100%" *ngIf="spellNeedsTarget()">
           <mat-label>Ziel</mat-label>
-          <mat-select [(ngModel)]="spellCastDialog.targetId">
+          <mat-select [(ngModel)]="spellCastDialog.targetId" (ngModelChange)="onSpellCastTargetChange($event)">
             <mat-option *ngFor="let c of spellTargets()" [value]="c.id">
               {{ cn(c) }}
             </mat-option>
@@ -1466,7 +1468,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="spellCastDialog.open = false">Abbrechen</button>
+          <button mat-stroked-button (click)="closeSpellCastDialog()">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performSpellCast()" [disabled]="!spellCastDialog.spellId">
             <mat-icon>auto_fix_high</mat-icon> Wirken
           </button>
@@ -1476,7 +1478,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Ablenken Dialog -->
     <div class="attack-dialog" *ngIf="distractDialog.open">
-      <div class="dialog-backdrop" (click)="distractDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeDistractDialog()"></div>
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ffab91">record_voice_over</mat-icon>Ablenken: {{ distractDialog.actor?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
@@ -1484,7 +1486,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
-          <mat-select [(ngModel)]="distractDialog.targetId">
+          <mat-select [(ngModel)]="distractDialog.targetId" (ngModelChange)="onDistractTargetChange($event)">
             <mat-option *ngFor="let c of distractTargets()" [value]="c.id">
               {{ cn(c) }} (SV {{ socD(c) }})
             </mat-option>
@@ -1506,7 +1508,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="distractDialog.open = false">Abbrechen</button>
+          <button mat-stroked-button (click)="closeDistractDialog()">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performDistract()" [disabled]="!distractDialog.targetId">
             <mat-icon>record_voice_over</mat-icon> Ablenken
           </button>
@@ -1971,7 +1973,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
 
     <!-- Taunt (Verspotten) Dialog -->
     <div class="attack-dialog" *ngIf="tauntDialog.open">
-      <div class="dialog-backdrop" (click)="tauntDialog.open = false"></div>
+      <div class="dialog-backdrop" (click)="closeTauntDialog()"></div>
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ef9a9a">sentiment_very_dissatisfied</mat-icon>Verspotten: {{ tauntDialog.actor?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
@@ -1979,7 +1981,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
-          <mat-select [(ngModel)]="tauntDialog.targetId">
+          <mat-select [(ngModel)]="tauntDialog.targetId" (ngModelChange)="onTauntTargetChange($event)">
             <mat-option *ngFor="let c of tauntTargets()" [value]="c.id">
               {{ cn(c) }} (SV {{ socD(c) }})
             </mat-option>
@@ -2001,7 +2003,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </label>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-          <button mat-stroked-button (click)="tauntDialog.open = false">Abbrechen</button>
+          <button mat-stroked-button (click)="closeTauntDialog()">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performTaunt()" [disabled]="!tauntDialog.targetId">
             <mat-icon>sentiment_very_dissatisfied</mat-icon> Verspotten
           </button>
@@ -2330,6 +2332,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       font-size: 10px; font-weight: 700; color: #888; background: rgba(255,255,255,0.05);
       border: 1px solid #444; border-radius: 8px; padding: 2px 8px;
       text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .dialog-state-badge {
+      font-size: 11px; font-weight: 600; color: #80cbc4; background: rgba(0,188,212,0.1);
+      border: 1px solid rgba(0,188,212,0.4); border-radius: 8px; padding: 2px 7px;
+      cursor: default; white-space: nowrap;
     }
     .combatant-card.has-acted { opacity: 0.55; }
     .combat-option-btn.use-action:not([disabled]) { color: #ab47bc; border-color: #6a1b9a; }
@@ -3144,6 +3151,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       aggressiveAttack: false,
       defensiveStance: false
     };
+    // Dialog-Status für andere Spieler sichtbar machen
+    this.pushDialogState(
+      attacker.id,
+      this.currentAttackActionLabel(),
+      lastDefender?.character.name,
+      weapon?.name
+    );
   }
 
   /** True wenn Blattschuss verwendet werden kann: Talent vorhanden, RANGED-Talent gewählt, nicht bereits diese Runde benutzt. */
@@ -3219,6 +3233,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         .find(t => t.talentDefinition.name === 'Waffenloser Kampf');
       if (unarmed) this.attackDialog.talentId = unarmed.talentDefinition.id;
     }
+    // Dialog-Status mit aktualisierter Waffe pushen
+    this.pushDialogState(
+      this.attackDialog.attacker.id,
+      this.currentAttackActionLabel(),
+      this.combatantNameById(this.attackDialog.defenderId),
+      weapon?.name
+    );
   }
 
   /** True wenn die im Dialog ausgewählte Waffe eine Krallenhand ist. */
@@ -3286,6 +3307,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         else this.lastWeaponMap.delete(req.attackerCombatantId);
         if (req.talentId != null) this.lastTalentMap.set(req.attackerCombatantId, req.talentId);
         else this.lastTalentMap.delete(req.attackerCombatantId);
+        this.clearDialogState(req.attackerCombatantId);
         this.attackDialog.open = false;
         this.resultModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -3546,6 +3568,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openThreadweaveDialog(c: CombatantState): void {
+    const spellName = c.preparingSpellId ? this.spellNameOf(c) : (this.spellsOf(c)[0]?.spellDefinition.name);
+    this.pushDialogState(c.id, 'WEAVE', undefined, undefined, spellName);
     this.threadweaveDialog = {
       open: true,
       caster: c,
@@ -3564,6 +3588,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.weaveThread(this.session.id, req).subscribe({
       next: result => {
+        if (this.threadweaveDialog.caster) this.clearDialogState(this.threadweaveDialog.caster.id);
         this.threadweaveDialog.open = false;
         this.threadweaveModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -3577,10 +3602,12 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   openSpellCastDialog(c: CombatantState): void {
     const readySpells = this.readySpellsOf(c);
+    const firstSpell = readySpells[0]?.spellDefinition;
+    this.pushDialogState(c.id, 'SPELL', undefined, undefined, firstSpell?.name);
     this.spellCastDialog = {
       open: true,
       caster: c,
-      spellId: readySpells.length > 0 ? readySpells[0].spellDefinition.id : undefined,
+      spellId: firstSpell?.id,
       targetId: undefined,
       spendKarma: false
     };
@@ -3618,6 +3645,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.castSpell(this.session.id, req).subscribe({
       next: result => {
+        if (this.spellCastDialog.caster) this.clearDialogState(this.spellCastDialog.caster.id);
         this.spellCastDialog.open = false;
         this.spellCastModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -3664,6 +3692,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openDistractDialog(actor: CombatantState): void {
+    this.pushDialogState(actor.id, 'DISTRACT');
     this.distractDialog = { open: true, actor, targetId: undefined, spendKarma: false };
   }
 
@@ -3678,6 +3707,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.performDistract(this.session.id, req).subscribe({
       next: result => {
+        if (this.distractDialog.actor) this.clearDialogState(this.distractDialog.actor.id);
         this.distractDialog.open = false;
         this.distractModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -3839,6 +3869,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openTauntDialog(actor: CombatantState): void {
+    this.pushDialogState(actor.id, 'TAUNT');
     this.tauntDialog = {
       open: true,
       actor,
@@ -3859,6 +3890,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.performTaunt(this.session.id, req).subscribe({
       next: result => {
+        if (this.tauntDialog.actor) this.clearDialogState(this.tauntDialog.actor.id);
         this.tauntDialog.open = false;
         this.tauntModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -4156,6 +4188,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   openRiposteDialog(c: CombatantState): void {
+    this.pushDialogState(c.id, 'RIPOSTE');
     this.riposteDialog = { open: true, defender: c, attackTotal: c.pendingRiposteAttackTotal, spendKarma: false };
     this.resultModal = { open: false };
   }
@@ -4164,6 +4197,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (!this.resultModal.result?.riposteDefenderId) return;
     const defender = this.session?.combatants.find(c => c.id === this.resultModal.result!.riposteDefenderId);
     if (!defender) return;
+    this.pushDialogState(defender.id, 'RIPOSTE');
     this.riposteDialog = {
       open: true, defender,
       attackTotal: defender.pendingRiposteAttackTotal,
@@ -4183,6 +4217,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.performRiposte(this.session.id, req).subscribe({
       next: result => {
+        this.clearDialogState(defenderId);
         this.riposteModal = { open: true, result };
         this.resultModal = { open: false };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -4203,6 +4238,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     };
     this.combatService.performRiposte(this.session.id, req).subscribe({
       next: result => {
+        this.clearDialogState(defender.id);
         this.riposteDialog.open = false;
         this.riposteModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
@@ -4361,5 +4397,140 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
     });
+  }
+
+  // =====================================================================
+  // Dialog-State Live-Push  (zeigt Mitspielern was ein Spieler plant)
+  // =====================================================================
+
+  /** Sendet den aktuellen Dialog-Status via WebSocket an alle Zuschauer. Fehler werden stillschweigend ignoriert. */
+  private pushDialogState(combatantId: number, actionType: string,
+                          targetName?: string, weaponName?: string, spellName?: string): void {
+    if (!this.session) return;
+    this.combatService.updateDialogState(this.session.id, combatantId,
+      { actionType, targetName, weaponName, spellName })
+      .subscribe({ error: () => {} });
+  }
+
+  /** Löscht den Dialog-Status des Kombattanten (Dialog wurde geschlossen). */
+  private clearDialogState(combatantId: number): void {
+    if (!this.session) return;
+    this.combatService.updateDialogState(this.session.id, combatantId, { actionType: null })
+      .subscribe({ error: () => {} });
+  }
+
+  /** Name eines Kombattanten anhand ID aus der aktuellen Session. */
+  private combatantNameById(id?: number): string | undefined {
+    if (id == null) return undefined;
+    return this.session?.combatants.find(c => c.id === id)?.character.name ?? undefined;
+  }
+
+  /** Name einer Waffe anhand ID aus dem Equipment eines Kombattanten. */
+  private weaponNameById(attacker?: CombatantState, weaponId?: number): string | undefined {
+    if (!attacker || weaponId == null) return undefined;
+    return (attacker.character.equipment ?? []).find(e => e.id === weaponId)?.name ?? undefined;
+  }
+
+  /** Aktionstyp-Label basierend auf dem aktuell gewählten Angriffstalent. */
+  private currentAttackActionLabel(): string {
+    const talent = this.attackDialog.attacker?.character.talents
+      .find(t => t.talentDefinition.id === this.attackDialog.talentId)?.talentDefinition.name ?? '';
+    if (talent === 'Projektilwaffen' || talent === 'Wurfwaffen') return 'RANGED_ATTACK';
+    if (talent === 'Spruchzauberei') return 'SPELL_ATTACK';
+    return 'MELEE_ATTACK';
+  }
+
+  /** Schließt den Angriffsdialog und löscht den Dialog-Status. */
+  closeAttackDialog(): void {
+    if (this.attackDialog.attacker) this.clearDialogState(this.attackDialog.attacker.id);
+    this.attackDialog.open = false;
+  }
+
+  /** Zielwechsel im Angriffsdialog → Dialog-Status aktualisieren. */
+  onAttackTargetChange(id: number): void {
+    this.attackDialog.defenderId = id;
+    if (!this.attackDialog.attacker) return;
+    this.pushDialogState(
+      this.attackDialog.attacker.id,
+      this.currentAttackActionLabel(),
+      this.combatantNameById(id),
+      this.weaponNameById(this.attackDialog.attacker, this.attackDialog.weaponId)
+    );
+  }
+
+  /** Schließt den Verspotten-Dialog und löscht den Dialog-Status. */
+  closeTauntDialog(): void {
+    if (this.tauntDialog.actor) this.clearDialogState(this.tauntDialog.actor.id);
+    this.tauntDialog.open = false;
+  }
+
+  /** Zielwechsel im Verspotten-Dialog → Dialog-Status aktualisieren. */
+  onTauntTargetChange(id: number): void {
+    this.tauntDialog.targetId = id;
+    if (!this.tauntDialog.actor) return;
+    this.pushDialogState(this.tauntDialog.actor.id, 'TAUNT', this.combatantNameById(id));
+  }
+
+  /** Schließt den Ablenken-Dialog und löscht den Dialog-Status. */
+  closeDistractDialog(): void {
+    if (this.distractDialog.actor) this.clearDialogState(this.distractDialog.actor.id);
+    this.distractDialog.open = false;
+  }
+
+  /** Zielwechsel im Ablenken-Dialog → Dialog-Status aktualisieren. */
+  onDistractTargetChange(id: number): void {
+    this.distractDialog.targetId = id;
+    if (!this.distractDialog.actor) return;
+    this.pushDialogState(this.distractDialog.actor.id, 'DISTRACT', this.combatantNameById(id));
+  }
+
+  /** Schließt den Fadenweben-Dialog und löscht den Dialog-Status. */
+  closeThreadweaveDialog(): void {
+    if (this.threadweaveDialog.caster) this.clearDialogState(this.threadweaveDialog.caster.id);
+    this.threadweaveDialog.open = false;
+  }
+
+  /** Schließt den Zauberwirken-Dialog und löscht den Dialog-Status. */
+  closeSpellCastDialog(): void {
+    if (this.spellCastDialog.caster) this.clearDialogState(this.spellCastDialog.caster.id);
+    this.spellCastDialog.open = false;
+  }
+
+  /** Zielwechsel im Zauberwirken-Dialog → Dialog-Status aktualisieren. */
+  onSpellCastTargetChange(id: number): void {
+    this.spellCastDialog.targetId = id;
+    if (!this.spellCastDialog.caster) return;
+    const spellName = this.spellsOf(this.spellCastDialog.caster)
+      .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition.name;
+    this.pushDialogState(this.spellCastDialog.caster.id, 'SPELL',
+      this.combatantNameById(id), undefined, spellName);
+  }
+
+  /** Schließt den Riposte-Dialog und löscht den Dialog-Status. */
+  closeRiposteDialog(): void {
+    if (this.riposteDialog.defender) this.clearDialogState(this.riposteDialog.defender.id);
+    this.riposteDialog.open = false;
+  }
+
+  /**
+   * Badge-Text für den Dialog-Status eines Kombattanten (sichtbar für andere Spieler).
+   * Gibt null zurück wenn kein Dialog offen.
+   */
+  dialogStateBadge(c: CombatantState): string | null {
+    const ds = this.session?.activeDialogs?.[c.id];
+    if (!ds?.actionType) return null;
+    let icon = '…';
+    if (ds.actionType === 'MELEE_ATTACK') icon = '⚔';
+    else if (ds.actionType === 'RANGED_ATTACK') icon = '🏹';
+    else if (ds.actionType === 'SPELL_ATTACK') icon = '✨';
+    else if (ds.actionType === 'SPELL') icon = '✨';
+    else if (ds.actionType === 'WEAVE') icon = '🌀';
+    else if (ds.actionType === 'TAUNT') icon = '💬';
+    else if (ds.actionType === 'DISTRACT') icon = '📢';
+    else if (ds.actionType === 'RIPOSTE') icon = '🤺';
+    let label = icon;
+    if (ds.targetName) label += ' → ' + ds.targetName;
+    if (ds.spellName) label += ' (' + ds.spellName + ')';
+    return label;
   }
 }

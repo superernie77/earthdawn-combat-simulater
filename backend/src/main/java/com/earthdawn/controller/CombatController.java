@@ -107,6 +107,19 @@ public class CombatController {
         return combatService.endCombat(id);
     }
 
+    /**
+     * Setzt oder löscht den Dialog-Status eines Kombattanten (welches Ziel/Waffe/Zauber er gerade
+     * plant). Wird sofort via WebSocket an alle Zuschauer der Session gebroadcastet.
+     * Body leer oder actionType=null → Dialog geschlossen.
+     */
+    @PostMapping("/sessions/{id}/combatants/{cId}/dialog-state")
+    public ResponseEntity<Void> updateDialogState(@PathVariable Long id,
+                                                   @PathVariable Long cId,
+                                                   @RequestBody(required = false) DialogState state) {
+        combatService.updateDialogState(id, cId, state);
+        return ResponseEntity.ok().build();
+    }
+
     @PatchMapping("/sessions/{id}/combatants/{combatantId}/value")
     public CombatSession updateValue(@PathVariable Long id,
                                       @PathVariable Long combatantId,

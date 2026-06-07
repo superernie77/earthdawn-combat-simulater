@@ -35,6 +35,10 @@ public class CombatService {
     /** Synchronisierter Modal-Status pro Session — überlebt Server-Lifetime, nicht persistiert. */
     private final java.util.Map<Long, LiveModalState> liveModals = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** Pro Session: aktive Dialog-Zustände aller Kombattanten (combatantId → DialogState). */
+    private final java.util.Map<Long, java.util.Map<Long, com.earthdawn.dto.DialogState>> dialogStates
+            = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** Setzt einen neuen Modal-Status für die Session und bumpt die Version. */
     private void openLiveModal(Long sessionId, String type, Object payload) {
         liveModals.compute(sessionId, (k, prev) -> {
@@ -96,6 +100,32 @@ public class CombatService {
             }
         }
         attachLiveModal(session);
+        attachDialogStates(session);
+    }
+
+    /** Hängt die aktuellen Dialog-Zustände aus dem Cache an die Session (transientes Feld). */
+    private void attachDialogStates(CombatSession session) {
+        if (session != null && session.getId() != null) {
+            var map = dialogStates.get(session.getId());
+            session.setActiveDialogs(map != null ? new java.util.HashMap<>(map) : new java.util.HashMap<>());
+        }
+    }
+
+    /** Setzt oder löscht den Dialog-Status eines Kombattanten und broadcasted die Session. */
+    public void updateDialogState(Long sessionId, Long combatantId, com.earthdawn.dto.DialogState state) {
+        if (state == null || state.getActionType() == null) {
+            var map = dialogStates.get(sessionId);
+            if (map != null) map.remove(combatantId);
+        } else {
+            dialogStates.computeIfAbsent(sessionId, k -> new java.util.concurrent.ConcurrentHashMap<>())
+                        .put(combatantId, state);
+        }
+        try {
+            CombatSession session = sessionRepo.findById(sessionId).orElse(null);
+            if (session != null) broadcast(session);
+        } catch (Exception e) {
+            log.warn("Dialog-State broadcast fehlgeschlagen: {}", e.getMessage());
+        }
     }
 
     public CombatSession createSession(String name) {
@@ -758,6 +788,7 @@ public class CombatService {
 
         addLog(session, null, null, ActionType.ROUND_CHANGE,
                 "Kampf beendet! Schaden, Wunden und Karma aller Charaktere wurden auf die Datenblätter übertragen.", true);
+        dialogStates.remove(sessionId);
         CombatSession saved = sessionRepo.save(session);
         broadcast(saved);
         return saved;
