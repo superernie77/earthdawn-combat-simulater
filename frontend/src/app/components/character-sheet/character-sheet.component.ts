@@ -1381,10 +1381,16 @@ export class CharacterSheetComponent implements OnInit {
       bonusSteps: 0,
       targetNumber: this.probeTargetNumber,
       spendKarma: false
-    }).subscribe(r => {
-      this.lastProbe = r;
-      if (r.karmaUsed) {
-        this.characterService.findById(this.character!.id!).subscribe(c => this.character = c);
+    }).subscribe({
+      next: r => {
+        this.lastProbe = r;
+        if (r.karmaUsed) {
+          this.characterService.findById(this.character!.id!).subscribe(c => this.character = c);
+        }
+      },
+      error: err => {
+        const msg = err?.error?.message ?? err?.message ?? 'Unbekannter Fehler';
+        this.snack.open(`Probe-Fehler: ${msg}`, 'OK', { duration: 5000 });
       }
     });
   }

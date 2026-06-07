@@ -1107,7 +1107,6 @@ public class CombatService {
 
         if (actor.isDefeated())  throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt und kann nicht handeln.");
         if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Aktionen sind nur in der Aktionsphase möglich.");
-        if (actor.isHasActedThisRound()) throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt.");
 
         // Verspotten-Talent laden
         CharacterTalent ct = actor.getCharacter().getTalents().stream()
@@ -1149,8 +1148,6 @@ public class CombatService {
                 .socialDefense(socialDef)
                 .success(success)
                 .extraSuccesses(extraSuccesses);
-
-        actor.setHasActedThisRound(true);
 
         if (!success) {
             result.penalty(0).duration(0)

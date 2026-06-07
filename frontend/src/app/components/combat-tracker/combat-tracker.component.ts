@@ -229,9 +229,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTauntTalent(c) && !c.defeated"
                   class="combat-option-btn taunt-btn"
-                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  [disabled]="!isActiveTurn(c)"
                   (click)="openTauntDialog(c)"
-                  matTooltip="Verspotten (CHA + Rang vs. Soziale VK, kostet 1 Schaden)">
+                  matTooltip="Verspotten (Freie Aktion · CHA + Rang vs. Soziale VK · kostet 1 Schaden)">
                   <mat-icon>sentiment_very_dissatisfied</mat-icon>
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
@@ -1960,7 +1960,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       <div class="dialog-box">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ef9a9a">sentiment_very_dissatisfied</mat-icon>Verspotten: {{ tauntDialog.actor?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
-          CHA + Rang vs. Soziale VK · Einfache Aktion · Kostet 1 Schaden
+          CHA + Rang vs. Soziale VK · Freie Aktion · Kostet 1 Schaden
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
