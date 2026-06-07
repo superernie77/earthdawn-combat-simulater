@@ -267,6 +267,11 @@ public class CombatService {
         }
         int attackStep = modifiers.getEffectiveValue(attacker, StatType.ATTACK_STEP, atkCtx);
 
+        // Magische Markierung nach Verbrauch entfernen (gilt nur für 1 Fernkampfangriff)
+        if (req.getActionType() == ActionType.RANGED_ATTACK) {
+            attacker.getActiveEffects().removeIf(e -> TalentNames.MAGISCHE_MARKIERUNG.equals(e.getName()));
+        }
+
         if (req.getTalentId() != null) {
             attackStep += attacker.getCharacter().getTalents().stream()
                     .filter(t -> t.getTalentDefinition().getId().equals(req.getTalentId()))
@@ -1810,8 +1815,9 @@ public class CombatService {
         int extraSuccesses = success && defenseValue > 0 ? (total - defenseValue) / 5 : (success ? 1 : 0);
         boolean effectApplied = false;
 
-        if (success && talent.getFreeActionModifyStat() != null && extraSuccesses > 0) {
-            double modValue = extraSuccesses * talent.getFreeActionValuePerSuccess();
+        if (success && talent.getFreeActionModifyStat() != null) {
+            // Basisbonus bei Erfolg + je Übererfolg ein weiterer Bonus
+            double modValue = (1 + extraSuccesses) * talent.getFreeActionValuePerSuccess();
             ModifierEntry modifier = ModifierEntry.builder()
                     .targetStat(talent.getFreeActionModifyStat())
                     .operation(ModifierOperation.ADD)
