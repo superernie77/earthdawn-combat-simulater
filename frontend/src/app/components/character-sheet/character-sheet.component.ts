@@ -12,6 +12,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
@@ -26,7 +27,8 @@ import { ProbeResult } from '../../models/dice.model';
     CommonModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule, MatTabsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatDividerModule, MatSnackBarModule, MatTooltipModule
+    MatDividerModule, MatSnackBarModule, MatTooltipModule,
+    MatCheckboxModule
   ],
   template: `
     <div class="sheet-container" *ngIf="character">
@@ -407,12 +409,11 @@ import { ProbeResult } from '../../models/dice.model';
               <div class="equip-list">
                 <div class="equip-item" *ngFor="let e of armors()"
                      [style.opacity]="e.active === false ? '0.45' : '1'">
-                  <button mat-icon-button
-                          [style.color]="e.active !== false ? '#81c784' : '#666'"
-                          (click)="toggleEquipmentActive(e)"
-                          [matTooltip]="e.active !== false ? 'Angelegt (klicken zum Ablegen)' : 'Abgelegt (klicken zum Anlegen)'">
-                    <mat-icon>{{ e.active !== false ? 'shield' : 'shield_outline' }}</mat-icon>
-                  </button>
+                  <mat-checkbox
+                    [checked]="e.active !== false"
+                    (change)="toggleEquipmentActive(e)"
+                    [matTooltip]="e.active !== false ? 'Angelegt (klicken zum Ablegen)' : 'Abgelegt (klicken zum Anlegen)'">
+                  </mat-checkbox>
                   <div class="equip-name">{{ e.name }}</div>
                   <div class="equip-stats">
                     <span class="equip-badge armor-phys" matTooltip="Physische Rüstung">{{ e.physicalArmor }} phys.</span>
@@ -462,12 +463,11 @@ import { ProbeResult } from '../../models/dice.model';
               <div class="equip-list">
                 <div class="equip-item" *ngFor="let e of shields()"
                      [style.opacity]="e.active === false ? '0.45' : '1'">
-                  <button mat-icon-button
-                          [style.color]="e.active !== false ? '#81c784' : '#666'"
-                          (click)="toggleEquipmentActive(e)"
-                          [matTooltip]="e.active !== false ? 'Ausgerüstet (klicken zum Ablegen)' : 'Abgelegt (klicken zum Ausrüsten)'">
-                    <mat-icon>{{ e.active !== false ? 'security' : 'security' }}</mat-icon>
-                  </button>
+                  <mat-checkbox
+                    [checked]="e.active !== false"
+                    (change)="toggleEquipmentActive(e)"
+                    [matTooltip]="e.active !== false ? 'Ausgerüstet (klicken zum Ablegen)' : 'Abgelegt (klicken zum Ausrüsten)'">
+                  </mat-checkbox>
                   <div class="equip-name">{{ e.name }}</div>
                   <div class="equip-stats">
                     <span class="equip-badge shield-phys" *ngIf="e.physicalDefenseBonus > 0" matTooltip="+KV (Körperliche Verteidigung)">+{{ e.physicalDefenseBonus }} KV</span>
@@ -1150,7 +1150,7 @@ export class CharacterSheetComponent implements OnInit {
   }
 
   shieldKVBonus(): number {
-    return this.shields().reduce((sum, s) => sum + (s.physicalDefenseBonus ?? 0), 0);
+    return this.shields().filter(s => s.active !== false).reduce((sum, s) => sum + (s.physicalDefenseBonus ?? 0), 0);
   }
 
   /** Kleiner Hinweistext, der unter dem Label angezeigt wird. */
@@ -1175,7 +1175,7 @@ export class CharacterSheetComponent implements OnInit {
       const bonus = this.shieldKVBonus();
       if (bonus <= 0) return '';
       const names = this.shields()
-        .filter(s => (s.physicalDefenseBonus ?? 0) > 0)
+        .filter(s => s.active !== false && (s.physicalDefenseBonus ?? 0) > 0)
         .map(s => `${s.name} +${s.physicalDefenseBonus}`)
         .join(', ');
       return `Schildbonus auf KV: ${names}`;
