@@ -65,6 +65,16 @@ export class CharacterService {
     return this.http.delete<void>(`${this.base}/${characterId}/talents/${talentId}`);
   }
 
+  assignSpellToMatrix(characterId: number, talentId: number, spellId: number | null): Observable<Character> {
+    const params: Record<string, string> = {};
+    if (spellId != null) params['spellId'] = String(spellId);
+    return this.http.patch<Character>(
+      `${this.base}/${characterId}/talents/${talentId}/assign-spell`,
+      null,
+      { params }
+    );
+  }
+
   addSkill(characterId: number, skillDefinitionId: number, rank = 1): Observable<Character> {
     return this.http.post<Character>(
       `${this.base}/${characterId}/skills`,

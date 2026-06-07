@@ -85,6 +85,14 @@ public class CharacterController {
         return ResponseEntity.ok().build();
     }
 
+    /** Weist einer Zaubermatritze einen Zauber zu (spellId=null → leert die Matrix). */
+    @PatchMapping("/{id}/talents/{talentId}/assign-spell")
+    public GameCharacter assignSpellToMatrix(@PathVariable Long id,
+                                              @PathVariable Long talentId,
+                                              @RequestParam(required = false) Long spellId) {
+        return characterService.assignSpellToMatrix(id, talentId, spellId);
+    }
+
     @PostMapping("/{id}/skills")
     public GameCharacter addSkill(@PathVariable Long id,
                                    @RequestParam Long skillDefinitionId,

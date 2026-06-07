@@ -331,6 +331,35 @@ public class CharacterService {
     }
 
     /**
+     * Weist einer Zaubermatritze-Instanz einen Zauber zu (oder leert sie bei spellId=null).
+     * Validierung: Der Kreis des Zaubers darf den Rang der Matrix nicht überschreiten.
+     */
+    public GameCharacter assignSpellToMatrix(Long characterId, Long talentId, Long spellId) {
+        GameCharacter c = findById(characterId);
+        CharacterTalent matrix = c.getTalents().stream()
+                .filter(t -> t.getId().equals(talentId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Talent nicht gefunden: " + talentId));
+
+        if (!TalentNames.ZAUBERMATRITZE.equals(matrix.getTalentDefinition().getName())) {
+            throw new IllegalArgumentException("Nur Zaubermatrizen können Zauber zugewiesen werden.");
+        }
+
+        if (spellId == null) {
+            matrix.setAssignedSpell(null);
+        } else {
+            SpellDefinition spell = spellDefRepo.findById(spellId)
+                    .orElseThrow(() -> new EntityNotFoundException("Zauber nicht gefunden: " + spellId));
+            if (spell.getCircle() > matrix.getRank()) {
+                throw new IllegalArgumentException(
+                    "Zauber '" + spell.getName() + "' (Kreis " + spell.getCircle() + ") übersteigt den Rang der Matrix (" + matrix.getRank() + ").");
+            }
+            matrix.setAssignedSpell(spell);
+        }
+        return characterRepo.save(c);
+    }
+
+    /**
      * Hält die Krallenhand-Waffe synchron zum Talent-Rang. Wird beim Hinzufügen oder
      * Aktualisieren des Talents aufgerufen. Schadensbonus = Rang + 3 (entspricht der
      * Krallenhandstufe = STR + Rang + 3 in Kombination mit der Standard-Schadensformel

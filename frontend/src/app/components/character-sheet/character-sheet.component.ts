@@ -17,7 +17,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { ArztResult, Character, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
+import { ArztResult, Character, CharacterTalent, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -522,6 +522,38 @@ import { ProbeResult } from '../../models/dice.model';
         <!-- Sprüche -->
         <mat-tab label="Sprüche" *ngIf="isMagicUser()">
           <div class="tab-content">
+
+            <!-- Zaubermatrizen -->
+            <div *ngIf="spellMatrices().length > 0" class="matrix-section">
+              <div class="section-title" style="margin-bottom:10px">Zaubermatrizen</div>
+              <div class="matrix-list">
+                <div class="matrix-item" *ngFor="let m of spellMatrices(); let i = index">
+                  <div class="matrix-header">
+                    <span class="matrix-label">Matrix {{ i + 1 }}</span>
+                    <span class="matrix-rank">Rang {{ m.rank }} · max. Kreis {{ m.rank }}</span>
+                  </div>
+                  <mat-form-field appearance="fill" style="flex:1;min-width:200px">
+                    <mat-label>Zauber zuweisen</mat-label>
+                    <mat-select [value]="m.assignedSpell?.id ?? null"
+                                (selectionChange)="assignSpellToMatrix(m, $event.value)">
+                      <mat-option [value]="null">— Leer —</mat-option>
+                      <mat-option *ngFor="let cs of spellsForMatrix(m)" [value]="cs.spellDefinition.id">
+                        {{ cs.spellDefinition.name }} (Kreis {{ cs.spellDefinition.circle }})
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <div class="matrix-spell-info" *ngIf="m.assignedSpell">
+                    <span class="spell-badge" [ngClass]="spellTypeBadgeClass(m.assignedSpell)">{{ spellTypeLabel(m.assignedSpell) }}</span>
+                    <span class="spell-threads" *ngIf="m.assignedSpell.threads > 0">
+                      {{ m.assignedSpell.threads }} {{ m.assignedSpell.threads === 1 ? 'Faden' : 'Fäden' }}
+                    </span>
+                    <span class="spell-threads" *ngIf="m.assignedSpell.threads === 0">Sofortzauber</span>
+                  </div>
+                </div>
+              </div>
+              <mat-divider style="margin:16px 0"></mat-divider>
+            </div>
+
             <div class="section-header">
               <div class="section-title">Gelernte Zauber</div>
               <mat-form-field appearance="fill" style="width:250px">
@@ -862,6 +894,18 @@ import { ProbeResult } from '../../models/dice.model';
     .equip-desc { font-size: 0.78rem; color: #666; font-style: italic; }
     .equip-empty { color: #555; font-size: 0.82rem; font-style: italic; padding: 4px 0 8px; }
     .equip-add-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+    .matrix-section { }
+    .matrix-list { display: flex; flex-direction: column; gap: 10px; }
+    .matrix-item {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: rgba(100, 60, 180, 0.08); border: 1px solid rgba(100, 60, 180, 0.25);
+      border-radius: 8px; padding: 10px 14px;
+    }
+    .matrix-header { display: flex; flex-direction: column; min-width: 100px; }
+    .matrix-label { font-family: 'Cinzel', serif; color: #b39ddb; font-size: 0.95rem; font-weight: 600; }
+    .matrix-rank { font-size: 0.75rem; color: #666; margin-top: 2px; }
+    .matrix-spell-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     .spell-list { display: flex; flex-direction: column; gap: 6px; }
     .spell-item {
@@ -1398,6 +1442,26 @@ export class CharacterSheetComponent implements OnInit {
     return [...(this.character?.talents ?? [])].sort((a, b) => b.rank - a.rank);
   }
 
+  /** Alle Zaubermatritze-Instanzen des Charakters, sortiert nach Reihenfolge. */
+  spellMatrices(): CharacterTalent[] {
+    return (this.character?.talents ?? [])
+      .filter(ct => ct.talentDefinition.name === 'Zaubermatritze');
+  }
+
+  /** Gelernte Zauber des Charakters, die in diese Matrix passen (Kreis ≤ Rang der Matrix). */
+  spellsForMatrix(matrix: CharacterTalent) {
+    return (this.character?.spells ?? [])
+      .filter(cs => cs.spellDefinition.circle <= matrix.rank);
+  }
+
+  assignSpellToMatrix(matrix: CharacterTalent, spellId: number | null): void {
+    if (!this.character?.id) return;
+    this.characterService.assignSpellToMatrix(this.character.id, matrix.id, spellId).subscribe({
+      next: c => { this.character = c; },
+      error: err => this.snack.open(err?.error?.message ?? 'Zuweisung fehlgeschlagen.', 'OK', { duration: 3000 })
+    });
+  }
+
   /** Dropdown-Liste: normale Talente nur wenn noch nicht gelernt; Multi-Instance-Talente immer, solange unter maxInstances. */
   availableTalentsForDropdown(): TalentDefinition[] {
     const learnedIds = new Set(this.character?.talents?.map(ct => ct.talentDefinition.id) ?? []);
@@ -1425,13 +1489,12 @@ export class CharacterSheetComponent implements OnInit {
     return ` (${this.talentInstanceCount(t)}/${t.maxInstances})`;
   }
 
-  /** Suffix in der Talentliste z.B. " II" wenn mehrere Instanzen vorhanden. */
+  /** Suffix in der Talentliste z.B. " 1" / " 2" / " 3" wenn mehrere Instanzen vorhanden. */
   talentInstanceSuffix(ct: CharacterTalent): string {
     if ((ct.talentDefinition.maxInstances ?? 1) <= 1) return '';
     const instances = this.character?.talents?.filter(t => t.talentDefinition.id === ct.talentDefinition.id) ?? [];
-    if (instances.length <= 1) return '';
     const idx = instances.findIndex(t => t.id === ct.id);
-    return ' ' + (['I', 'II', 'III'][idx] ?? '');
+    return ' ' + (idx + 1);
   }
 
   weapons(): Equipment[] {

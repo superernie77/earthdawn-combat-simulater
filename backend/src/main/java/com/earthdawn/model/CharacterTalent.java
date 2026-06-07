@@ -27,4 +27,12 @@ public class CharacterTalent {
 
     /** Rang 1-15 */
     private int rank;
+
+    /**
+     * Nur für Zaubermatritze: der in dieser Matrix gespeicherte Zauber.
+     * null = Matrix ist leer.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "assigned_spell_id")
+    private SpellDefinition assignedSpell;
 }

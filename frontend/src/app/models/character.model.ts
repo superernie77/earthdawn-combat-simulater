@@ -54,6 +54,8 @@ export interface CharacterTalent {
   id: number;
   talentDefinition: TalentDefinition;
   rank: number;
+  /** Nur für Zaubermatritze: der zugewiesene Zauber (null = leer). */
+  assignedSpell?: SpellDefinition | null;
 }
 
 export interface CharacterSkill {
