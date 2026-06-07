@@ -447,6 +447,8 @@ export interface RiposteResult {
   counterArmorValue?: number;
   counterNetDamage?: number;
   counterWoundDealt?: boolean;
+  /** Schaden den der Verteidiger erhält wenn Riposte fehlschlägt oder nicht versucht wird. */
+  incomingNetDamage?: number;
   description: string;
 }
 

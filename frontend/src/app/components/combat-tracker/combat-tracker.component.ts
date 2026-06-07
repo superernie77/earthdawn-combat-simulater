@@ -763,8 +763,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       <div class="dialog-backdrop" (click)="riposteModal.open = false"></div>
       <div class="dialog-box result-box" *ngIf="riposteModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
-          <mat-icon>{{ r.success ? 'sports_martial_arts' : 'close' }}</mat-icon>
-          {{ r.success ? 'PARIERT!' : 'RIPOSTE FEHLGESCHLAGEN' }}
+          <mat-icon>{{ r.success ? 'sports_martial_arts' : (r.riposteAttempted ? 'close' : 'arrow_downward') }}</mat-icon>
+          {{ r.success ? 'PARIERT!' : (r.riposteAttempted ? 'RIPOSTE FEHLGESCHLAGEN' : 'SCHADEN ANGENOMMEN') }}
         </div>
         <div *ngIf="r.success && r.counterAttack" class="result-subtitle"
              [style.color]="r.counterAttackHit ? '#ff8a65' : '#888'">
@@ -797,6 +797,21 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <span class="roll-label">Kosten</span>
             <span class="roll-expr">Überanstrengung</span>
             <span class="roll-value" style="color:#ef5350">−2</span>
+          </div>
+          <!-- Erhaltener Schaden bei Fehlschlag -->
+          <div class="roll-row" *ngIf="!r.success && (r.incomingNetDamage ?? 0) > 0"
+               style="background:rgba(239,83,80,0.12);margin-top:4px">
+            <span class="roll-label">Treffer</span>
+            <span class="roll-expr">Schaden erhalten</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.incomingNetDamage }}</span>
+          </div>
+        </div>
+        <!-- Schaden bei Verzicht (kein Riposte-Versuch) -->
+        <div class="result-rolls" *ngIf="!r.riposteAttempted && (r.incomingNetDamage ?? 0) > 0">
+          <div class="roll-row" style="background:rgba(239,83,80,0.12)">
+            <span class="roll-label">Treffer</span>
+            <span class="roll-expr">Schaden erhalten</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.incomingNetDamage }}</span>
           </div>
         </div>
         <div style="color:#aaa;font-size:0.82rem;margin-top:8px">{{ r.description }}</div>
