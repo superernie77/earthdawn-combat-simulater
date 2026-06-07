@@ -484,6 +484,7 @@ public class CombatService {
                 if (defenderHasRiposte) {
                     defender.setPendingRiposteAttackTotal(attackTotal);
                     defender.setPendingRiposteAttackerId(attacker.getId());
+                    defender.setPendingRiposteDamage(netDamage);
                     result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
                 }
                 if (defenderHasDodge) {
@@ -568,6 +569,7 @@ public class CombatService {
             clearBlattschussPending(combatant);
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);
+            combatant.setPendingRiposteDamage(0);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
             combatant.getActiveEffects().removeIf(effect ->
                     TalentNames.EFFECT_AGGRESSIVER_ANGRIFF.equals(effect.getName())
@@ -1897,8 +1899,10 @@ public class CombatService {
         String defenderName = defender.getCharacter().getName();
 
         // Ausstehenden Angriff immer zurücksetzen
+        int riposteDamage = defender.getPendingRiposteDamage();
         defender.setPendingRiposteAttackTotal(-1);
         defender.setPendingRiposteAttackerId(null);
+        defender.setPendingRiposteDamage(0);
         // Falls auch Ausweichen pending war: Dodge-Reaktion verwerfen, da Riposte gewählt wurde
         defender.setPendingDodgeDamage(0);
         defender.setPendingDodgeAttackTotal(0);
@@ -1907,16 +1911,16 @@ public class CombatService {
         defender.setPendingDamageRollJson(null);
 
         if (!req.isRiposteAttempted()) {
-            // Kein Riposte — Angriff annehmen, Schaden anwenden
-            // Wir müssen den Schaden nachberechnen, da wir ihn nicht gespeichert haben.
-            // Stattdessen geben wir 0 Schaden zurück und zeigen eine Meldung.
-            String desc = defenderName + " nimmt den Angriff an (kein Riposte). Schaden wird manuell angewendet.";
+            // Kein Riposte — Angriff annehmen, Schaden direkt anwenden
+            applyDamageToDefender(session, defender, riposteDamage);
+            String desc = defenderName + " nimmt den Angriff an (kein Riposte). " + riposteDamage + " Schaden erhalten.";
             addLog(session, defenderName, null, ActionType.RIPOSTE, desc, false);
             sessionRepo.save(session);
             broadcast(session);
             return RiposteResult.builder()
                     .defenderName(defenderName).attackerName(attackerName)
-                    .attackTotal(attackTotal).success(false).riposteAttempted(false).description(desc).build();
+                    .attackTotal(attackTotal).success(false).riposteAttempted(false)
+                    .incomingNetDamage(riposteDamage).description(desc).build();
         }
 
         CharacterTalent ct = defender.getCharacter().getTalents().stream()
@@ -1954,11 +1958,11 @@ public class CombatService {
                 .append(" vs Angriff ").append(attackTotal).append(" → ")
                 .append(success ? "Pariert!" : "Fehlgeschlagen — Angriff trifft!");
 
-        if (!success && attacker != null) {
-            // Parieren fehlgeschlagen: Schaden berechnen und anwenden
-            // Wir schätzen den Schaden konservativ (Basisschaden ohne Übererfolge, da wir die
-            // ursprüngliche Angriffsprobe nicht mehr haben). Der SL muss ggf. korrigieren.
-            desc.append(" (Schaden wird manuell angewendet.)");
+        if (!success) {
+            // Parieren fehlgeschlagen: gespeicherten Nettschaden anwenden
+            applyDamageToDefender(session, defender, riposteDamage);
+            result.incomingNetDamage(riposteDamage);
+            desc.append(" ").append(riposteDamage).append(" Schaden erhalten.");
         }
 
         if (success && extraSuccesses > 0 && attacker != null) {
@@ -2439,6 +2443,7 @@ public class CombatService {
                 if (defenderHasRiposte) {
                     defender.setPendingRiposteAttackTotal(attackTotal);
                     defender.setPendingRiposteAttackerId(attacker.getId());
+                    defender.setPendingRiposteDamage(net);
                     result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
                 }
                 if (defenderHasDodge) {

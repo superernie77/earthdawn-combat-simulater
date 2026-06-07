@@ -69,6 +69,11 @@ public class CombatantState {
     /** ID des angreifenden Kombattanten (für Riposte-Gegenangriff). */
     private Long pendingRiposteAttackerId;
 
+    /** Nettschaden (nach Rüstung) der bei Riposte-Misserfolg angewendet wird. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingRiposteDamage = 0;
+
     /** Tigersprung bereits in dieser Runde eingesetzt. */
     @Column(columnDefinition = "boolean default false")
     @Builder.Default
