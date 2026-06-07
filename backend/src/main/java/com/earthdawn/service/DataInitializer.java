@@ -51,6 +51,7 @@ public class DataInitializer {
             migrateExtraSuccessEffects();
             migrateUtilityTalents();
             migrateArztSkill();
+            migratePhantomkrieger();
             return;
         }
         log.info("Initialisiere Earthdawn Referenzdaten...");
@@ -894,9 +895,16 @@ public class DataInitializer {
                 StatType.ATTACK_STEP, ModifierOperation.ADD, -2.0, TriggerContext.ALWAYS, 3));
         saveSpellIfAbsent(spell("Niemand Da", "Illusionist", 3, 1, 7, 0,
                 SpellEffectType.BUFF, 0, "Macht Gruppe für Außenstehende unsichtbar (stationär; 4 Schritt Radius)", "Gruppeninvisibilität"));
-        saveSpellIfAbsent(spell("Phantomkrieger", "Illusionist", 3, 1, 7, 0,
-                SpellEffectType.BUFF, 0, "Erschafft 3 Abbilder; +3 KV; Gegner -3 auf Verteidigung", "+3 KV",
-                StatType.PHYSICAL_DEFENSE, ModifierOperation.ADD, 3.0, TriggerContext.ALWAYS, 3));
+        saveSpellIfAbsent(SpellDefinition.builder()
+                .name("Phantomkrieger").discipline("Illusionist").circle(3)
+                .threads(1).weavingDifficulty(7).castingDifficulty(0)
+                .effectType(SpellEffectType.BUFF).effectStep(0)
+                .description("Erschafft 3 Abbilder des Ziels: +3 KV auf das Ziel; Angriffe gegen das Ziel erleiden −3. Wirkschwierigkeit = MV des Ziels.")
+                .effectDescription("+3 KV; Angreifer −3")
+                .modifyStat(StatType.PHYSICAL_DEFENSE).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(3.0).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .requiresTarget(true)
+                .build());
         saveSpellIfAbsent(spell("Und ein Schleier fiel", "Illusionist", 3, 0, 7, 0,
                 SpellEffectType.BUFF, 0, "+5 auf Durchschauen-Proben für 2 Runden", "+5 Durchschauen"));
 
@@ -1242,6 +1250,21 @@ public class DataInitializer {
                     .build());
             log.info("Fertigkeit 'Arzt' hinzugefügt.");
         }
+    }
+
+    /**
+     * Setzt requiresTarget=true auf Phantomkrieger (für Instanzen die vor V23 geseedet wurden).
+     */
+    private void migratePhantomkrieger() {
+        spellRepo.findAll().stream()
+                .filter(s -> "Phantomkrieger".equals(s.getName()) && !s.isRequiresTarget())
+                .forEach(s -> {
+                    s.setRequiresTarget(true);
+                    s.setDescription("Erschafft 3 Abbilder des Ziels: +3 KV auf das Ziel; Angriffe gegen das Ziel erleiden −3. Wirkschwierigkeit = MV des Ziels.");
+                    s.setEffectDescription("+3 KV; Angreifer −3");
+                    spellRepo.save(s);
+                    log.info("Phantomkrieger: requiresTarget auf true gesetzt.");
+                });
     }
 
 }

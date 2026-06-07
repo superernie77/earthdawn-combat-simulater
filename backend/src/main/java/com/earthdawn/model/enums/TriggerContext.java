@@ -12,5 +12,7 @@ public enum TriggerContext {
     ON_DAMAGE_RECEIVED,
     ON_INITIATIVE,
     ON_RECOVERY_TEST,
-    ON_SOCIAL_ACTION
+    ON_SOCIAL_ACTION,
+    /** Effekt liegt auf dem Verteidiger und schwächt Angriffe gegen ihn (z.B. Phantomkrieger −3). */
+    ON_INCOMING_ATTACK
 }

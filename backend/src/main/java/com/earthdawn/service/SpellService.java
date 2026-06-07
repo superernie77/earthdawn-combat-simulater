@@ -280,6 +280,28 @@ public class SpellService {
             effectTarget.getActiveEffects().add(effect);
         }
 
+        // Phantomkrieger: zusätzlicher Effekt — Angreifer gegen das Ziel erleiden −3 auf Angriffsstufe
+        if ("Phantomkrieger".equals(spell.getName()) && target != null) {
+            ActiveEffect attackPenalty = ActiveEffect.builder()
+                    .combatantState(target)
+                    .name("Phantomkrieger (Angreifer −3)")
+                    .description("Angriffe gegen " + target.getCharacter().getName() + " erleiden −3 auf Angriffsstufe")
+                    .sourceType(SourceType.SPELL)
+                    .sourceId(spell.getId())
+                    .remainingRounds(spell.getDuration())
+                    .negative(false)
+                    .modifiers(List.of(
+                            com.earthdawn.model.ModifierEntry.builder()
+                                    .targetStat(com.earthdawn.model.enums.StatType.ATTACK_STEP)
+                                    .operation(com.earthdawn.model.enums.ModifierOperation.ADD)
+                                    .value(-3)
+                                    .triggerContext(com.earthdawn.model.enums.TriggerContext.ON_INCOMING_ATTACK)
+                                    .build()
+                    ))
+                    .build();
+            target.getActiveEffects().add(attackPenalty);
+        }
+
         result.effectApplied(spell.getEffectDescription())
               .effectDuration(spell.getDuration());
     }

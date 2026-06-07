@@ -3713,7 +3713,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     const spell = this.spellsOf(this.spellCastDialog.caster)
       .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition;
     if (!spell) return false;
-    return spell.effectType === 'DAMAGE' || spell.effectType === 'DEBUFF';
+    return spell.effectType === 'DAMAGE' || spell.effectType === 'DEBUFF' || !!spell.requiresTarget;
   }
 
   spellTargets(): CombatantState[] {
@@ -3721,8 +3721,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     const spell = this.spellsOf(this.spellCastDialog.caster)
       .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition;
     if (!spell) return [];
-    if (spell.effectType === 'BUFF' || spell.effectType === 'HEAL') {
-      // Friendly targets (same side)
+    if (spell.effectType === 'BUFF' || spell.effectType === 'HEAL' || spell.requiresTarget) {
+      // Friendly targets (same side) — inkl. des Zauberers selbst (Selbstbuff möglich)
       return (this.session?.combatants ?? []).filter(c => !c.defeated);
     }
     // Enemy targets

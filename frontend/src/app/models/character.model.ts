@@ -109,6 +109,8 @@ export interface SpellDefinition {
   duration: number;
   description: string;
   effectDescription: string;
+  /** Wenn true: im Zauberdialog wird ein Ziel ausgewählt; Schwierigkeit = MV des Ziels. */
+  requiresTarget?: boolean;
 }
 
 export interface CharacterSpell {

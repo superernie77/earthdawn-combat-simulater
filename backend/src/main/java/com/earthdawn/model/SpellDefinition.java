@@ -77,6 +77,14 @@ public class SpellDefinition {
     private String effectDescription;
 
     /**
+     * Ob beim Wirken ein explizites Ziel gewählt werden muss (auch für BUFF-Zauber).
+     * Wenn true: Wirkschwierigkeit = MV des Ziels (statt castingDifficulty).
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean requiresTarget = false;
+
+    /**
      * Was passiert bei Übererfolgen?
      * "DAMAGE"   → +2 Schadensstufe pro Übererfolg (Standard für Schadenszauber)
      * "DURATION" → Dauer verlängert sich (2 Runden/Min pro Übererfolg — wird im Log angezeigt)

@@ -297,6 +297,17 @@ public class CombatService {
         }
         int attackStep = modifiers.getEffectiveValue(attacker, StatType.ATTACK_STEP, atkCtx);
 
+        // Effekte auf dem VERTEIDIGER, die Angriffe gegen ihn schwächen (z.B. Phantomkrieger −3)
+        for (ActiveEffect eff : defender.getActiveEffects()) {
+            for (ModifierEntry mod : eff.getModifiers()) {
+                if (mod.getTargetStat() != StatType.ATTACK_STEP) continue;
+                if (mod.getTriggerContext() != TriggerContext.ON_INCOMING_ATTACK) continue;
+                int v = (int) mod.getValue();
+                attackStep += v;
+                attackBonusNotes.add(eff.getName() + " " + (v >= 0 ? "+" : "") + v);
+            }
+        }
+
         // Magische Markierung nach Verbrauch entfernen (gilt nur für 1 Fernkampfangriff)
         if (req.getActionType() == ActionType.RANGED_ATTACK) {
             attacker.getActiveEffects().removeIf(e -> TalentNames.MAGISCHE_MARKIERUNG.equals(e.getName()));
