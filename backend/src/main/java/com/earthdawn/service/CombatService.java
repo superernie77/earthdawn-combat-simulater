@@ -1158,8 +1158,8 @@ public class CombatService {
             return result.build();
         }
 
-        // Übererfolge × −1 Malus
-        int penalty = extraSuccesses; // wird als negative ADD gespeichert
+        // Erfolg = −1, je Übererfolg ein weiteres −1 (also −(1 + Übererfolge))
+        int penalty = 1 + extraSuccesses;
         int duration = ct.getRank();
 
         // Starrsinn-Gegenprobe des Ziels
@@ -1208,11 +1208,9 @@ public class CombatService {
         if (resisted) {
             desc = actorName + " verspottet " + targetName + " (" + total + " vs SV " + socialDef
                  + "), aber " + targetName + " widersteht mit Starrsinn (" + resistRoll.getTotal() + ")!";
-        } else if (penalty > 0) {
+        } else {
             desc = actorName + " verspottet " + targetName + " erfolgreich! " + extraSuccesses + " Übererfolg(e) → −"
                  + penalty + " auf Proben/SV für " + duration + " Runden.";
-        } else {
-            desc = actorName + " verspottet " + targetName + " (" + total + " vs SV " + socialDef + "). Knapper Erfolg, kein Malus.";
         }
         result.description(desc);
 
