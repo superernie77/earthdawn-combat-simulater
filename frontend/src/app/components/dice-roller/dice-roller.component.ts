@@ -749,8 +749,9 @@ export class DiceRollerComponent implements OnInit {
         this.snack.open(`Defensive Haltung: +3 KV/MV/SV diese Runde!`, 'OK', { duration: 3000 });
       }
 
+      // Karma wurde bereits vom Backend in ProbeService abgezogen — kein zweiter Abzug hier.
       if (r.karmaUsed && this.activeChar?.id) {
-        this.characterService.updateField(this.activeChar.id, 'karma', -1).subscribe(updated => {
+        this.characterService.findById(this.activeChar.id).subscribe(updated => {
           this.activeChar = updated;
           this.activeCharService.update(updated);
           if (updated.karmaCurrent === 0) {
