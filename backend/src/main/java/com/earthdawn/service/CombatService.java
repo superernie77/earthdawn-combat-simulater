@@ -746,7 +746,18 @@ public class CombatService {
     public CombatSession endCombat(Long sessionId) {
         CombatSession session = findById(sessionId);
         session.setStatus(CombatStatus.FINISHED);
-        addLog(session, null, null, ActionType.ROUND_CHANGE, "Kampf beendet!", true);
+
+        // Schaden, Wunden und Karma aus dem Kampf auf die Charakterdatenblätter zurückschreiben
+        for (CombatantState cs : session.getCombatants()) {
+            GameCharacter c = cs.getCharacter();
+            c.setCurrentDamage(cs.getCurrentDamage());
+            c.setWounds(cs.getWounds());
+            c.setKarmaCurrent(cs.getCurrentKarma());
+            characterRepo.save(c);
+        }
+
+        addLog(session, null, null, ActionType.ROUND_CHANGE,
+                "Kampf beendet! Schaden, Wunden und Karma aller Charaktere wurden auf die Datenblätter übertragen.", true);
         CombatSession saved = sessionRepo.save(session);
         broadcast(saved);
         return saved;
