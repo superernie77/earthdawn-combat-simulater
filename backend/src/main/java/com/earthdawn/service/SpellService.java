@@ -163,6 +163,11 @@ public class SpellService {
             caster.setCurrentKarma(Math.max(0, caster.getCurrentKarma() - 1));
         }
 
+        // Verzweiflungsschlag-Amulette (Zauber) auf den Zauberwurf — werden hier entladen
+        List<String> amuletNotes = new java.util.ArrayList<>();
+        int amuletCastBonus = combatService.applyAmulets(caster, req.getAmuletCastIds(), true, "Zauber", amuletNotes);
+        castStep += amuletCastBonus;
+
         RollResult castRoll = diceService.roll(castStep);
         int total = castRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
 
@@ -196,12 +201,17 @@ public class SpellService {
 
         if (success) {
             switch (spell.getEffectType()) {
-                case DAMAGE -> applySpellDamage(session, caster, target, spell, extraSuccesses, result);
+                case DAMAGE -> {
+                    // Schadens-Amulette (Zauber) hier entladen und +6 je Amulett auf den Schadenswurf
+                    int amuletDmg = combatService.applyAmulets(caster, req.getAmuletDamageIds(), true, "Schaden", amuletNotes);
+                    applySpellDamage(session, caster, target, spell, extraSuccesses, amuletDmg, result);
+                }
                 case BUFF   -> applySpellBuff(session, caster, target, spell, result);
                 case DEBUFF -> applySpellDebuff(session, target, spell, result);
                 case HEAL   -> applySpellHeal(target != null ? target : caster, spell, result);
             }
         }
+        result.amuletNotes(amuletNotes);
 
         // Vorbereitung zurücksetzen
         caster.setPreparingSpellId(null);
@@ -240,13 +250,13 @@ public class SpellService {
     // --- Spell-Effekte ---
 
     private void applySpellDamage(CombatSession session, CombatantState caster, CombatantState target,
-                                   SpellDefinition spell, int extraSuccesses,
+                                   SpellDefinition spell, int extraSuccesses, int amuletDamageBonus,
                                    SpellCastResult.SpellCastResultBuilder result) {
         if (target == null) throw new IllegalStateException("Schadenszauber benötigt ein Ziel.");
 
         int wilStep = Math.max(1, diceService.attributeToStep(caster.getCharacter().getWillpower()) - caster.getWounds());
         int damageBonus = "DAMAGE".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
-        int damageStep = spell.getEffectStep() + wilStep + damageBonus;
+        int damageStep = spell.getEffectStep() + wilStep + damageBonus + amuletDamageBonus;
         RollResult damageRoll = diceService.roll(damageStep);
 
         StatType armorStat = spell.isUseMysticArmor() ? StatType.MYSTIC_ARMOR : StatType.PHYSICAL_ARMOR;

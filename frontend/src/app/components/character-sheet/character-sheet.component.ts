@@ -17,7 +17,7 @@ import { CharacterService } from '../../services/character.service';
 import { ReferenceService } from '../../services/reference.service';
 import { DiceService } from '../../services/dice.service';
 import { ActiveUserService } from '../../services/active-user.service';
-import { ArztResult, Character, CharacterTalent, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
+import { AmuletRechargeResult, ArztResult, Character, CharacterTalent, DerivedStats, DrinkPotionResult, TalentDefinition, SkillDefinition, DisciplineDefinition, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition, RACES } from '../../models/character.model';
 import { ProbeResult } from '../../models/dice.model';
 
 @Component({
@@ -516,6 +516,87 @@ import { ProbeResult } from '../../models/dice.model';
               </div>
             </div>
 
+            <mat-divider style="margin:16px 0"></mat-divider>
+
+            <!-- Verzweiflungsschlag-Amulette -->
+            <div class="equip-section">
+              <div class="section-title">Verzweiflungsschlag-Amulette</div>
+              <div style="font-size:12px;color:#999;margin:-4px 0 10px">
+                Vor dem Wurf ansagen (wie Karma): <strong style="color:#c9a84c">+6</strong> auf Angriffs-/Zauberwurf
+                <em>oder</em> Schadenswurf. Jedes Amulett kostet <strong style="color:#ef9a9a">3 Blutmagie</strong>
+                (dauerhaft −3 auf Bewusstlosigkeits- &amp; Todesschwelle). Aufladen: Erholungsprobe ≥ 3 opfern.
+              </div>
+              <div class="equip-list">
+                <div class="equip-item" *ngFor="let e of amulets()">
+                  <div class="equip-name">
+                    <span matTooltip="Verzweiflungsschlag-Amulett">🩸</span>
+                    {{ e.name }}
+                  </div>
+                  <div class="equip-stats">
+                    <span class="equip-badge" [ngClass]="e.amuletForSpell ? 'shield-myst' : 'weapon'">
+                      {{ e.amuletForSpell ? 'Zauber' : 'Physisch' }}
+                    </span>
+                    <span class="equip-badge weapon">+{{ e.amuletStepBonus ?? 6 }} Stufen</span>
+                    <span class="equip-badge armor-init" matTooltip="Blutmagie-Schaden: dauerhaft −{{ e.bloodMagicDamage ?? 3 }} auf Bewusstlosigkeits-/Todesschwelle">
+                      −{{ e.bloodMagicDamage ?? 3 }} Blutmagie
+                    </span>
+                    <span class="equip-badge" [ngClass]="e.charged !== false ? 'shield-phys' : 'inactive-badge'"
+                          [matTooltip]="e.charged !== false ? 'Einsatzbereit' : 'Entladen — Erholungsprobe ≥3 opfern zum Aufladen'">
+                      {{ e.charged !== false ? '⚡ geladen' : 'entladen' }}
+                    </span>
+                    <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
+                  </div>
+                  <button mat-stroked-button color="accent"
+                          *ngIf="e.charged === false"
+                          [disabled]="getRecoveryTestsRemaining() <= 0"
+                          (click)="rechargeAmulet(e)"
+                          [matTooltip]="getRecoveryTestsRemaining() > 0 ? 'Erholungsprobe opfern (≥3 lädt auf, sonst heilt sie regulär)' : 'Keine Erholungsproben mehr übrig'">
+                    <mat-icon>bolt</mat-icon> Aufladen
+                  </button>
+                  <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+                <div class="equip-empty" *ngIf="!amulets().length">Keine Amulette eingetragen</div>
+              </div>
+
+              <!-- Letztes Aufladeergebnis -->
+              <div class="heal-result" *ngIf="lastAmuletRecharge" style="margin-top:8px">
+                <mat-icon [style.color]="lastAmuletRecharge.recharged ? '#66bb6a' : '#ef9a9a'">
+                  {{ lastAmuletRecharge.recharged ? 'bolt' : 'healing' }}
+                </mat-icon>
+                <div>
+                  <div class="heal-name">{{ lastAmuletRecharge.amuletName }}</div>
+                  <div class="heal-detail">
+                    Erholungswurf Stufe {{ lastAmuletRecharge.rollStep }} → <strong>{{ lastAmuletRecharge.roll?.total }}</strong>
+                    <span *ngIf="lastAmuletRecharge.recharged"> · <strong style="color:#66bb6a">aufgeladen</strong> (Heilung geopfert)</span>
+                    <span *ngIf="!lastAmuletRecharge.recharged"> · &lt;3 → stattdessen <strong class="heal-amount">{{ lastAmuletRecharge.healed }} LP geheilt</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="equip-add-form">
+                <mat-form-field appearance="fill" style="flex:2">
+                  <mat-label>Name</mat-label>
+                  <input matInput [(ngModel)]="newAmulet.name" placeholder="z.B. Verzweiflungsschlag-Amulett">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:160px">
+                  <mat-label>Art</mat-label>
+                  <mat-select [(ngModel)]="newAmulet.amuletForSpell">
+                    <mat-option [value]="false">Physischer Angriff</mat-option>
+                    <mat-option [value]="true">Zauber</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="flex:3">
+                  <mat-label>Beschreibung (optional)</mat-label>
+                  <input matInput [(ngModel)]="newAmulet.description">
+                </mat-form-field>
+                <button mat-stroked-button [disabled]="!newAmulet.name.trim()" (click)="addAmulet()">
+                  <mat-icon>add</mat-icon> Hinzufügen
+                </button>
+              </div>
+            </div>
+
           </div>
         </mat-tab>
 
@@ -999,6 +1080,8 @@ export class CharacterSheetComponent implements OnInit {
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
   newPotionQty: number = 1;
+  newAmulet: { name: string; amuletForSpell: boolean; description: string } = { name: '', amuletForSpell: false, description: '' };
+  lastAmuletRecharge?: AmuletRechargeResult;
   lastRecovery?: RecoveryTestResult;
   lastHolzhaut?: HolzhautResult;
   lastArzt?: ArztResult;
@@ -1219,10 +1302,18 @@ export class CharacterSheetComponent implements OnInit {
       const nat = this.naturalMysticArmor();
       return nat > 0 ? `+${nat} aus WIL` : null;
     }
-    if ((key === 'unconsciousnessRating' || key === 'deathRating') && this.holzhautBonus() > 0) {
-      return `+${this.holzhautBonus()} Holzhaut`;
+    if (key === 'unconsciousnessRating' || key === 'deathRating') {
+      const parts: string[] = [];
+      if (this.holzhautBonus() > 0) parts.push(`+${this.holzhautBonus()} Holzhaut`);
+      if (this.bloodMagicDamage() > 0) parts.push(`−${this.bloodMagicDamage()} Blutmagie`);
+      if (parts.length) return parts.join(' · ');
     }
     return null;
+  }
+
+  /** Blutmagie-Schaden getragener Amulette (vom Backend via derived). */
+  bloodMagicDamage(): number {
+    return this.derived?.bloodMagicDamage ?? 0;
   }
 
   /** Tooltip mit ausführlicher Erklärung. */
@@ -1241,8 +1332,11 @@ export class CharacterSheetComponent implements OnInit {
       const nat = this.naturalMysticArmor();
       return `Natürliche mystische Rüstung aus Willenskraft ${wil}: ${nat} (Tabelle: 1-4=0, 5-9=1, 10-14=2, 15-19=3, 20-24=4, 25-29=5, 30+=6). Ausrüstungs-Boni werden zusätzlich addiert.`;
     }
-    if ((key === 'unconsciousnessRating' || key === 'deathRating') && this.holzhautBonus() > 0) {
-      return `Inklusive Holzhaut-Bonus von +${this.holzhautBonus()}`;
+    if (key === 'unconsciousnessRating' || key === 'deathRating') {
+      const parts: string[] = [];
+      if (this.holzhautBonus() > 0) parts.push(`Holzhaut-Bonus +${this.holzhautBonus()}`);
+      if (this.bloodMagicDamage() > 0) parts.push(`Blutmagie-Abzug −${this.bloodMagicDamage()} (Amulette)`);
+      if (parts.length) return 'Inklusive ' + parts.join(' und ');
     }
     return '';
   }
@@ -1522,6 +1616,43 @@ export class CharacterSheetComponent implements OnInit {
 
   potions(): Equipment[] {
     return (this.character?.equipment ?? []).filter(e => e.type === 'POTION');
+  }
+
+  amulets(): Equipment[] {
+    return (this.character?.equipment ?? []).filter(e => e.type === 'AMULET');
+  }
+
+  addAmulet(): void {
+    if (!this.character?.id || !this.newAmulet.name.trim()) return;
+    const eq: Equipment = {
+      name: this.newAmulet.name.trim(), type: 'AMULET',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      description: this.newAmulet.description,
+      amuletForSpell: this.newAmulet.amuletForSpell, charged: true,
+      amuletStepBonus: 6, bloodMagicDamage: 3
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
+      this.character = c;
+      this.newAmulet = { name: '', amuletForSpell: false, description: '' };
+      this.loadDerived();
+    });
+  }
+
+  rechargeAmulet(a: Equipment): void {
+    if (!this.character?.id || !a.id) return;
+    this.characterService.rechargeAmulet(this.character.id, a.id).subscribe({
+      next: result => {
+        this.lastAmuletRecharge = result;
+        this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
+        if (result.recharged) {
+          this.snack.open(`${result.amuletName} aufgeladen (Wurf ${result.roll?.total} ≥ 3, Erholungsprobe geopfert).`, 'OK', { duration: 4000 });
+        } else {
+          this.snack.open(`Aufladen gescheitert (Wurf ${result.roll?.total} < 3) — stattdessen ${result.healed} LP geheilt.`, 'OK', { duration: 4000 });
+        }
+      },
+      error: err => this.snack.open(err?.error?.message ?? 'Fehler beim Aufladen', 'OK', { duration: 3000 })
+    });
   }
 
   addWeapon(): void {

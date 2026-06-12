@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.earthdawn.dto.AmuletRechargeResult;
 import com.earthdawn.dto.ArztResult;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.DrinkPotionResult;
@@ -192,6 +193,7 @@ public class CharacterService {
                 .recoveryStep(modifierAggregator.getBaseValueFromCharacter(c, StatType.RECOVERY_STEP))
                 .carryingCapacity(modifierAggregator.getBaseValueFromCharacter(c, StatType.CARRYING_CAPACITY))
                 .holzhautBonus(holzhaut)
+                .bloodMagicDamage(modifierAggregator.bloodMagicDamage(c))
                 .build();
     }
 
@@ -426,8 +428,72 @@ public class CharacterService {
                     .filter(e -> e.getType() == equipment.getType())
                     .forEach(e -> e.setActive(false));
         }
+        // Verzweiflungsschlag-Amulett: feste Werte serverseitig erzwingen (geladen, +6, 3 Blutmagie)
+        if (equipment.getType() == EquipmentType.AMULET) {
+            equipment.setCharged(true);
+            if (equipment.getAmuletStepBonus() <= 0) equipment.setAmuletStepBonus(6);
+            if (equipment.getBloodMagicDamage() <= 0) equipment.setBloodMagicDamage(3);
+        }
         c.getEquipment().add(equipment);
         return characterRepo.save(c);
+    }
+
+    /**
+     * Lädt ein entladenes Amulett über eine geopferte Erholungsprobe wieder auf.
+     * Verbraucht einen Erholungs-Slot und würfelt eine Erholungsprobe. Wurf ≥ 3 →
+     * Amulett wird geladen, die Heilung verfällt. Wurf < 3 → Aufladen scheitert,
+     * die Probe heilt stattdessen regulär.
+     */
+    public AmuletRechargeResult rechargeAmulet(Long characterId, Long equipmentId) {
+        GameCharacter c = findById(characterId);
+
+        Equipment amulet = c.getEquipment().stream()
+                .filter(e -> e.getId().equals(equipmentId) && EquipmentType.AMULET.equals(e.getType()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Amulett nicht gefunden: " + equipmentId));
+
+        if (amulet.isCharged()) {
+            throw new IllegalStateException("Amulett ist bereits geladen.");
+        }
+
+        int max = getRecoveryTestsMax(c.getToughness());
+        int remaining = getRecoveryTestsRemaining(c);
+        if (remaining <= 0) {
+            throw new IllegalStateException("Keine Erholungsproben mehr für heute übrig.");
+        }
+
+        int touStep = stepRollService.attributeToStep(c.getToughness());
+        int woundPenalty = c.getWounds();
+        int rollStep = Math.max(1, touStep - woundPenalty);
+
+        remaining--;
+        c.setRecoveryTestsRemaining(remaining);
+
+        RollResult roll = stepRollService.roll(rollStep);
+        boolean recharged = roll.getTotal() >= 3;
+        int healed = 0;
+        if (recharged) {
+            // Erholungsprobe geopfert: Amulett laden, keine Heilung
+            amulet.setCharged(true);
+        } else {
+            // Reicht nicht zum Aufladen: heilt stattdessen regulär
+            healed = Math.min(roll.getTotal(), c.getCurrentDamage());
+            c.setCurrentDamage(c.getCurrentDamage() - healed);
+        }
+        characterRepo.save(c);
+
+        return AmuletRechargeResult.builder()
+                .amuletName(amulet.getName())
+                .toughnessStep(touStep)
+                .woundPenalty(woundPenalty)
+                .rollStep(rollStep)
+                .roll(roll)
+                .recharged(recharged)
+                .healed(healed)
+                .remainingDamage(c.getCurrentDamage())
+                .recoveryTestsRemaining(remaining)
+                .recoveryTestsMax(max)
+                .build();
     }
 
     /**

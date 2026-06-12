@@ -320,6 +320,11 @@ public class CombatService {
         }
         attackStep += req.getBonusSteps();
 
+        // Verzweiflungsschlag-Amulette auf den Angriffswurf (+6 je Amulett, entlädt sie)
+        boolean amuletsUsed = false;
+        int amuletAttackBonus = applyAmulets(attacker, req.getAmuletAttackIds(), false, "Angriff", attackBonusNotes);
+        if (amuletAttackBonus != 0) { attackStep += amuletAttackBonus; amuletsUsed = true; }
+
         // Ausstehende Angriffsboni (z.B. aus Manövrieren) verbrauchen
         if (attacker.getPendingAttackBonus() != 0) {
             int pending = attacker.getPendingAttackBonus();
@@ -496,6 +501,11 @@ public class CombatService {
                   .damageWeaponName(weaponName);
             damageStep += extraSuccesses * 2;
 
+            // Verzweiflungsschlag-Amulette auf den Schadenswurf (+6 je Amulett, entlädt sie)
+            int amuletDamageBonus = applyAmulets(attacker, req.getAmuletDamageIds(), false, "Schaden", damageBonusNotes);
+            if (amuletDamageBonus != 0) { damageStep += amuletDamageBonus; amuletsUsed = true; }
+            result.damageBonusNotes(damageBonusNotes);
+
             RollResult damageRoll = diceService.roll(damageStep);
 
             // 6a. Karma auf Schaden — nur bei Krallenhand-Waffe erlaubt
@@ -554,6 +564,7 @@ public class CombatService {
                         : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
                 addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                         req.getActionType(), actionResult.getDescription() + tag, hit);
+                if (amuletsUsed) characterRepo.save(attacker.getCharacter());
                 sessionRepo.save(session);
                 broadcastWithModal(session, "ATTACK_RESULT", actionResult);
                 return actionResult;
@@ -589,9 +600,44 @@ public class CombatService {
         addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                 req.getActionType(), actionResult.getDescription(), hit);
 
+        if (amuletsUsed) characterRepo.save(attacker.getCharacter());
         sessionRepo.save(session);
         broadcastWithModal(session, "ATTACK_RESULT", actionResult);
         return actionResult;
+    }
+
+    /**
+     * Wendet Verzweiflungsschlag-Amulette an: validiert sie, addiert je ihren Stufen-Bonus (+6),
+     * entlädt sie (charged=false) und fügt eine Anzeige-Notiz hinzu. Gibt die Summe der Boni zurück.
+     *
+     * @param forSpell true = Zauber-Amulette erwartet, false = physische Amulette erwartet
+     * @param label    Anzeige-Label ("Angriff"/"Schaden"/"Zauber")
+     */
+    public int applyAmulets(CombatantState combatant, java.util.List<Long> amuletIds,
+                            boolean forSpell, String label, java.util.List<String> notes) {
+        if (amuletIds == null || amuletIds.isEmpty()) return 0;
+        int bonus = 0;
+        for (Long id : amuletIds) {
+            com.earthdawn.model.Equipment amulet = combatant.getCharacter().getEquipment().stream()
+                    .filter(e -> e.getId().equals(id))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Amulett nicht gefunden: " + id));
+            if (amulet.getType() != com.earthdawn.model.enums.EquipmentType.AMULET) {
+                throw new IllegalStateException(amulet.getName() + " ist kein Amulett.");
+            }
+            if (!amulet.isCharged()) {
+                throw new IllegalStateException("Amulett '" + amulet.getName() + "' ist nicht geladen.");
+            }
+            if (amulet.isAmuletForSpell() != forSpell) {
+                throw new IllegalStateException("Amulett '" + amulet.getName() + "' passt nicht zu dieser Aktion ("
+                        + (forSpell ? "Zauber" : "physischer Angriff") + ").");
+            }
+            int b = amulet.getAmuletStepBonus();
+            bonus += b;
+            amulet.setCharged(false);
+            notes.add(amulet.getName() + " (" + label + ") +" + b);
+        }
+        return bonus;
     }
 
     // --- Runden-Management ---

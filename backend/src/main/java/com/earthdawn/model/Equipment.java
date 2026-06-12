@@ -82,4 +82,33 @@ public class Equipment {
     @Column(columnDefinition = "boolean default true")
     @Builder.Default
     private boolean active = true;
+
+    // --- Verzweiflungsschlag-Amulett (Typ AMULET) ---
+
+    /**
+     * Amulett: ist es gerade geladen (einsatzbereit)? Nach einer Anwendung false,
+     * bis es über eine geopferte Erholungsprobe (≥3) wieder aufgeladen wird.
+     */
+    @Column(columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean charged = true;
+
+    /**
+     * Amulett: true = wirkt auf Zauber (Zauber-/Schadenswurf), false = wirkt auf
+     * physische Angriffe (Angriffs-/Schadenswurf).
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean amuletForSpell = false;
+
+    /** Amulett: Stufen-Bonus bei Anwendung (Standard 6). Wird auf Angriffs- oder Schadenswurf addiert. */
+    @Builder.Default
+    private int amuletStepBonus = 0;
+
+    /**
+     * Blutmagie-Schaden dieses Gegenstands (Amulett: Standard 3). Reduziert dauerhaft
+     * Bewusstlosigkeits- und Todesschwelle, solange der Gegenstand getragen wird.
+     */
+    @Builder.Default
+    private int bloodMagicDamage = 0;
 }

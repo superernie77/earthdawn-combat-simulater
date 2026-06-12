@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ArztResult, Character, DerivedStats, DrinkPotionResult, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition } from '../models/character.model';
+import { AmuletRechargeResult, ArztResult, Character, DerivedStats, DrinkPotionResult, Equipment, HolzhautResult, RecoveryTestResult, SpellDefinition } from '../models/character.model';
 
 @Injectable({ providedIn: 'root' })
 export class CharacterService {
@@ -117,6 +117,14 @@ export class CharacterService {
       `${this.base}/${characterId}/equipment/${equipmentId}/active`,
       null,
       { params: { active } }
+    );
+  }
+
+  /** Lädt ein entladenes Amulett über eine geopferte Erholungsprobe (≥3) wieder auf. */
+  rechargeAmulet(characterId: number, equipmentId: number): Observable<AmuletRechargeResult> {
+    return this.http.post<AmuletRechargeResult>(
+      `${this.base}/${characterId}/equipment/${equipmentId}/recharge-amulet`,
+      null
     );
   }
 

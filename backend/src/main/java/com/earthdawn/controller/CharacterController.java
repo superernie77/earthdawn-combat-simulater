@@ -1,5 +1,6 @@
 package com.earthdawn.controller;
 
+import com.earthdawn.dto.AmuletRechargeResult;
 import com.earthdawn.dto.ArztResult;
 import com.earthdawn.dto.DerivedStats;
 import com.earthdawn.dto.DrinkPotionResult;
@@ -136,6 +137,11 @@ public class CharacterController {
     @DeleteMapping("/{id}/equipment/{equipmentId}")
     public GameCharacter removeEquipment(@PathVariable Long id, @PathVariable Long equipmentId) {
         return characterService.removeEquipment(id, equipmentId);
+    }
+
+    @PostMapping("/{id}/equipment/{equipmentId}/recharge-amulet")
+    public AmuletRechargeResult rechargeAmulet(@PathVariable Long id, @PathVariable Long equipmentId) {
+        return characterService.rechargeAmulet(id, equipmentId);
     }
 
     // --- Zauber ---

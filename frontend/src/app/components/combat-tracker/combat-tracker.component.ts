@@ -1144,6 +1144,23 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             Blattschuss
           </label>
         </div>
+        <!-- Verzweiflungsschlag-Amulette (physisch) -->
+        <div *ngIf="amuletsOf(attackDialog.attacker, false).length" class="amulet-section">
+          <div class="amulet-title">🩸 Verzweiflungsschlag-Amulette (+6 ansagen)</div>
+          <div class="amulet-row" *ngFor="let a of amuletsOf(attackDialog.attacker, false)">
+            <span class="amulet-name">{{ a.name }}</span>
+            <label class="karma-toggle amulet-toggle"
+              [class.active]="attackDialog.amuletMode?.[a.id!] === 'attack'"
+              (click)="toggleAmuletMode(attackDialog.amuletMode, a.id, 'attack')">
+              +6 Angriff
+            </label>
+            <label class="karma-toggle amulet-toggle"
+              [class.active]="attackDialog.amuletMode?.[a.id!] === 'damage'"
+              (click)="toggleAmuletMode(attackDialog.amuletMode, a.id, 'damage')">
+              +6 Schaden
+            </label>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
           <button mat-stroked-button (click)="closeAttackDialog()">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performAttack()">⚔ Angreifen</button>
@@ -1221,7 +1238,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <mat-select [(ngModel)]="gmEffectDialog.statKey">
             <mat-optgroup label="Verteidigungen">
               <mat-option value="PHYSICAL_DEFENSE">KV – Körperliche Verteidigung</mat-option>
-              <mat-option value="MYSTIC_DEFENSE">MV – Mystische Verteidigung</mat-option>
+              <mat-option value="SPELL_DEFENSE">MV – Mystische Verteidigung</mat-option>
               <mat-option value="SOCIAL_DEFENSE">SV – Soziale Verteidigung</mat-option>
               <mat-option value="ALL_DEFENSES">Alle Verteidigungen (KV + MV + SV)</mat-option>
             </mat-optgroup>
@@ -1551,6 +1568,23 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               {{ spellCastDialog.caster?.currentKarma ?? 0 }}
             </span>
           </label>
+        </div>
+        <!-- Verzweiflungsschlag-Amulette (Zauber) -->
+        <div *ngIf="amuletsOf(spellCastDialog.caster, true).length" class="amulet-section">
+          <div class="amulet-title">🩸 Verzweiflungsschlag-Amulette (+6 ansagen)</div>
+          <div class="amulet-row" *ngFor="let a of amuletsOf(spellCastDialog.caster, true)">
+            <span class="amulet-name">{{ a.name }}</span>
+            <label class="karma-toggle amulet-toggle"
+              [class.active]="spellCastDialog.amuletMode?.[a.id!] === 'attack'"
+              (click)="toggleAmuletMode(spellCastDialog.amuletMode, a.id, 'attack')">
+              +6 Zauberwurf
+            </label>
+            <label class="karma-toggle amulet-toggle"
+              [class.active]="spellCastDialog.amuletMode?.[a.id!] === 'damage'"
+              (click)="toggleAmuletMode(spellCastDialog.amuletMode, a.id, 'damage')">
+              +6 Schaden
+            </label>
+          </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
           <button mat-stroked-button (click)="closeSpellCastDialog()">Abbrechen</button>
@@ -2529,6 +2563,12 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .karma-toggle.disabled { opacity: 0.4; cursor: not-allowed; }
     .karma-toggle mat-icon { font-size: 18px; height: 18px; width: 18px; }
     .karma-count-badge { background: rgba(201,168,76,0.2); border-radius: 10px; padding: 0 6px; font-size: 0.8rem; font-weight: bold; color: #c9a84c; }
+    .amulet-section { margin-top: 10px; padding: 8px 10px; border: 1px solid #6d3a3a; border-radius: 8px; background: rgba(160,60,60,0.08); }
+    .amulet-title { font-size: 0.8rem; color: #e0a0a0; margin-bottom: 6px; }
+    .amulet-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .amulet-name { flex: 1; min-width: 120px; font-size: 0.85rem; color: #ddd; }
+    .amulet-toggle { padding: 3px 10px; font-size: 0.8rem; }
+    .amulet-toggle.active { border-color: #ef9a9a; color: #ef9a9a; background: rgba(239,154,154,0.12); }
     .karma-count-badge.empty { background: rgba(244,67,54,0.2); color: #f44336; }
     .roll-block-totals { display: flex; align-items: baseline; gap: 8px; }
     .roll-big-total { font-size: 2.2rem; font-weight: 900; color: #c9a84c; line-height: 1; }
@@ -2777,7 +2817,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     useBlattschuss?: boolean;
     aggressiveAttack: boolean;
     defensiveStance: boolean;
-  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false, useBlattschuss: false, aggressiveAttack: false, defensiveStance: false };
+    /** Amulett-IDs → 'attack' | 'damage' | undefined (nicht angewandt). */
+    amuletMode?: Record<number, 'attack' | 'damage'>;
+  } = { open: false, bonusSteps: 0, spendKarma: false, spendKarmaForDamage: false, useBlattschuss: false, aggressiveAttack: false, defensiveStance: false, amuletMode: {} };
 
   /** Letztes Angriffsziel pro Kombattant (combatantId → defenderId) */
   private lastTargetMap = new Map<number, number>();
@@ -2886,7 +2928,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     spellId?: number;
     targetId?: number;
     spendKarma: boolean;
-  } = { open: false, spendKarma: false };
+    /** Amulett-IDs → 'attack' (Zauberwurf) | 'damage' (Schadenswurf). */
+    amuletMode?: Record<number, 'attack' | 'damage'>;
+  } = { open: false, spendKarma: false, amuletMode: {} };
 
   spellCastModal: { open: boolean; result?: SpellCastResult } = { open: false };
 
@@ -3244,7 +3288,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       spendKarmaForDamage: false,
       useBlattschuss: false,
       aggressiveAttack: false,
-      defensiveStance: false
+      defensiveStance: false,
+      amuletMode: {}
     };
     // Dialog-Status für andere Spieler sichtbar machen
     this.pushDialogState(
@@ -3369,6 +3414,27 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return (c?.character.equipment ?? []).filter(e => e.type === 'WEAPON').sort((a, b) => b.damageBonus - a.damageBonus);
   }
 
+  /** Geladene Verzweiflungsschlag-Amulette des Kombattanten, gefiltert nach Zauber/physisch. */
+  amuletsOf(c: CombatantState | undefined, forSpell: boolean) {
+    return (c?.character.equipment ?? [])
+      .filter(e => e.type === 'AMULET' && e.charged !== false && !!e.amuletForSpell === forSpell);
+  }
+
+  /** Schaltet ein Amulett zwischen 'attack', 'damage' und nicht-gewählt um. */
+  toggleAmuletMode(modeMap: Record<number, 'attack' | 'damage'> | undefined, id: number | undefined, mode: 'attack' | 'damage'): void {
+    if (!modeMap || id == null) return;
+    if (modeMap[id] === mode) delete modeMap[id];
+    else modeMap[id] = mode;
+  }
+
+  /** Equipment-IDs der Amulette, die im angegebenen Modus angewandt werden. */
+  selectedAmuletIds(modeMap: Record<number, 'attack' | 'damage'> | undefined, mode: 'attack' | 'damage'): number[] {
+    if (!modeMap) return [];
+    return Object.keys(modeMap)
+      .filter(k => modeMap[+k] === mode)
+      .map(k => +k);
+  }
+
   private resolveActionType(): AttackActionRequest['actionType'] {
     const talent = this.attackDialog.attacker?.character.talents
       .find(t => t.talentDefinition.id === this.attackDialog.talentId)
@@ -3392,7 +3458,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       spendKarmaForDamage: this.attackDialog.spendKarmaForDamage,
       useBlattschuss: this.attackDialog.useBlattschuss,
       aggressiveAttack: this.attackDialog.aggressiveAttack,
-      defensiveStance: this.attackDialog.defensiveStance
+      defensiveStance: this.attackDialog.defensiveStance,
+      amuletAttackIds: this.selectedAmuletIds(this.attackDialog.amuletMode, 'attack'),
+      amuletDamageIds: this.selectedAmuletIds(this.attackDialog.amuletMode, 'damage')
     };
     this.combatService.performAttack(req).subscribe({
       next: result => {
@@ -3704,7 +3772,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       caster: c,
       spellId: firstSpell?.id,
       targetId: undefined,
-      spendKarma: false
+      spendKarma: false,
+      amuletMode: {}
     };
   }
 
@@ -3736,7 +3805,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       casterCombatantId: this.spellCastDialog.caster.id,
       targetCombatantId: this.spellCastDialog.targetId,
       spellId: this.spellCastDialog.spellId,
-      spendKarma: this.spellCastDialog.spendKarma
+      spendKarma: this.spellCastDialog.spendKarma,
+      amuletCastIds: this.selectedAmuletIds(this.spellCastDialog.amuletMode, 'attack'),
+      amuletDamageIds: this.selectedAmuletIds(this.spellCastDialog.amuletMode, 'damage')
     };
     this.combatService.castSpell(this.session.id, req).subscribe({
       next: result => {
@@ -4568,11 +4639,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   private gmStatToModifiers(key: string): Array<{ targetStat: string; triggerContext: string }> {
     switch (key) {
       case 'PHYSICAL_DEFENSE': return [{ targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' }];
-      case 'MYSTIC_DEFENSE':   return [{ targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' }];
+      case 'SPELL_DEFENSE':    return [{ targetStat: 'SPELL_DEFENSE',    triggerContext: 'ALWAYS' }];
       case 'SOCIAL_DEFENSE':   return [{ targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }];
       case 'ALL_DEFENSES':     return [
         { targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' },
-        { targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' },
+        { targetStat: 'SPELL_DEFENSE',    triggerContext: 'ALWAYS' },
         { targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }
       ];
       case 'ATTACK_STEP':     return [{ targetStat: 'ATTACK_STEP',     triggerContext: 'ALWAYS' }];
@@ -4581,7 +4652,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'ALL_ACTIONS':     return [
         { targetStat: 'ATTACK_STEP',      triggerContext: 'ALWAYS' },
         { targetStat: 'PHYSICAL_DEFENSE', triggerContext: 'ALWAYS' },
-        { targetStat: 'MYSTIC_DEFENSE',   triggerContext: 'ALWAYS' },
+        { targetStat: 'SPELL_DEFENSE',    triggerContext: 'ALWAYS' },
         { targetStat: 'SOCIAL_DEFENSE',   triggerContext: 'ALWAYS' }
       ];
       case 'MYSTIC_ARMOR':    return [{ targetStat: 'MYSTIC_ARMOR',    triggerContext: 'ALWAYS' }];
@@ -4594,7 +4665,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   private gmStatLabel(key: string): string {
     const map: Record<string, string> = {
       'PHYSICAL_DEFENSE': 'KV',
-      'MYSTIC_DEFENSE':   'MV',
+      'SPELL_DEFENSE':    'MV',
       'SOCIAL_DEFENSE':   'SV',
       'ALL_DEFENSES':     'alle VK',
       'ATTACK_STEP':      'Angriff',

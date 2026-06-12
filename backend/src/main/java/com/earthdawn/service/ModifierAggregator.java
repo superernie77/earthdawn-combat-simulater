@@ -83,8 +83,8 @@ public class ModifierAggregator {
             case ATTACK_STEP          -> Math.max(1, stepRoll.attributeToStep(c.getDexterity()) - combatant.getWounds());
             case DAMAGE_STEP          -> Math.max(1, stepRoll.attributeToStep(c.getStrength())  - combatant.getWounds());
             case WOUND_THRESHOLD      -> computeOrOverride(c.getWoundThreshold(),      (c.getToughness() / 2) + 4);
-            case UNCONSCIOUSNESS_RATING -> computeOrOverride(c.getUnconsciousnessRating(), c.getToughness() * 2 + (c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0));
-            case DEATH_RATING         -> computeOrOverride(c.getDeathRating(),         c.getToughness() * 2 + 10 + (c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0));
+            case UNCONSCIOUSNESS_RATING -> computeOrOverride(c.getUnconsciousnessRating(), c.getToughness() * 2 + (c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0)) - bloodMagicDamage(c);
+            case DEATH_RATING         -> computeOrOverride(c.getDeathRating(),         c.getToughness() * 2 + 10 + (c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0)) - bloodMagicDamage(c);
             case KARMA_STEP           -> c.getDiscipline() != null ? c.getDiscipline().getKarmaStep() : 4;
             case RECOVERY_STEP        -> stepRoll.attributeToStep(c.getToughness());
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
@@ -108,8 +108,8 @@ public class ModifierAggregator {
             case ATTACK_STEP          -> stepRoll.attributeToStep(c.getDexterity());
             case DAMAGE_STEP          -> stepRoll.attributeToStep(c.getStrength());
             case WOUND_THRESHOLD      -> computeOrOverride(c.getWoundThreshold(),      (c.getToughness() / 2) + 4);
-            case UNCONSCIOUSNESS_RATING -> computeOrOverride(c.getUnconsciousnessRating(), c.getToughness() * 2 + (c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0));
-            case DEATH_RATING         -> computeOrOverride(c.getDeathRating(),         c.getToughness() * 2 + 10 + (c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0));
+            case UNCONSCIOUSNESS_RATING -> computeOrOverride(c.getUnconsciousnessRating(), c.getToughness() * 2 + (c.getDiscipline() != null ? c.getDiscipline().getBwBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0)) - bloodMagicDamage(c);
+            case DEATH_RATING         -> computeOrOverride(c.getDeathRating(),         c.getToughness() * 2 + 10 + (c.getDiscipline() != null ? c.getDiscipline().getTdBonusPerCircle() * Math.max(0, c.getCircle() - 1) : 0)) - bloodMagicDamage(c);
             case KARMA_STEP           -> c.getDiscipline() != null ? c.getDiscipline().getKarmaStep() : 4;
             case RECOVERY_STEP        -> stepRoll.attributeToStep(c.getToughness());
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
@@ -118,6 +118,15 @@ public class ModifierAggregator {
 
     private int computeOrOverride(Integer override, int computed) {
         return override != null ? override : computed;
+    }
+
+    /**
+     * Summe des Blutmagie-Schadens aller getragenen Gegenstände (Amulette).
+     * Reduziert dauerhaft Bewusstlosigkeits- und Todesschwelle.
+     */
+    public int bloodMagicDamage(GameCharacter c) {
+        return c.getEquipment() == null ? 0
+                : c.getEquipment().stream().mapToInt(Equipment::getBloodMagicDamage).sum();
     }
 
     /**

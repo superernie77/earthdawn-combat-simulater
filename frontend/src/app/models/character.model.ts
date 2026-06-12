@@ -64,7 +64,7 @@ export interface CharacterSkill {
   rank: number;
 }
 
-export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION';
+export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION' | 'AMULET';
 
 export interface Equipment {
   id?: number;
@@ -89,6 +89,30 @@ export interface Equipment {
    * Default: true (neu hinzugefügte Stücke sind automatisch aktiv).
    */
   active?: boolean;
+  // --- Verzweiflungsschlag-Amulett (Typ AMULET) ---
+  /** Amulett geladen (einsatzbereit)? Nach Anwendung false, bis per Erholungsprobe aufgeladen. */
+  charged?: boolean;
+  /** Amulett: true = für Zauber, false = für physische Angriffe. */
+  amuletForSpell?: boolean;
+  /** Amulett: Stufen-Bonus bei Anwendung (Standard 6). */
+  amuletStepBonus?: number;
+  /** Blutmagie-Schaden (Amulett: 3) — reduziert dauerhaft Bewusstlosigkeits-/Todesschwelle. */
+  bloodMagicDamage?: number;
+}
+
+export interface AmuletRechargeResult {
+  amuletName: string;
+  toughnessStep: number;
+  woundPenalty: number;
+  rollStep: number;
+  roll: RollResult;
+  /** true = Wurf ≥ 3, Amulett aufgeladen (Heilung geopfert). */
+  recharged: boolean;
+  /** Geheilter Schaden, falls Wurf < 3 (sonst 0). */
+  healed: number;
+  remainingDamage: number;
+  recoveryTestsRemaining: number;
+  recoveryTestsMax: number;
 }
 
 export interface SpellDefinition {
@@ -202,6 +226,8 @@ export interface DerivedStats {
   carryingCapacity: number;
   /** Aktiver Holzhaut-Bonus (0 = nicht aktiv); bereits in unconsciousnessRating und deathRating eingerechnet. */
   holzhautBonus: number;
+  /** Blutmagie-Schaden getragener Amulette (0 = keine); bereits von unconsciousnessRating und deathRating abgezogen. */
+  bloodMagicDamage: number;
 }
 
 export interface HolzhautResult {

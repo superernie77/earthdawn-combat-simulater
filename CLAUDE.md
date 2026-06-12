@@ -147,7 +147,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 
 ## Equipment System
 
-Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION`.
+Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION | AMULET`.
 
 | Type | Relevant fields | Effect |
 |---|---|---|
@@ -155,10 +155,21 @@ Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, Casca
 | ARMOR | `physicalArmor`, `mysticalArmor`, `initiativePenalty` | `initiativePenalty` subtracted from `INITIATIVE_STEP` via `ModifierAggregator` |
 | SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty` | Bonuses added to defenses via `ModifierAggregator` |
 | POTION | `quantity`, `healStep`, `extraRecovery` | See Erholungsproben below |
+| AMULET | `charged`, `amuletForSpell`, `amuletStepBonus`, `bloodMagicDamage` | Verzweiflungsschlag-Amulett — siehe unten |
 
 The "Ausrüstung" tab on the character sheet has separate sections per type. The "Erholung" tab handles recovery tests and potions.
 
 **API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
+
+### Verzweiflungsschlag-Amulette (Typ AMULET)
+- **Mechanik**: Vor dem Wurf ansagen (wie Karma). Jedes Amulett gibt **+6 Stufen** (`amuletStepBonus`, Standard 6) **entweder** auf den Angriffs-/Zauberwurf **oder** auf den Schadenswurf — pro Anwendung wählbar. Mehrere Amulette gleichzeitig tragbar und anwendbar.
+- **Variante**: `amuletForSpell` — `false` = wirkt auf physische Angriffe (`performAttack`), `true` = wirkt auf Zauber (`SpellService.castSpell`). Falsche Kombination wirft `IllegalStateException`.
+- **Blutmagie-Kosten**: `bloodMagicDamage` (Standard 3) reduziert dauerhaft **Bewusstlosigkeits- UND Todesschwelle**, solange getragen. Zentral in `ModifierAggregator.bloodMagicDamage(c)` (Summe über alle Equipment) — abgezogen in `UNCONSCIOUSNESS_RATING` und `DEATH_RATING` (beide Methoden), greift in Kampf und Anzeige. In `DerivedStats.bloodMagicDamage` zur Anzeige.
+- **Aufladen**: Amulett wird nach Anwendung entladen (`charged=false`). `POST /api/characters/{id}/equipment/{equipmentId}/recharge-amulet` opfert eine Erholungsprobe: Wurf ≥ 3 → `charged=true`, Heilung verfällt; Wurf < 3 → heilt regulär, Amulett bleibt entladen. Verbraucht in beiden Fällen einen Erholungs-Slot. Gibt `AmuletRechargeResult` zurück.
+- **Anwendung im Kampf**: `AttackActionRequest.amuletAttackIds` / `amuletDamageIds` (Equipment-IDs), `SpellCastRequest.amuletCastIds` / `amuletDamageIds`. Angriffs-/Zauber-Amulette werden beim Wurf entladen (auch bei Fehlschlag), Schadens-Amulette nur bei Treffer (Schadenswurf). Geteilte Hilfsmethode: `CombatService.applyAmulets(...)`. Entladung wird über `characterRepo.save` / `@Transactional` persistiert.
+- **Defaults serverseitig erzwungen**: `CharacterService.addEquipment` setzt bei Typ AMULET `charged=true`, `amuletStepBonus=6` (falls ≤0), `bloodMagicDamage=3` (falls ≤0).
+- **Flyway V24**: Equipment-Constraint um `AMULET` erweitert + 4 neue Spalten auf `character_equipment`.
+- **Frontend**: Amulett-Sektion im "Ausrüstung"-Tab (Hinzufügen/Liste/Aufladen, Blutmagie-Badge). Im Kampf: Amulett-Toggles (`+6 Angriff` / `+6 Schaden` bzw. `+6 Zauberwurf` / `+6 Schaden`) im Angriffs- und Zauberdialog, nur geladene Amulette der passenden Art.
 
 ### Erholungsproben (Recovery Tests)
 - **Roll**: ZÄH-Step − wounds (min 1). Result reduces `currentDamage`.
@@ -235,6 +246,7 @@ POST   /api/characters/{id}/skills       ?skillDefinitionId=&rank=
 POST   /api/characters/{id}/equipment    Equipment body
 PATCH  /api/characters/{id}/equipment/{equipmentId}  ?quantity=N
 DELETE /api/characters/{id}/equipment/{equipmentId}
+POST   /api/characters/{id}/equipment/{equipmentId}/recharge-amulet → opfert Erholungsprobe (≥3 lädt Amulett), gibt AmuletRechargeResult
 POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speichert als holzhautBonus (überschreibt)
 POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
 POST   /api/characters/{id}/recovery-test         { potionId? } → Erholungsprobe würfeln (optionaler Trank-Bonus); gibt RecoveryTestResult

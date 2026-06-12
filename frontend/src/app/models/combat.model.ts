@@ -170,6 +170,10 @@ export interface AttackActionRequest {
   useBlattschuss?: boolean;
   aggressiveAttack?: boolean;
   defensiveStance?: boolean;
+  /** Verzweiflungsschlag-Amulette (physisch) für +6 auf den Angriffswurf. Equipment-IDs. */
+  amuletAttackIds?: number[];
+  /** Verzweiflungsschlag-Amulette (physisch) für +6 auf den Schadenswurf. Equipment-IDs. */
+  amuletDamageIds?: number[];
 }
 
 export interface CombatActionResult {
@@ -280,6 +284,10 @@ export interface SpellCastRequest {
   targetCombatantId?: number;
   spellId: number;
   spendKarma: boolean;
+  /** Verzweiflungsschlag-Amulette (Zauber) für +6 auf den Zauberwurf. Equipment-IDs. */
+  amuletCastIds?: number[];
+  /** Verzweiflungsschlag-Amulette (Zauber) für +6 auf den Schadenswurf. Equipment-IDs. */
+  amuletDamageIds?: number[];
 }
 
 export interface SpellCastResult {
@@ -308,6 +316,8 @@ export interface SpellCastResult {
   effectDuration?: number;
   healedAmount?: number;
   description: string;
+  /** Angewandte Verzweiflungsschlag-Amulette (Zauber-/Schadensbonus) zur Anzeige. */
+  amuletNotes?: string[];
 }
 
 export interface DistractRequest {

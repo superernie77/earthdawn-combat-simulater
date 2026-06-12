@@ -38,4 +38,7 @@ public class SpellCastResult {
     private int healedAmount;
 
     private String description;
+
+    /** Angewandte Verzweiflungsschlag-Amulette (Zauber-/Schadensbonus) zur Anzeige. */
+    private java.util.List<String> amuletNotes;
 }

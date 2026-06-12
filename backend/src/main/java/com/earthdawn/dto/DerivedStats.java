@@ -21,4 +21,6 @@ public class DerivedStats {
     private int carryingCapacity;
     /** Aktiver Holzhaut-Bonus (0 = nicht aktiv). Bereits in unconsciousnessRating und deathRating eingerechnet. */
     private int holzhautBonus;
+    /** Blutmagie-Schaden getragener Amulette (0 = keine). Bereits von unconsciousnessRating und deathRating abgezogen. */
+    private int bloodMagicDamage;
 }
