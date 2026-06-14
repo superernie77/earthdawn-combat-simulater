@@ -64,7 +64,7 @@ export interface CharacterSkill {
   rank: number;
 }
 
-export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION' | 'AMULET';
+export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION' | 'AMULET' | 'VERBANDSZEUG';
 
 export interface Equipment {
   id?: number;
@@ -201,6 +201,8 @@ export interface Character {
   recoveryTestsRemaining?: number | null;
   // Ausstehender Bonus auf nächste reguläre Erholungsprobe (durch Erholungstrank)
   pendingRecoveryBonus?: number;
+  // Nach erfolgreicher Arztbehandlung: nächste Erholungsprobe ohne Wundabzug
+  arztWoundPenaltyNegated?: boolean;
 
   // Spielleiter
   gmCharacter?: boolean;
@@ -276,6 +278,10 @@ export interface ArztResult {
   success: boolean;
   bonusGranted: number;
   newPendingBonus: number;
+  /** true = Wundabzug der nächsten Erholungsprobe wird aufgehoben (bei Erfolg). */
+  woundPenaltyNegated: boolean;
+  /** Verbleibende Verbandszeug-Anwendungen des Heilers nach dieser Behandlung. */
+  verbandszeugRemaining: number;
 }
 
 export function emptyCharacter(): Character {

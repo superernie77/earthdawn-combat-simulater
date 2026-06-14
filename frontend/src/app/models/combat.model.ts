@@ -162,6 +162,8 @@ export interface AttackActionRequest {
   defenderCombatantId: number;
   actionType: ActionType;
   talentId?: number;
+  /** Alternativ zum Talent: Waffen-Fertigkeit (Nahkampfwaffen/Projektilwaffen). Kein Karma. */
+  skillId?: number;
   weaponId?: number;
   bonusSteps: number;
   spendKarma: boolean;

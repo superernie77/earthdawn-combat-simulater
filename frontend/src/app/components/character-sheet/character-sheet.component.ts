@@ -597,6 +597,45 @@ import { ProbeResult } from '../../models/dice.model';
               </div>
             </div>
 
+            <mat-divider style="margin:16px 0"></mat-divider>
+
+            <!-- Verbandszeug (Arzt-Verbrauchsgegenstand) -->
+            <div class="equip-section">
+              <div class="section-title">Verbandszeug</div>
+              <div style="font-size:12px;color:#999;margin:-4px 0 10px">
+                Verbrauchsgegenstand für Arztproben — pro Behandlung wird <strong>1 Anwendung</strong> verbraucht.
+              </div>
+              <div class="potion-list">
+                <div class="potion-item" *ngFor="let v of verbandszeug()">
+                  <div class="potion-info">
+                    <mat-icon class="potion-icon" style="color:#80cbc4">medical_services</mat-icon>
+                    <div>
+                      <div class="potion-name">{{ v.name }}</div>
+                      <div class="potion-desc" *ngIf="v.description">{{ v.description }}</div>
+                    </div>
+                  </div>
+                  <div class="potion-qty">
+                    <button mat-icon-button (click)="adjustPotionQty(v, -1)" [disabled]="v.quantity <= 0"><mat-icon>remove</mat-icon></button>
+                    <span class="qty-val">{{ v.quantity }}×</span>
+                    <button mat-icon-button (click)="adjustPotionQty(v, 1)"><mat-icon>add</mat-icon></button>
+                  </div>
+                  <button mat-icon-button color="warn" (click)="removeEquipment(v)" matTooltip="Entfernen">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+                <div class="equip-empty" *ngIf="!verbandszeug().length">Kein Verbandszeug im Inventar</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+                <mat-form-field appearance="fill" style="width:90px">
+                  <mat-label>Anzahl</mat-label>
+                  <input matInput type="number" [(ngModel)]="newVerbandszeugQty" min="1">
+                </mat-form-field>
+                <button mat-stroked-button (click)="addVerbandszeug()">
+                  <mat-icon>medical_services</mat-icon> Verbandszeug hinzufügen
+                </button>
+              </div>
+            </div>
+
           </div>
         </mat-tab>
 
@@ -707,6 +746,15 @@ import { ProbeResult } from '../../models/dice.model';
               </span>
             </div>
 
+            <!-- Arzt-Wundpflege: nächste Probe ohne Wundabzug -->
+            <div *ngIf="character.arztWoundPenaltyNegated"
+              style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:#13302e;border-radius:6px;border:1px solid #2e6e66">
+              <mat-icon style="color:#80cbc4">medical_services</mat-icon>
+              <span style="color:#a7d8d2;font-size:13px">
+                Arzt-Wundpflege aktiv: nächste Erholungsprobe <strong>ohne Wundabzug</strong> (−{{ character.wounds }} entfällt)
+              </span>
+            </div>
+
             <div style="display:flex;gap:8px;margin-bottom:20px">
               <button mat-raised-button color="primary"
                 [disabled]="getRecoveryTestsRemaining() <= 0"
@@ -794,8 +842,9 @@ import { ProbeResult } from '../../models/dice.model';
 
             <div style="font-size:13px;color:#aaa;margin-bottom:16px">
               Ein Charakter mit der <strong style="color:#c9a84c">Arzt</strong>-Fertigkeit behandelt diesen Charakter.
-              <br>Wurf: WN-Stufe + Rang vs. <strong style="color:#ef9a9a">{{ 6 * (character?.wounds ?? 0) }}</strong>
-              (6 × {{ character?.wounds ?? 0 }} Wunden).
+              <br>Wurf: WAH-Stufe + Rang vs. festem Mindestwurf <strong style="color:#ef9a9a">5</strong> (Verletzungen und Wunden).
+              Verbraucht <strong>1× Verbandszeug</strong> des Heilers. Erfolg: +Rang auf nächste Erholungsprobe
+              und der <strong>Wundabzug</strong> der nächsten Erholungsprobe entfällt.
             </div>
 
             <div *ngIf="(character?.wounds ?? 0) === 0"
@@ -809,16 +858,21 @@ import { ProbeResult } from '../../models/dice.model';
                   <mat-label>Behandelnder Charakter</mat-label>
                   <mat-select [(ngModel)]="selectedHealerId">
                     <mat-option *ngFor="let c of healerCandidates()" [value]="c.id">
-                      {{ c.name }} (Arzt Rang {{ arztRankOf(c) }})
+                      {{ c.name }} (Arzt Rang {{ arztRankOf(c) }}, Verbandszeug {{ verbandszeugCount(c) }}×)
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
                 <button mat-raised-button color="accent"
-                  [disabled]="!selectedHealerId"
+                  [disabled]="!selectedHealerId || selectedHealerVerbandszeug() <= 0"
                   (click)="doArzt()"
-                  [matTooltip]="'WN-Stufe + Rang vs. ' + (6 * (character?.wounds ?? 0))">
+                  [matTooltip]="selectedHealerVerbandszeug() > 0 ? 'WAH-Stufe + Rang vs. MW 5 — verbraucht 1 Verbandszeug' : 'Heiler hat kein Verbandszeug'">
                   <mat-icon>medical_services</mat-icon> Arztprobe
                 </button>
+              </div>
+
+              <div *ngIf="selectedHealerId && selectedHealerVerbandszeug() <= 0"
+                style="padding:10px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:6px;color:#ef9a9a;font-size:13px;margin-bottom:16px">
+                Der gewählte Heiler hat kein Verbandszeug — Arztprobe nicht möglich.
               </div>
 
               <div class="arzt-result" *ngIf="lastArzt">
@@ -832,7 +886,9 @@ import { ProbeResult } from '../../models/dice.model';
                     vs. MW {{ lastArzt.targetNumber }}
                     → <strong [style.color]="lastArzt.success ? '#66bb6a' : '#ef5350'">{{ lastArzt.roll?.total }}</strong>
                     <span *ngIf="lastArzt.success"> · <strong class="arzt-bonus">+{{ lastArzt.bonusGranted }} Bonus-Stufen</strong> auf nächste Erholungsprobe</span>
+                    <span *ngIf="lastArzt.woundPenaltyNegated"> · <strong style="color:#80cbc4">Wundabzug der nächsten Erholungsprobe entfällt</strong></span>
                     <span *ngIf="!lastArzt.success"> · Fehlschlag</span>
+                    <div style="color:#999;font-size:12px;margin-top:2px">Verbandszeug übrig: {{ lastArzt.verbandszeugRemaining }}×</div>
                   </div>
                 </div>
               </div>
@@ -1087,6 +1143,7 @@ export class CharacterSheetComponent implements OnInit {
   lastArzt?: ArztResult;
   allCharacters: Character[] = [];
   selectedHealerId?: number;
+  newVerbandszeugQty: number = 3;
   currencyDelta: Record<string, number> = { gold: 0, silver: 0, copper: 0 };
 
   attributeFields = [
@@ -1521,20 +1578,28 @@ export class CharacterSheetComponent implements OnInit {
     return c.skills?.find(s => s.skillDefinition.name === 'Arzt')?.rank ?? 0;
   }
 
+  /** Verbandszeug-Anwendungen des aktuell gewählten Heilers. */
+  selectedHealerVerbandszeug(): number {
+    const healer = this.allCharacters.find(c => c.id === this.selectedHealerId);
+    return this.verbandszeugCount(healer);
+  }
+
   doArzt(): void {
     if (!this.character?.id || !this.selectedHealerId) return;
     this.characterService.applyArzt(this.character.id, this.selectedHealerId).subscribe({
       next: result => {
         this.lastArzt = result;
+        // Verbandszeug wird bei jeder Anwendung verbraucht → Heilerliste auffrischen
+        this.characterService.findAll().subscribe(all => this.allCharacters = all);
         if (result.success) {
           this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
           this.snack.open(
-            `${result.healerName}: Erfolg! +${result.bonusGranted} Bonus-Stufen auf nächste Erholungsprobe (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
+            `${result.healerName}: Erfolg! +${result.bonusGranted} Bonus-Stufen + Wundabzug aufgehoben (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
             'OK', { duration: 4000 }
           );
         } else {
           this.snack.open(
-            `${result.healerName}: Fehlschlag (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
+            `${result.healerName}: Fehlschlag (MW ${result.targetNumber}, Wurf: ${result.roll?.total}) — Verbandszeug verbraucht`,
             'OK', { duration: 3000 }
           );
         }
@@ -1620,6 +1685,29 @@ export class CharacterSheetComponent implements OnInit {
 
   amulets(): Equipment[] {
     return (this.character?.equipment ?? []).filter(e => e.type === 'AMULET');
+  }
+
+  verbandszeug(): Equipment[] {
+    return (this.character?.equipment ?? []).filter(e => e.type === 'VERBANDSZEUG');
+  }
+
+  /** Gesamtzahl verbleibender Verbandszeug-Anwendungen eines (Heiler-)Charakters. */
+  verbandszeugCount(c?: Character): number {
+    return (c?.equipment ?? []).filter(e => e.type === 'VERBANDSZEUG').reduce((sum, e) => sum + (e.quantity ?? 0), 0);
+  }
+
+  addVerbandszeug(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Verbandszeug', type: 'VERBANDSZEUG',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0,
+      quantity: Math.max(1, this.newVerbandszeugQty), healStep: 0
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
+      this.character = c;
+      this.newVerbandszeugQty = 3;
+    });
   }
 
   addAmulet(): void {
@@ -1757,7 +1845,8 @@ export class CharacterSheetComponent implements OnInit {
 
   getRecoveryRollStep(): number {
     if (!this.character) return 1;
-    return Math.max(1, this.attrToStep(this.character.toughness) - this.character.wounds);
+    const woundPenalty = this.character.arztWoundPenaltyNegated ? 0 : this.character.wounds;
+    return Math.max(1, this.attrToStep(this.character.toughness) - woundPenalty);
   }
 
   recoverySlotArray(): number[] {

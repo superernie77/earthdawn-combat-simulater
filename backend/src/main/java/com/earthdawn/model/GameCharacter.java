@@ -94,6 +94,14 @@ public class GameCharacter {
     @Column(columnDefinition = "integer default 0")
     @Builder.Default private int pendingRecoveryBonus = 0;
 
+    /**
+     * Nach erfolgreicher Arztbehandlung gesetzt: die nächste Erholungsprobe ignoriert den
+     * Wundabzug (Spec: Arzt eliminiert den Malus, den Wunden auf Erholungsproben verursachen).
+     * Wird bei der nächsten Erholungsprobe verbraucht.
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default private boolean arztWoundPenaltyNegated = false;
+
     // --- Spielleiter ---
     /** true = nur für den Spielleiter sichtbar */
     @Column(columnDefinition = "boolean default false")

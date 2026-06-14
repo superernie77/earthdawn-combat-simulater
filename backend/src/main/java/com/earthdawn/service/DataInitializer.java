@@ -51,6 +51,7 @@ public class DataInitializer {
             migrateExtraSuccessEffects();
             migrateUtilityTalents();
             migrateArztSkill();
+            migrateWeaponSkills();
             migratePhantomkrieger();
             return;
         }
@@ -535,9 +536,30 @@ public class DataInitializer {
             skill("Etikette",      AttributeType.CHARISMA,   "Höfisches Verhalten",    "Sozial"),
             skill("Straßenkunde",  AttributeType.PERCEPTION, "Stadtleben kennen",      "Wissen"),
             skill("Magierkunde",   AttributeType.PERCEPTION, "Magie und Sprüche",      "Wissen"),
-            skill("Theologie",     AttributeType.PERCEPTION, "Religion und Götter",    "Wissen")
+            skill("Theologie",     AttributeType.PERCEPTION, "Religion und Götter",    "Wissen"),
+            skill("Nahkampfwaffen", AttributeType.DEXTERITY, "Nahkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.", "Waffen"),
+            skill("Projektilwaffen", AttributeType.DEXTERITY, "Fernkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.", "Waffen")
         );
         skillRepo.saveAll(skills);
+    }
+
+    /** Idempotent: fügt die Waffen-Fertigkeiten hinzu (für bestehende DBs). Funktionieren wie die
+     *  gleichnamigen Talente im Kampf, erlauben aber kein Karma. */
+    private void migrateWeaponSkills() {
+        if (!skillRepo.existsByName("Nahkampfwaffen")) {
+            skillRepo.save(SkillDefinition.builder()
+                    .name("Nahkampfwaffen").attribute(AttributeType.DEXTERITY)
+                    .description("Nahkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.")
+                    .category("Waffen").build());
+            log.info("Fertigkeit 'Nahkampfwaffen' hinzugefügt.");
+        }
+        if (!skillRepo.existsByName("Projektilwaffen")) {
+            skillRepo.save(SkillDefinition.builder()
+                    .name("Projektilwaffen").attribute(AttributeType.DEXTERITY)
+                    .description("Fernkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.")
+                    .category("Waffen").build());
+            log.info("Fertigkeit 'Projektilwaffen' hinzugefügt.");
+        }
     }
 
     private void seedDisciplines() {

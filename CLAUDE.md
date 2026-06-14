@@ -175,12 +175,20 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 ### Erholungsproben (Recovery Tests)
 - **Roll**: ZÄH-Step − wounds (min 1). Result reduces `currentDamage`.
 - **Daily limit** from ZÄH: 1–6→1, 7–12→2, 13–18→3, 19–24→4, 25+→5. Stored as `recoveryTestsRemaining` (Integer, null = full) on `GameCharacter`.
-- **Wound penalty**: −1 step per wound, clamped to minimum 1.
+- **Wound penalty**: −1 step per wound, clamped to minimum 1. **Ausnahme**: ist `arztWoundPenaltyNegated=true` (nach erfolgreicher Arztbehandlung), entfällt der Wundabzug für **eine** Erholungsprobe; das Flag wird dabei verbraucht.
 - **Erholungstrank** (`extraRecovery=false`): +`healStep` bonus steps, consumes one daily slot.
 - **Heiltrank** (`extraRecovery=true`): +`healStep` bonus steps, grants an extra test (ignores daily limit).
 - **`healStep`** default 7 for both types (ED4 standard). Quantity decrements by 1 on use.
 - **Reset**: `POST /api/characters/{id}/recovery-test/reset` → sets `recoveryTestsRemaining = max` (new day).
 - **Frontend**: Tab "Erholung" shows slot dots, "Erholungsprobe würfeln" button, "Neuer Tag" reset, potion list with Trinken-button. `lastRecovery` (type `RecoveryTestResult`) displays last result.
+
+### Arzt (Physician) — Verletzungen und Wunden
+- **Wurf**: WAH-Step + Arzt-Rang vs. **festem Mindestwurf 5** (ED4-DN für „Verletzungen und Wunden"; **nicht** 6×Wunden). Nur möglich, wenn der Patient ≥1 Wunde hat.
+- **Verbandszeug**: Verbrauchsgegenstand des Heilers (`EquipmentType.VERBANDSZEUG`, `quantity` = Anwendungen). **1× pro Arztprobe verbraucht** (auch bei Fehlschlag). Ohne Verbandszeug wirft die Probe `IllegalStateException`.
+- **Erfolg**: (1) Patient erhält **+Rang** als `pendingRecoveryBonus` auf die nächste Erholungsprobe; (2) `arztWoundPenaltyNegated=true` → die nächste Erholungsprobe ignoriert den Wundabzug (Wunde bleibt, aber ohne Recovery-Malus).
+- **Endpoint**: `POST /api/characters/{id}/arzt` (Body `{ healerCharacterId }`), gibt `ArztResult` (inkl. `woundPenaltyNegated`, `verbandszeugRemaining`).
+- **Flyway V26**: `EquipmentType`-Constraint um `VERBANDSZEUG` erweitert + Spalte `arzt_wound_penalty_negated` auf `characters`.
+- **Frontend**: Verbandszeug-Sektion im „Ausrüstung"-Tab (Mengensteuerung). „Arzt"-Tab zeigt Verbandszeug-Bestand des Heilers, sperrt die Probe ohne Verbandszeug; „Erholung"-Tab zeigt aktive Wundpflege.
 
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
@@ -252,6 +260,7 @@ POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speicher
 POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
 POST   /api/characters/{id}/recovery-test         { potionId? } → Erholungsprobe würfeln (optionaler Trank-Bonus); gibt RecoveryTestResult
 POST   /api/characters/{id}/recovery-test/reset   → Neuer Tag: setzt recoveryTestsRemaining auf Max (aus ZÄH)
+POST   /api/characters/{id}/arzt                  { healerCharacterId } → Arztprobe (MW 5, verbraucht 1 Verbandszeug); gibt ArztResult
 
 GET    /api/reference/disciplines
 GET    /api/reference/talents
@@ -330,6 +339,10 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Additional attacks: Zweitwaffe (DEX), Nachtreten (DEX, waffenlos, nur vs. niedrigere Initiative)
 - Initiative: Tigersprung (DEX, once/round, no roll), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
+
+**Skills seeded (Auswahl):** Reiten, diverse Wissens-/Handwerks-/Sozialfertigkeiten, Arzt (PER), sowie die **Waffen-Fertigkeiten Nahkampfwaffen & Projektilwaffen** (DEX, Kategorie „Waffen"). Idempotent via `migrateWeaponSkills()` / `migrateArztSkill()`.
+
+**Waffen-Fertigkeiten im Kampf:** Nahkampfwaffen/Projektilwaffen existieren sowohl als Talent **als auch** als Fertigkeit. Im Angriffsdialog wählbar als Angriffsbasis (`AttackActionRequest.skillId` statt `talentId`). Mechanik identisch zum Talent (GES-Step + Rang vs. KV), **aber Karma ist nicht erlaubt** — `performAttack` rollt kein Karma, wenn `skillId != null` (auch wenn `spendKarma=true`); im Frontend wird der Karma-Toggle ausgeblendet.
 
 **Spells (~105 total):** Illusionist (Circles 1–8) + Geisterbeschwörer (Circles 1–8)
 

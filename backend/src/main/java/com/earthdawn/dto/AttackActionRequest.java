@@ -12,6 +12,8 @@ public class AttackActionRequest {
     private Long defenderCombatantId;
     private ActionType actionType;
     private Long talentId;
+    /** Alternativ zum Talent: Waffen-Fertigkeit (Nahkampfwaffen/Projektilwaffen). Kein Karma erlaubt. */
+    private Long skillId;
     private Long weaponId;
     private int bonusSteps;
     private boolean spendKarma;

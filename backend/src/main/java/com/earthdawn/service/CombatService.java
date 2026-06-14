@@ -318,6 +318,12 @@ public class CombatService {
                     .filter(t -> t.getTalentDefinition().getId().equals(req.getTalentId()))
                     .findFirst().map(CharacterTalent::getRank).orElse(0);
         }
+        // Waffen-Fertigkeit (alternativ zum Talent): Rang wie beim Talent, aber kein Karma
+        if (req.getSkillId() != null) {
+            attackStep += attacker.getCharacter().getSkills().stream()
+                    .filter(s -> s.getSkillDefinition().getId().equals(req.getSkillId()))
+                    .findFirst().map(CharacterSkill::getRank).orElse(0);
+        }
         attackStep += req.getBonusSteps();
 
         // Verzweiflungsschlag-Amulette auf den Angriffswurf (+6 je Amulett, entlädt sie)
@@ -359,9 +365,9 @@ public class CombatService {
             attacker.setBlattschussUsedThisRound(true);
         }
 
-        // 2. Karma — immer W6 (Stufe 4)
+        // 2. Karma — immer W6 (Stufe 4). Bei Waffen-Fertigkeiten ist kein Karma erlaubt.
         RollResult karmaRoll = null;
-        if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
+        if (req.isSpendKarma() && req.getSkillId() == null && attacker.getCurrentKarma() > 0) {
             karmaRoll = diceService.roll(4);
             attacker.setCurrentKarma(attacker.getCurrentKarma() - 1);
         }

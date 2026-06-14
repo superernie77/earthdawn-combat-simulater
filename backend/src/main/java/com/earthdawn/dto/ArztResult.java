@@ -18,4 +18,8 @@ public class ArztResult {
     private boolean success;
     private int bonusGranted;
     private int newPendingBonus;
+    /** true = bei Erfolg wird der Wundabzug der nächsten Erholungsprobe aufgehoben. */
+    private boolean woundPenaltyNegated;
+    /** Verbleibende Verbandszeug-Anwendungen des Heilers nach dieser Behandlung. */
+    private int verbandszeugRemaining;
 }

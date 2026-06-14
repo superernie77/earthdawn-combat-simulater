@@ -1150,19 +1150,23 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="fill" style="width:100%">
-          <mat-label>Waffentalent</mat-label>
-          <mat-select [(ngModel)]="attackDialog.talentId">
-            <mat-option [value]="null">Kein Talent</mat-option>
-            <mat-option *ngFor="let t of attackTalentsOf(attackDialog.attacker)" [value]="t.talentDefinition.id">
+          <mat-label>Waffentalent / -fertigkeit</mat-label>
+          <mat-select [ngModel]="attackDialog.attackSource" (ngModelChange)="onAttackSourceChange($event)">
+            <mat-option [value]="''">Kein Talent / keine Fertigkeit</mat-option>
+            <mat-option *ngFor="let t of attackTalentsOf(attackDialog.attacker)" [value]="'t:' + t.talentDefinition.id">
               ⚔ {{ t.talentDefinition.name }} (Rang {{ t.rank }})
             </mat-option>
-            <mat-option *ngFor="let t of nonAttackTalentsOf(attackDialog.attacker)" [value]="t.talentDefinition.id">
+            <mat-option *ngFor="let t of nonAttackTalentsOf(attackDialog.attacker)" [value]="'t:' + t.talentDefinition.id">
               {{ t.talentDefinition.name }} (Rang {{ t.rank }})
+            </mat-option>
+            <mat-option *ngFor="let s of weaponSkillsOf(attackDialog.attacker)" [value]="'s:' + s.skillDefinition.id">
+              🎯 {{ s.skillDefinition.name }} (Fertigkeit, Rang {{ s.rank }})
             </mat-option>
           </mat-select>
         </mat-form-field>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <label class="karma-toggle"
+            *ngIf="attackDialog.skillId == null"
             [class.active]="attackDialog.spendKarma"
             [class.disabled]="(attackDialog.attacker?.currentKarma ?? 0) <= 0"
             (click)="(attackDialog.attacker?.currentKarma ?? 0) > 0 && (attackDialog.spendKarma = !attackDialog.spendKarma)">
@@ -1172,6 +1176,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               {{ attackDialog.attacker?.currentKarma ?? 0 }}
             </span>
           </label>
+          <span *ngIf="attackDialog.skillId != null" style="font-size:0.8rem;color:#888;display:flex;align-items:center;gap:4px">
+            <mat-icon style="font-size:16px;height:16px;width:16px">block</mat-icon>
+            Fertigkeit: kein Karma
+          </span>
           <label class="karma-toggle"
             *ngIf="isClawWeaponSelected(attackDialog)"
             [class.active]="attackDialog.spendKarmaForDamage"
@@ -2858,6 +2866,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     attacker?: CombatantState;
     defenderId?: number;
     talentId?: number;
+    /** Alternativ zum Talent: Waffen-Fertigkeit. Wenn gesetzt, ist kein Karma erlaubt. */
+    skillId?: number;
+    /** Composite-Auswahlwert des Angriffsbasis-Dropdowns: 't:<id>' | 's:<id>' | ''. */
+    attackSource?: string;
     weaponId?: number;
     bonusSteps: number;
     spendKarma: boolean;
@@ -3337,6 +3349,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       attacker,
       defenderId: lastDefender?.id,
       talentId: talent?.talentDefinition.id,
+      skillId: undefined,
+      attackSource: talent ? 't:' + talent.talentDefinition.id : '',
       weaponId: weapon?.id,
       bonusSteps: 0,
       spendKarma: false,
@@ -3426,7 +3440,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (weapon?.clawWeapon) {
       const unarmed = (this.attackDialog.attacker.character.talents ?? [])
         .find(t => t.talentDefinition.name === 'Waffenloser Kampf');
-      if (unarmed) this.attackDialog.talentId = unarmed.talentDefinition.id;
+      if (unarmed) {
+        this.attackDialog.talentId = unarmed.talentDefinition.id;
+        this.attackDialog.skillId = undefined;
+        this.attackDialog.attackSource = 't:' + unarmed.talentDefinition.id;
+      }
     }
     // Dialog-Status mit aktualisierter Waffe pushen
     this.pushDialogState(
@@ -3490,13 +3508,53 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       .map(k => +k);
   }
 
+  /** Name der aktuell gewählten Angriffsbasis (Talent ODER Waffen-Fertigkeit). */
+  private selectedAttackSourceName(): string {
+    if (this.attackDialog.skillId != null) {
+      return (this.attackDialog.attacker?.character.skills ?? [])
+        .find(s => s.skillDefinition.id === this.attackDialog.skillId)?.skillDefinition.name ?? '';
+    }
+    return (this.attackDialog.attacker?.character.talents ?? [])
+      .find(t => t.talentDefinition.id === this.attackDialog.talentId)?.talentDefinition.name ?? '';
+  }
+
   private resolveActionType(): AttackActionRequest['actionType'] {
-    const talent = this.attackDialog.attacker?.character.talents
-      .find(t => t.talentDefinition.id === this.attackDialog.talentId)
-      ?.talentDefinition.name ?? '';
-    if (talent === 'Projektilwaffen' || talent === 'Wurfwaffen') return 'RANGED_ATTACK';
-    if (talent === 'Spruchzauberei') return 'SPELL_ATTACK';
+    const name = this.selectedAttackSourceName();
+    if (name === 'Projektilwaffen' || name === 'Wurfwaffen') return 'RANGED_ATTACK';
+    if (name === 'Spruchzauberei') return 'SPELL_ATTACK';
     return 'MELEE_ATTACK';
+  }
+
+  /** Waffen-Fertigkeiten des Kombattanten, die wie Angriffstalente nutzbar sind. */
+  weaponSkillsOf(c?: CombatantState) {
+    const names = ['Nahkampfwaffen', 'Projektilwaffen', 'Wurfwaffen'];
+    return (c?.character.skills ?? [])
+      .filter(s => names.includes(s.skillDefinition.name))
+      .sort((a, b) => b.rank - a.rank);
+  }
+
+  /** Auswahl im Angriffsbasis-Dropdown ('t:<id>' Talent | 's:<id>' Fertigkeit | '' keine). */
+  onAttackSourceChange(val: string): void {
+    this.attackDialog.attackSource = val;
+    if (val?.startsWith('s:')) {
+      this.attackDialog.skillId = +val.slice(2);
+      this.attackDialog.talentId = undefined;
+      this.attackDialog.spendKarma = false; // Fertigkeiten erlauben kein Karma
+    } else if (val?.startsWith('t:')) {
+      this.attackDialog.talentId = +val.slice(2);
+      this.attackDialog.skillId = undefined;
+    } else {
+      this.attackDialog.talentId = undefined;
+      this.attackDialog.skillId = undefined;
+    }
+    if (this.attackDialog.attacker) {
+      this.pushDialogState(
+        this.attackDialog.attacker.id,
+        this.currentAttackActionLabel(),
+        this.combatantNameById(this.attackDialog.defenderId),
+        this.weaponNameById(this.attackDialog.attacker, this.attackDialog.weaponId)
+      );
+    }
   }
 
   performAttack(): void {
@@ -3507,9 +3565,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       defenderCombatantId: this.attackDialog.defenderId,
       actionType: this.resolveActionType(),
       talentId: this.attackDialog.talentId ?? undefined,
+      skillId: this.attackDialog.skillId ?? undefined,
       weaponId: this.attackDialog.weaponId ?? undefined,
       bonusSteps: this.attackDialog.bonusSteps,
-      spendKarma: this.attackDialog.spendKarma,
+      spendKarma: this.attackDialog.skillId != null ? false : this.attackDialog.spendKarma,
       spendKarmaForDamage: this.attackDialog.spendKarmaForDamage,
       useBlattschuss: this.attackDialog.useBlattschuss,
       aggressiveAttack: this.attackDialog.aggressiveAttack,
@@ -4802,13 +4861,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return (attacker.character.equipment ?? []).find(e => e.id === weaponId)?.name ?? undefined;
   }
 
-  /** Aktionstyp-Label basierend auf dem aktuell gewählten Angriffstalent. */
+  /** Aktionstyp-Label basierend auf der aktuell gewählten Angriffsbasis (Talent/Fertigkeit). */
   private currentAttackActionLabel(): string {
-    const talent = this.attackDialog.attacker?.character.talents
-      .find(t => t.talentDefinition.id === this.attackDialog.talentId)?.talentDefinition.name ?? '';
-    if (talent === 'Projektilwaffen' || talent === 'Wurfwaffen') return 'RANGED_ATTACK';
-    if (talent === 'Spruchzauberei') return 'SPELL_ATTACK';
-    return 'MELEE_ATTACK';
+    return this.resolveActionType();
   }
 
   /** Schließt den Angriffsdialog und löscht den Dialog-Status. */

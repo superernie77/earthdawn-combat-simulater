@@ -5,5 +5,6 @@ public enum EquipmentType {
     ARMOR,
     SHIELD,
     POTION,
-    AMULET
+    AMULET,
+    VERBANDSZEUG
 }
