@@ -13,7 +13,8 @@ export type ActionType =
   | 'STAND_UP' | 'AUFSPRINGEN'
   | 'THREADWEAVE' | 'SPELL_CAST' | 'TAUNT'
   | 'ACROBATIC_DEFENSE' | 'COMBAT_SENSE'
-  | 'DISTRACT' | 'IRON_WILL';
+  | 'DISTRACT' | 'IRON_WILL'
+  | 'ZWEITE_WAFFE' | 'NACHTRETEN';
 
 export interface ModifierEntry {
   targetStat: string;
@@ -555,6 +556,14 @@ export interface ZweitwaffeRequest {
   actorCombatantId: number;
   defenderCombatantId: number;
   weaponId?: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface NachtretenRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  defenderCombatantId: number;
   bonusSteps: number;
   spendKarma: boolean;
 }

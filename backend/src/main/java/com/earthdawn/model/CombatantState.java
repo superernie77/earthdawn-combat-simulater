@@ -84,6 +84,11 @@ public class CombatantState {
     @Builder.Default
     private boolean zweitWaffeUsedThisRound = false;
 
+    /** Nachtreten bereits in dieser Runde eingesetzt. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean nachtretenUsedThisRound = false;
+
     /** Lufttanz wurde in dieser Runde aktiviert (Initiative-Bonus, ermöglicht Bonusangriff). */
     @Column(columnDefinition = "boolean default false")
     @Builder.Default

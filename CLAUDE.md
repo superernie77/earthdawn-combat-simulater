@@ -94,6 +94,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 | **Kampfsinn** | PER | MV des Ziels | +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
 | **Manövrieren** | DEX | KV des Ziels | +successes×2 KV (ON_MELEE_DEFENSE) + pending attack bonus für 1 Runde. |
 | **Zweitwaffe** | DEX | KV des Ziels | Zusätzlicher Waffenangriff. Eigener once-per-round-Flag (`zweitWaffeUsedThisRound`). Kann nach Hauptangriff oder statt ihm eingesetzt werden. |
+| **Nachtreten** | DEX | KV des Ziels | Zusätzlicher **waffenloser** Angriff (Einfache Aktion). Schaden = reine STR-Stufe (+2/Übererfolg), kein Waffenbonus. Eigener once-per-round-Flag (`nachtretenUsedThisRound`), verbraucht **kein** `hasActedThisRound`. **Nur gegen Ziele mit niedrigerer Initiative** (`attacker.initiative > defender.initiative`). Riposte/Ausweichen des Ziels wie beim Nahkampf. Endpoint `POST /sessions/{id}/nachtreten` (`NachtretenRequest`). Flyway V25. |
 
 **Successes formula** for all main-action talents: `1 + floor((total − TN) / 5)` on success.
 
@@ -288,6 +289,7 @@ POST   /api/combat/sessions/{id}/combatants/{cId}/iron-will      ?attackTotal=&s
 POST   /api/combat/sessions/{id}/riposte             RiposteRequest { defenderCombatantId, bonusSteps, spendKarma, riposteAttempted }
 POST   /api/combat/sessions/{id}/manoeuver           ManoeuverRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/zweitwaffe          ZweitwaffeRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma }
+POST   /api/combat/sessions/{id}/nachtreten          NachtretenRequest { actorCombatantId, defenderCombatantId, bonusSteps, spendKarma } — waffenloser Zusatzangriff, nur vs. niedrigere Initiative
 POST   /api/combat/sessions/{id}/combatants/{cId}/tigersprung   → no body; initiative += rank, costs 1 damage
 POST   /api/combat/sessions/{id}/combatants/{cId}/lufttanz      → no body; +rank initiative (DECLARATION), enables bonus melee attack, costs 2 damage
 POST   /api/combat/sessions/{id}/lufttanz-attack                LufttanzAttackRequest (bonus melee attack, no hasActedThisRound consumed)
@@ -325,7 +327,7 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Defensive actions: Akrobatische Verteidigung (DEX), Kampfsinn (PER), Manövrieren (DEX)
 - Recon: Schwachstelle erkennen (PER, ziel-spezifischer Schadensbonus, nur physisch)
 - Schützen: Blattschuss (PER, bis zu Rang Karmawürfel auf Fernkampf-Probe — auch nachträglich nach Fehlschlag)
-- Additional attacks: Zweitwaffe (DEX)
+- Additional attacks: Zweitwaffe (DEX), Nachtreten (DEX, waffenlos, nur vs. niedrigere Initiative)
 - Initiative: Tigersprung (DEX, once/round, no roll), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
 

@@ -31,6 +31,7 @@ import {
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
   ZweitwaffeRequest,
+  NachtretenRequest,
   SpotArmorFlawRequest, SpotArmorFlawResult,
   LufttanzActivationResult, LufttanzAttackRequest,
   InitiativeRollDetail, DialogState
@@ -325,6 +326,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openZweitwaffeDialog(c)"
                   matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung) — freie Aktion, 1×/Runde">
                   <mat-icon>join_full</mat-icon>
+                </button>
+                <!-- Nachtreten: zusätzlicher waffenloser Angriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNachtretenTalent(c) && !c.defeated"
+                  class="combat-option-btn nachtreten-btn"
+                  [disabled]="c.nachtretenUsedThisRound"
+                  (click)="openNachtretenDialog(c)"
+                  matTooltip="Nachtreten: zusätzlicher waffenloser Angriff (GES + Rang vs. KV, waffenloser STR-Schaden). Einfache Aktion, 1×/Runde, kostet 1 Überanstrengung. Nur gegen Ziele mit niedrigerer Initiative.">
+                  <mat-icon>sports_martial_arts</mat-icon> Nachtreten
                 </button>
                 <button mat-icon-button *ngIf="session!.status === 'SETUP'"
                   color="warn" (click)="removeCombatant(c.id)" matTooltip="Entfernen">
@@ -1075,6 +1084,43 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
+    <!-- Nachtreten Dialog -->
+    <div class="attack-dialog" *ngIf="nachtretenDialog.open">
+      <div class="dialog-backdrop" (click)="nachtretenDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ffb74d">sports_martial_arts</mat-icon>Nachtreten: {{ nachtretenDialog.actor?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel (nur niedrigere Initiative)</mat-label>
+          <mat-select [(ngModel)]="nachtretenDialog.defenderId">
+            <mat-option *ngFor="let c of nachtretenTargets(nachtretenDialog.actor)" [value]="c.id">
+              {{ cn(c) }} (Ini {{ c.initiative }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          GES + Rang vs. KV — waffenloser STR-Schaden. Einfache Aktion, kostet 1 Überanstrengung, einmal/Runde.
+          <span *ngIf="!nachtretenTargets(nachtretenDialog.actor).length" style="color:#ef9a9a;display:block;margin-top:4px">
+            Kein Ziel mit niedrigerer Initiative als {{ nachtretenDialog.actor?.initiative }}.
+          </span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="nachtretenDialog.spendKarma"
+            [class.disabled]="(nachtretenDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(nachtretenDialog.actor?.currentKarma ?? 0) > 0 && (nachtretenDialog.spendKarma = !nachtretenDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(nachtretenDialog.actor?.currentKarma ?? 0) <= 0">{{ nachtretenDialog.actor?.currentKarma ?? 0 }}</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="nachtretenDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" [disabled]="!nachtretenDialog.defenderId" (click)="performNachtreten()">
+            <mat-icon>sports_martial_arts</mat-icon> Nachtreten
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Attack Dialog -->
     <div class="attack-dialog" *ngIf="attackDialog.open">
       <div class="dialog-backdrop" (click)="closeAttackDialog()"></div>
@@ -1358,14 +1404,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </div>
           <ng-container *ngIf="r.success">
             <div class="roll-divider"></div>
-            <div class="roll-row extra-success-row" *ngIf="r.extraSuccesses > 0">
-              <span class="roll-label">Übererfolge</span>
-              <span class="roll-expr">{{ r.extraSuccesses }}× → +{{ r.extraSuccesses * 2 }} Fernkampf-Angriff</span>
-              <span class="roll-value extra-success">{{ r.extraSuccesses }}</span>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Bonus</span>
+              <span class="roll-expr">+2 Erfolg<span *ngIf="r.extraSuccesses > 0"> + {{ r.extraSuccesses }}× +2 Übererfolg</span></span>
+              <span class="roll-value extra-success">+{{ (1 + r.extraSuccesses) * 2 }}</span>
             </div>
             <div class="taunt-effect-banner" style="background:rgba(206,147,216,0.12);border-color:#ce93d8;color:#ce93d8" *ngIf="r.effectApplied">
               <mat-icon>gps_fixed</mat-icon>
-              +{{ r.extraSuccesses * 2 }} Fernkampf-Angriff bis Rundenende
+              +{{ (1 + r.extraSuccesses) * 2 }} Fernkampf-Angriff bis Rundenende
             </div>
           </ng-container>
           <div class="roll-row" *ngIf="r.damageTaken > 0" style="background:rgba(239,83,80,0.08);margin-top:8px">
@@ -2702,6 +2748,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     }
     .combat-option-btn.zweitwaffe-btn { color: #ce93d8; border-color: #3a1a40; }
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
+    .combat-option-btn.nachtreten-btn { color: #ffb74d; border-color: #4a3413; }
+    .combat-option-btn.nachtreten-btn:not([disabled]):hover { border-color: #ffb74d; background: rgba(255,183,77,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
     .distract-effect-badge {
       flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
@@ -2903,6 +2951,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     actor?: CombatantState;
     defenderId?: number;
     weaponId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  nachtretenDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    defenderId?: number;
     spendKarma: boolean;
   } = { open: false, spendKarma: false };
 
@@ -4558,6 +4613,43 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.combatService.performZweitwaffe(this.session.id, req).subscribe({
       next: result => {
         this.zweitwaffeDialog.open = false;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Nachtreten ---
+
+  hasNachtretenTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Nachtreten');
+  }
+
+  /** Mögliche Ziele für Nachtreten: nicht besiegt, nicht der Anwender, niedrigere Initiative. */
+  nachtretenTargets(actor?: CombatantState): CombatantState[] {
+    if (!actor) return [];
+    return (this.session?.combatants ?? [])
+      .filter(c => c.id !== actor.id && !c.defeated && c.initiative < actor.initiative);
+  }
+
+  openNachtretenDialog(actor: CombatantState): void {
+    this.nachtretenDialog = { open: true, actor, defenderId: undefined, spendKarma: false };
+  }
+
+  performNachtreten(): void {
+    const actor = this.nachtretenDialog.actor;
+    if (!this.session || !actor || !this.nachtretenDialog.defenderId) return;
+    const req: NachtretenRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: actor.id,
+      defenderCombatantId: this.nachtretenDialog.defenderId,
+      bonusSteps: 0,
+      spendKarma: this.nachtretenDialog.spendKarma
+    };
+    this.combatService.performNachtreten(this.session.id, req).subscribe({
+      next: result => {
+        this.nachtretenDialog.open = false;
         this.resultModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },

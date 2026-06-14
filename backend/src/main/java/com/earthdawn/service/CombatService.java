@@ -653,6 +653,7 @@ public class CombatService {
             combatant.setPendingDefenseBonus(0);
             combatant.setTigersprungUsedThisRound(false);
             combatant.setZweitWaffeUsedThisRound(false);
+            combatant.setNachtretenUsedThisRound(false);
             combatant.setLufttanzActivatedThisRound(false);
             combatant.setLufttanzBonusUsedThisRound(false);
             combatant.setPendingLufttanzTargetId(-1L);
@@ -2588,6 +2589,127 @@ public class CombatService {
         actionResult.setDescription(buildDescription(actionResult));
         addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                 ActionType.ZWEITE_WAFFE, actionResult.getDescription(), hit);
+        sessionRepo.save(session);
+        broadcast(session);
+        return actionResult;
+    }
+
+    // --- Nachtreten (zusätzlicher waffenloser Angriff) ---
+
+    public CombatActionResult performNachtreten(Long sessionId, NachtretenRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState attacker = findCombatant(session, req.getActorCombatantId());
+        CombatantState defender = findCombatant(session, req.getDefenderCombatantId());
+
+        if (attacker.isDefeated()) throw new IllegalStateException(attacker.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (attacker.isNachtretenUsedThisRound()) throw new IllegalStateException("Nachtreten wurde bereits in dieser Runde eingesetzt.");
+
+        // Initiative: Anwender muss höhere Initiative als das Ziel haben
+        if (attacker.getInitiative() <= defender.getInitiative()) {
+            throw new IllegalStateException("Nachtreten ist nur gegen Ziele mit niedrigerer Initiative möglich.");
+        }
+
+        CharacterTalent ct = attacker.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.NACHTRETEN.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Nachtreten' nicht gefunden."));
+
+        // 1 Überanstrengung — Nachtreten ist eine Einfache Aktion (1× pro Runde, zusätzlich zur Hauptaktion)
+        attacker.setCurrentDamage(attacker.getCurrentDamage() + 1);
+        attacker.setNachtretenUsedThisRound(true);
+
+        int dexStep = Math.max(1, diceService.attributeToStep(attacker.getCharacter().getDexterity()) - attacker.getWounds());
+        int attackStep = Math.max(1, dexStep + ct.getRank() + req.getBonusSteps());
+        // Ausstehende Angriffsboni (z.B. Manövrieren) auch hier verbrauchen
+        if (attacker.getPendingAttackBonus() != 0) {
+            attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
+            attacker.setPendingAttackBonus(0);
+        }
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            attacker.setCurrentKarma(Math.max(0, attacker.getCurrentKarma() - 1));
+        }
+
+        RollResult attackRoll = diceService.roll(attackStep);
+        int attackTotal = attackRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int pd = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_DEFENSE, TriggerContext.ON_MELEE_DEFENSE);
+        if (defender.getPendingDefenseBonus() != 0) {
+            pd += defender.getPendingDefenseBonus();
+            defender.setPendingDefenseBonus(0);
+        }
+        boolean hit = attackTotal >= pd;
+
+        CombatActionResult.CombatActionResultBuilder result = CombatActionResult.builder()
+                .actorName(attacker.getCharacter().getName())
+                .targetName(defender.getCharacter().getName())
+                .actionType(ActionType.NACHTRETEN)
+                .attackStep(attackStep).attackRoll(attackRoll).karmaRoll(karmaRoll)
+                .defenseValue(pd).hit(hit);
+
+        if (hit) {
+            int extraSucc = (attackTotal - pd) / 5;
+            // Waffenloser Schaden: reine Stärkestufe + Übererfolge
+            int strStep = diceService.attributeToStep(attacker.getCharacter().getStrength());
+            int damageStep = Math.max(1, strStep + extraSucc * 2);
+            RollResult damageRoll = diceService.roll(damageStep);
+            int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+            int net = Math.max(0, damageRoll.getTotal() - armor);
+
+            // Reaktionsmöglichkeiten des Verteidigers (Riposte und/oder Ausweichen) — wie bei normalem Nahkampfangriff
+            boolean defenderHasRiposte = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
+                    && defender.getPendingRiposteAttackTotal() < 0;
+            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
+
+            if (defenderHasRiposte || defenderHasDodge) {
+                if (defenderHasRiposte) {
+                    defender.setPendingRiposteAttackTotal(attackTotal);
+                    defender.setPendingRiposteAttackerId(attacker.getId());
+                    defender.setPendingRiposteDamage(net);
+                    result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                }
+                if (defenderHasDodge) {
+                    defender.setPendingDodgeDamage(net);
+                    defender.setPendingDodgeAttackTotal(attackTotal);
+                    defender.setPendingDamageStep(damageStep);
+                    defender.setPendingArmorValue(armor);
+                    try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
+                    result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(net);
+                }
+                result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(net);
+                CombatActionResult actionResult = result.build();
+                actionResult.setDescription(buildDescription(actionResult));
+                String tag = defenderHasRiposte && defenderHasDodge
+                        ? " (Riposte oder Ausweichen möglich!)"
+                        : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
+                addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                        ActionType.NACHTRETEN, actionResult.getDescription() + tag, hit);
+                sessionRepo.save(session);
+                broadcast(session);
+                return actionResult;
+            }
+
+            int prevWounds = defender.getWounds();
+            KnockdownResult kdr = applyDamageToDefender(session, defender, net);
+            int newWounds = defender.getWounds() - prevWounds;
+
+            result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                  .armorValue(armor).netDamage(net)
+                  .woundDealt(newWounds > 0).newWounds(newWounds)
+                  .totalWounds(defender.getWounds())
+                  .targetDefeated(defender.isDefeated()).knockdownResult(kdr);
+        }
+
+        CombatActionResult actionResult = result.build();
+        actionResult.setDescription(buildDescription(actionResult));
+        addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                ActionType.NACHTRETEN, actionResult.getDescription(), hit);
         sessionRepo.save(session);
         broadcast(session);
         return actionResult;

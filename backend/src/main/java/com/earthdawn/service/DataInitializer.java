@@ -112,6 +112,16 @@ public class DataInitializer {
                     .testable(true).attackTalent(false).build());
             log.info("Talent 'Zweitwaffe' hinzugefügt.");
         }
+        if (talentRepo.findByName("Nachtreten").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Nachtreten")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Zusätzlicher waffenloser Nahkampfangriff. GES + Rang vs. KV des Ziels. " +
+                            "Einfache Aktion (zusätzlich zur Hauptaktion), kostet 1 Überanstrengung. Einmal pro Runde. " +
+                            "Nur gegen Ziele mit niedrigerer Initiative. Schaden: waffenlose Stärkestufe.")
+                    .testable(true).attackTalent(false).build());
+            log.info("Talent 'Nachtreten' hinzugefügt.");
+        }
         if (talentRepo.findByName("Blattschuss").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Blattschuss")
