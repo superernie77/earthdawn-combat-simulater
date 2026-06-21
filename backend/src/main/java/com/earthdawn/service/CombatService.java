@@ -514,9 +514,12 @@ public class CombatService {
                   .damageWeaponName(weaponName);
             damageStep += extraSuccesses * 2;
 
-            // Verzweiflungsschlag-Amulette auf den Schadenswurf (+6 je Amulett, entlädt sie)
-            int amuletDamageBonus = applyAmulets(attacker, req.getAmuletDamageIds(), false, "Schaden", damageBonusNotes);
-            if (amuletDamageBonus != 0) { damageStep += amuletDamageBonus; amuletsUsed = true; }
+            // Verzweiflungsschlag-Amulette auf den Schadenswurf (+6 je Amulett). Entladen erst, wenn der
+            // Schaden tatsächlich angewendet wird — nicht bei Fehlschlag / erfolgreichem Ausweichen/Riposte.
+            java.util.List<com.earthdawn.model.Equipment> damageAmulets =
+                    collectAmulets(attacker, req.getAmuletDamageIds(), false, "Schaden", damageBonusNotes);
+            int amuletDamageBonus = damageAmulets.stream().mapToInt(com.earthdawn.model.Equipment::getAmuletStepBonus).sum();
+            if (amuletDamageBonus != 0) damageStep += amuletDamageBonus;
             result.damageBonusNotes(damageBonusNotes);
 
             RollResult damageRoll = diceService.roll(damageStep);
@@ -564,6 +567,12 @@ public class CombatService {
                     try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
                     result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(netDamage);
                 }
+                // Schaden-Amulette für den ausstehenden Treffer reservieren (erst bei Schadensanwendung entladen)
+                if (!damageAmulets.isEmpty()) {
+                    defender.setPendingDamageAmuletIds(damageAmulets.stream()
+                            .map(a -> String.valueOf(a.getId())).collect(java.util.stream.Collectors.joining(",")));
+                    defender.setPendingDamageAmuletAttackerId(attacker.getId());
+                }
                 // Wenn nur Riposte (kein Ausweichen): Aktion ist durch, Treffer wird beim Riposte-Resolve angewendet
                 // Wenn Ausweichen aktiv ist: regulärer Pfad — Schaden steht aus, Aktion ebenfalls verbraucht
                 attacker.setHasActedThisRound(true);
@@ -588,6 +597,11 @@ public class CombatService {
                 int prevWounds = defender.getWounds();
                 KnockdownResult kdr = applyDamageToDefender(session, defender, netDamage);
                 int newWounds = defender.getWounds() - prevWounds;
+                // Schaden wurde angewendet → Schaden-Amulette jetzt entladen
+                if (!damageAmulets.isEmpty()) {
+                    damageAmulets.forEach(a -> a.setCharged(false));
+                    amuletsUsed = true;
+                }
                 result.woundDealt(newWounds > 0)
                       .newWounds(newWounds)
                       .totalWounds(defender.getWounds())
@@ -628,8 +642,20 @@ public class CombatService {
      */
     public int applyAmulets(CombatantState combatant, java.util.List<Long> amuletIds,
                             boolean forSpell, String label, java.util.List<String> notes) {
-        if (amuletIds == null || amuletIds.isEmpty()) return 0;
-        int bonus = 0;
+        java.util.List<com.earthdawn.model.Equipment> amulets = collectAmulets(combatant, amuletIds, forSpell, label, notes);
+        amulets.forEach(a -> a.setCharged(false)); // sofort entladen
+        return amulets.stream().mapToInt(com.earthdawn.model.Equipment::getAmuletStepBonus).sum();
+    }
+
+    /**
+     * Validiert die Amulette, fügt Anzeige-Notizen hinzu und gibt die passenden Amulett-Objekte
+     * zurück — OHNE sie zu entladen. Der Aufrufer entscheidet, wann entladen wird (z.B. erst wenn
+     * Schaden tatsächlich angewendet wird).
+     */
+    java.util.List<com.earthdawn.model.Equipment> collectAmulets(CombatantState combatant, java.util.List<Long> amuletIds,
+                            boolean forSpell, String label, java.util.List<String> notes) {
+        java.util.List<com.earthdawn.model.Equipment> result = new java.util.ArrayList<>();
+        if (amuletIds == null || amuletIds.isEmpty()) return result;
         for (Long id : amuletIds) {
             com.earthdawn.model.Equipment amulet = combatant.getCharacter().getEquipment().stream()
                     .filter(e -> e.getId().equals(id))
@@ -645,12 +671,35 @@ public class CombatService {
                 throw new IllegalStateException("Amulett '" + amulet.getName() + "' passt nicht zu dieser Aktion ("
                         + (forSpell ? "Zauber" : "physischer Angriff") + ").");
             }
-            int b = amulet.getAmuletStepBonus();
-            bonus += b;
-            amulet.setCharged(false);
-            notes.add(amulet.getName() + " (" + label + ") +" + b);
+            notes.add(amulet.getName() + " (" + label + ") +" + amulet.getAmuletStepBonus());
+            result.add(amulet);
         }
-        return bonus;
+        return result;
+    }
+
+    /**
+     * Entlädt die für einen ausstehenden Treffer reservierten Schaden-Amulette des Angreifers,
+     * sobald der Schaden tatsächlich angewendet wird. Liest die CSV-IDs vom Verteidiger.
+     */
+    private void dischargePendingDamageAmulets(CombatSession session, CombatantState defender) {
+        String csv = defender.getPendingDamageAmuletIds();
+        Long attackerId = defender.getPendingDamageAmuletAttackerId();
+        if (csv == null || csv.isBlank() || attackerId == null) return;
+        CombatantState attacker = session.getCombatants().stream()
+                .filter(c -> attackerId.equals(c.getId())).findFirst().orElse(null);
+        if (attacker != null) {
+            for (String idStr : csv.split(",")) {
+                try {
+                    long id = Long.parseLong(idStr.trim());
+                    attacker.getCharacter().getEquipment().stream()
+                            .filter(e -> e.getId().equals(id))
+                            .findFirst().ifPresent(a -> a.setCharged(false));
+                } catch (NumberFormatException ignored) {}
+            }
+            characterRepo.save(attacker.getCharacter());
+        }
+        defender.setPendingDamageAmuletIds(null);
+        defender.setPendingDamageAmuletAttackerId(null);
     }
 
     /**
@@ -710,6 +759,9 @@ public class CombatService {
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);
             combatant.setPendingRiposteDamage(0);
+            // Unaufgelöste Schaden-Amulett-Reservierung verfällt (Amulett bleibt geladen)
+            combatant.setPendingDamageAmuletIds(null);
+            combatant.setPendingDamageAmuletAttackerId(null);
             // Aggressive / Defensive Haltungs-Effekte am Rundenende entfernen (unabhängig von remainingRounds)
             combatant.getActiveEffects().removeIf(effect ->
                     TalentNames.EFFECT_AGGRESSIVER_ANGRIFF.equals(effect.getName())
@@ -1023,6 +1075,7 @@ public class CombatService {
             int wtSkip = modifiers.getEffectiveValue(defender, StatType.WOUND_THRESHOLD, TriggerContext.ALWAYS);
             int prevWounds = defender.getWounds();
             KnockdownResult kdr = applyDamageToDefender(session, defender, netDamage);
+            dischargePendingDamageAmulets(session, defender); // Schaden angewendet → Amulette entladen
             int newWounds = defender.getWounds() - prevWounds;
             addLog(session, defName, null, ActionType.DODGE, defName + " nimmt " + netDamage + " Schaden an (kein Ausweichen).", false);
             sessionRepo.save(session);
@@ -1073,6 +1126,11 @@ public class CombatService {
             int prevWounds = defender.getWounds();
             knockdownResult = applyDamageToDefender(session, defender, netDamage);
             newWounds = defender.getWounds() - prevWounds;
+            dischargePendingDamageAmulets(session, defender); // Treffer landet → Amulette entladen
+        } else {
+            // Erfolgreich ausgewichen → Schaden-Amulette bleiben geladen
+            defender.setPendingDamageAmuletIds(null);
+            defender.setPendingDamageAmuletAttackerId(null);
         }
 
         String desc = success
@@ -2066,6 +2124,7 @@ public class CombatService {
         if (!req.isRiposteAttempted()) {
             // Kein Riposte — Angriff annehmen, Schaden direkt anwenden
             applyDamageToDefender(session, defender, riposteDamage);
+            dischargePendingDamageAmulets(session, defender); // Schaden angewendet → Amulette entladen
             String desc = defenderName + " nimmt den Angriff an (kein Riposte). " + riposteDamage + " Schaden erhalten.";
             addLog(session, defenderName, null, ActionType.RIPOSTE, desc, false);
             sessionRepo.save(session);
@@ -2114,8 +2173,13 @@ public class CombatService {
         if (!success) {
             // Parieren fehlgeschlagen: gespeicherten Nettschaden anwenden
             applyDamageToDefender(session, defender, riposteDamage);
+            dischargePendingDamageAmulets(session, defender); // Treffer landet → Amulette entladen
             result.incomingNetDamage(riposteDamage);
             desc.append(" ").append(riposteDamage).append(" Schaden erhalten.");
+        } else {
+            // Erfolgreich pariert → Schaden-Amulette bleiben geladen
+            defender.setPendingDamageAmuletIds(null);
+            defender.setPendingDamageAmuletAttackerId(null);
         }
 
         if (success && extraSuccesses > 0 && attacker != null) {

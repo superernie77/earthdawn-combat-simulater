@@ -95,6 +95,28 @@ class CombatServiceAmuletTest {
         assertThat(combatService.applyAmulets(cs, List.of(), false, "Angriff", new ArrayList<>())).isZero();
     }
 
+    @Test
+    void collectAmulets_validatesAndReturns_butDoesNotDischarge() {
+        Equipment a = amulet(1L, false, true, 6);
+        CombatantState cs = combatantWith(a);
+        List<String> notes = new ArrayList<>();
+
+        var collected = combatService.collectAmulets(cs, List.of(1L), false, "Schaden", notes);
+
+        assertThat(collected).containsExactly(a);
+        assertThat(a.isCharged()).isTrue();   // NICHT entladen (Entladen erst bei Schadensanwendung)
+        assertThat(notes).hasSize(1);
+        assertThat(notes.get(0)).contains("+6");
+    }
+
+    @Test
+    void collectAmulets_stillValidates_notCharged() {
+        CombatantState cs = combatantWith(amulet(1L, false, false, 6));
+        assertThatThrownBy(() -> combatService.collectAmulets(cs, List.of(1L), false, "Schaden", new ArrayList<>()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("nicht geladen");
+    }
+
     // --- Helpers ---
 
     private CombatantState combatantWith(Equipment... equipment) {

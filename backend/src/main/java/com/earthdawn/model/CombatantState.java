@@ -171,6 +171,16 @@ public class CombatantState {
     @Column(columnDefinition = "text")
     private String pendingDamageRollJson;
 
+    /**
+     * Verzweiflungsschlag-Schaden-Amulette, die für den ausstehenden Treffer eingesetzt wurden
+     * (CSV der Equipment-IDs des Angreifers). Werden erst entladen, wenn der Schaden tatsächlich
+     * angewendet wird (nicht bei erfolgreichem Ausweichen/Riposte). */
+    @Column(columnDefinition = "text")
+    private String pendingDamageAmuletIds;
+
+    /** Angreifer-Kombattant des ausstehenden Treffers (für das Entladen der Schaden-Amulette). */
+    private Long pendingDamageAmuletAttackerId;
+
     // --- Zauber-Vorbereitung (Fadenweben) ---
 
     /** ID des aktuell vorbereiteten Zaubers (null = kein Zauber in Vorbereitung) */
