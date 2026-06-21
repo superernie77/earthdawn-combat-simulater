@@ -420,6 +420,13 @@ public class CombatService {
                 .blattschussActive(blattschussActive)
                 .blattschussRank(blattschussRank);
 
+        // Ein-/Zweihändige Waffe ↔ Schild-Automatik (gilt unabhängig von Treffer/Fehlschlag)
+        com.earthdawn.model.Equipment mainWeapon = req.getWeaponId() == null ? null
+                : attacker.getCharacter().getEquipment().stream()
+                    .filter(e -> e.getId().equals(req.getWeaponId()))
+                    .findFirst().orElse(null);
+        boolean shieldChanged = applyTwoHandedShieldRule(attacker, mainWeapon, result);
+
         // Blattschuss + Fehlschlag: pending-State setzen, damit weitere Karma eingesetzt werden können
         if (!hit && blattschussActive && blattschussRank > 0) {
             attacker.setPendingBlattschussDefenderId(defender.getId());
@@ -570,7 +577,7 @@ public class CombatService {
                         : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
                 addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                         req.getActionType(), actionResult.getDescription() + tag, hit);
-                if (amuletsUsed) characterRepo.save(attacker.getCharacter());
+                if (amuletsUsed || shieldChanged) characterRepo.save(attacker.getCharacter());
                 sessionRepo.save(session);
                 broadcastWithModal(session, "ATTACK_RESULT", actionResult);
                 return actionResult;
@@ -606,7 +613,7 @@ public class CombatService {
         addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                 req.getActionType(), actionResult.getDescription(), hit);
 
-        if (amuletsUsed) characterRepo.save(attacker.getCharacter());
+        if (amuletsUsed || shieldChanged) characterRepo.save(attacker.getCharacter());
         sessionRepo.save(session);
         broadcastWithModal(session, "ATTACK_RESULT", actionResult);
         return actionResult;
@@ -644,6 +651,40 @@ public class CombatService {
             notes.add(amulet.getName() + " (" + label + ") +" + b);
         }
         return bonus;
+    }
+
+    /**
+     * Schild-Automatik je nach Waffe: Eine zweihändige Waffe legt ein aktives Schild
+     * (außer Buckler) automatisch ab; eine einhändige Waffe legt ein zuvor automatisch
+     * abgelegtes Schild wieder an. Setzt ggf. die Anzeige-Felder im Ergebnis.
+     *
+     * @return true, wenn ein Schild-Zustand geändert wurde (→ Charakter muss gespeichert werden)
+     */
+    boolean applyTwoHandedShieldRule(CombatantState attacker, com.earthdawn.model.Equipment weapon,
+                                     CombatActionResult.CombatActionResultBuilder result) {
+        if (weapon == null) return false; // waffenlos/Zauber → Schildzustand unverändert
+        boolean changed = false;
+        if (weapon.isTwoHanded()) {
+            for (com.earthdawn.model.Equipment e : attacker.getCharacter().getEquipment()) {
+                if (e.getType() == com.earthdawn.model.enums.EquipmentType.SHIELD
+                        && e.isActive() && !e.isBuckler()) {
+                    e.setActive(false);
+                    e.setAutoStowed(true);
+                    if (result != null) result.shieldStowedName(e.getName());
+                    changed = true;
+                }
+            }
+        } else {
+            for (com.earthdawn.model.Equipment e : attacker.getCharacter().getEquipment()) {
+                if (e.getType() == com.earthdawn.model.enums.EquipmentType.SHIELD && e.isAutoStowed()) {
+                    e.setActive(true);
+                    e.setAutoStowed(false);
+                    if (result != null) result.shieldRestoredName(e.getName());
+                    changed = true;
+                }
+            }
+        }
+        return changed;
     }
 
     // --- Runden-Management ---

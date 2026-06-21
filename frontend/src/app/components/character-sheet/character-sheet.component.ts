@@ -371,6 +371,7 @@ import { ProbeResult } from '../../models/dice.model';
                   </div>
                   <div class="equip-stats">
                     <span class="equip-badge weapon">+{{ e.damageBonus }} Schaden</span>
+                    <span class="equip-badge two-handed-badge" *ngIf="e.twoHanded" matTooltip="Zweihändig: kann nicht zusammen mit einem Schild geführt werden (außer Buckler)">✋✋ Zweihändig</span>
                     <span class="equip-badge claw-badge" *ngIf="e.clawWeapon" matTooltip="Krallenhand: ersetzt STR-Stufe, Karma auf Schaden möglich, nicht entwaffenbar">Krallenhand</span>
                     <span class="equip-badge secondary-weapon" *ngIf="character.secondaryWeaponId === e.id" matTooltip="Wird als Zweitwaffe verwendet">⚔ Zweitwaffe</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
@@ -397,6 +398,13 @@ import { ProbeResult } from '../../models/dice.model';
                 <mat-form-field appearance="fill" style="width:130px">
                   <mat-label>Schadensbonus</mat-label>
                   <input matInput type="number" [(ngModel)]="newWeapon.damageBonus" min="0">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:150px" matTooltip="Zweihändige Waffen können nicht mit Schild geführt werden (außer Buckler)">
+                  <mat-label>Hände</mat-label>
+                  <mat-select [(ngModel)]="newWeapon.twoHanded">
+                    <mat-option [value]="false">Einhändig</mat-option>
+                    <mat-option [value]="true">Zweihändig</mat-option>
+                  </mat-select>
                 </mat-form-field>
                 <mat-form-field appearance="fill" style="flex:3">
                   <mat-label>Beschreibung (optional)</mat-label>
@@ -480,7 +488,9 @@ import { ProbeResult } from '../../models/dice.model';
                     <span class="equip-badge shield-phys" *ngIf="e.physicalDefenseBonus > 0" matTooltip="+KV (Körperliche Verteidigung)">+{{ e.physicalDefenseBonus }} KV</span>
                     <span class="equip-badge shield-myst" *ngIf="e.mysticDefenseBonus > 0" matTooltip="+MV (Mystische Verteidigung)">+{{ e.mysticDefenseBonus }} MV</span>
                     <span class="equip-badge armor-init" *ngIf="e.initiativePenalty > 0" matTooltip="Initiativemalus">−{{ e.initiativePenalty }} Init.</span>
-                    <span class="equip-badge inactive-badge" *ngIf="e.active === false" matTooltip="Dieses Schild ist abgelegt und wird nicht gewertet">abgelegt</span>
+                    <span class="equip-badge buckler-badge" *ngIf="e.buckler" matTooltip="Buckler: kann auch mit zweihändigen Waffen geführt werden">🛡 Buckler</span>
+                    <span class="equip-badge inactive-badge" *ngIf="e.active === false && !e.autoStowed" matTooltip="Dieses Schild ist abgelegt und wird nicht gewertet">abgelegt</span>
+                    <span class="equip-badge inactive-badge" *ngIf="e.active === false && e.autoStowed" matTooltip="Wegen einer zweihändigen Waffe automatisch abgelegt — wird beim nächsten Einhandangriff wieder angelegt">⚔ autom. abgelegt</span>
                     <span class="equip-desc" *ngIf="e.description">{{ e.description }}</span>
                   </div>
                   <button mat-icon-button color="warn" (click)="removeEquipment(e)" matTooltip="Entfernen">
@@ -506,6 +516,8 @@ import { ProbeResult } from '../../models/dice.model';
                   <mat-label>Init.-Malus</mat-label>
                   <input matInput type="number" [(ngModel)]="newShield.initiativePenalty" min="0">
                 </mat-form-field>
+                <mat-checkbox [(ngModel)]="newShield.buckler" style="margin:0 8px"
+                  matTooltip="Buckler: darf auch mit zweihändigen Waffen geführt werden">Buckler</mat-checkbox>
                 <mat-form-field appearance="fill" style="flex:3">
                   <mat-label>Beschreibung (optional)</mat-label>
                   <input matInput [(ngModel)]="newShield.description">
@@ -1132,9 +1144,9 @@ export class CharacterSheetComponent implements OnInit {
   selectedSpellId?: number;
   availableSpells: SpellDefinition[] = [];
 
-  newWeapon: { name: string; damageBonus: number; description: string } = { name: '', damageBonus: 0, description: '' };
+  newWeapon: { name: string; damageBonus: number; twoHanded: boolean; description: string } = { name: '', damageBonus: 0, twoHanded: false, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
-  newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
+  newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; buckler: boolean; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, buckler: false, description: '' };
   newPotionQty: number = 1;
   newAmulet: { name: string; amuletForSpell: boolean; description: string } = { name: '', amuletForSpell: false, description: '' };
   lastAmuletRecharge?: AmuletRechargeResult;
@@ -1745,10 +1757,10 @@ export class CharacterSheetComponent implements OnInit {
 
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
-    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, description: this.newWeapon.description };
+    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, twoHanded: this.newWeapon.twoHanded, description: this.newWeapon.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newWeapon = { name: '', damageBonus: 0, description: '' };
+      this.newWeapon = { name: '', damageBonus: 0, twoHanded: false, description: '' };
     });
   }
 
@@ -1863,10 +1875,10 @@ export class CharacterSheetComponent implements OnInit {
 
   addShield(): void {
     if (!this.character?.id || !this.newShield.name.trim()) return;
-    const eq: Equipment = { name: this.newShield.name.trim(), type: 'SHIELD', damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: this.newShield.initiativePenalty, physicalDefenseBonus: this.newShield.physicalDefenseBonus, mysticDefenseBonus: this.newShield.mysticDefenseBonus, quantity: 1, healStep: 0, description: this.newShield.description };
+    const eq: Equipment = { name: this.newShield.name.trim(), type: 'SHIELD', damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: this.newShield.initiativePenalty, physicalDefenseBonus: this.newShield.physicalDefenseBonus, mysticDefenseBonus: this.newShield.mysticDefenseBonus, quantity: 1, healStep: 0, buckler: this.newShield.buckler, description: this.newShield.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newShield = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, description: '' };
+      this.newShield = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, buckler: false, description: '' };
       this.loadDerived();
     });
   }

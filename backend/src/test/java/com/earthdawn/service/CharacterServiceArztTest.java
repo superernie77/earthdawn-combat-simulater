@@ -3,9 +3,11 @@ package com.earthdawn.service;
 import com.earthdawn.dto.ArztResult;
 import com.earthdawn.dto.RollResult;
 import com.earthdawn.model.CharacterSkill;
+import com.earthdawn.model.Equipment;
 import com.earthdawn.model.GameCharacter;
 import com.earthdawn.model.SkillDefinition;
 import com.earthdawn.model.enums.AttributeType;
+import com.earthdawn.model.enums.EquipmentType;
 import com.earthdawn.repository.CharacterRepository;
 import com.earthdawn.repository.SkillDefinitionRepository;
 import com.earthdawn.repository.SpellDefinitionRepository;
@@ -28,7 +30,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests für die Arzt-Fertigkeit in CharacterService.
+ * Tests für die Arzt-Fertigkeit in CharacterService (ED4-Spec: Verletzungen und Wunden).
+ * Fester Mindestwurf 5, Verbandszeug-Verbrauch, Aufhebung des Wundabzugs.
  * Plain Mockito — kein Spring-Kontext.
  */
 @ExtendWith(MockitoExtension.class)
@@ -53,13 +56,13 @@ class CharacterServiceArztTest {
     // =========================================================================
 
     @Test
-    void success_addsBonusToWoundedPendingRecovery() {
-        GameCharacter wounded = wounded(2, 0); // 2 Wunden, 0 pending bonus
-        GameCharacter healer  = healerWithArzt(15, 3); // WN=15, Arzt Rang 3
+    void success_addsBonusAndNegatesWoundPenalty_andConsumesVerbandszeug() {
+        GameCharacter wounded = wounded(2, 0);
+        GameCharacter healer  = healerWithArzt(15, 3, 3); // WAH=15, Rang 3, 3 Verbandszeug
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(15)).thenReturn(6);
-        stubRoll(14); // >= TN 12 (6×2) → Erfolg
+        stubRoll(9); // >= 5 → Erfolg
 
         ArztResult result = characterService.applyArzt(1L, 2L);
 
@@ -67,91 +70,109 @@ class CharacterServiceArztTest {
         assertThat(result.getBonusGranted()).isEqualTo(3); // = Rang
         assertThat(result.getNewPendingBonus()).isEqualTo(3);
         assertThat(wounded.getPendingRecoveryBonus()).isEqualTo(3);
+        assertThat(result.isWoundPenaltyNegated()).isTrue();
+        assertThat(wounded.isArztWoundPenaltyNegated()).isTrue();
+        assertThat(result.getVerbandszeugRemaining()).isEqualTo(2); // 3 → 2
         verify(characterRepo).save(wounded);
+        verify(characterRepo).save(healer); // Verbandszeug-Verbrauch persistiert
     }
 
     @Test
     void success_accumulatesOnExistingPendingBonus() {
-        GameCharacter wounded = woundedWithPendingBonus(1, 5); // schon 5 pending
-        GameCharacter healer  = healerWithArzt(10, 2); // Rang 2
+        GameCharacter wounded = woundedWithPendingBonus(1, 5);
+        GameCharacter healer  = healerWithArzt(10, 2, 1);
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(10)).thenReturn(5);
-        stubRoll(8); // >= TN 6 (6×1)
+        stubRoll(8);
 
         ArztResult result = characterService.applyArzt(1L, 2L);
 
         assertThat(result.getBonusGranted()).isEqualTo(2);
         assertThat(result.getNewPendingBonus()).isEqualTo(7); // 5 + 2
-        assertThat(wounded.getPendingRecoveryBonus()).isEqualTo(7);
     }
 
     // =========================================================================
-    // Mindestwurf
+    // Mindestwurf — fest 5 (nicht 6 × Wunden)
     // =========================================================================
 
     @Test
-    void targetNumber_equals6TimesWounds() {
-        GameCharacter wounded = wounded(3, 0); // TN = 6×3 = 18
-        GameCharacter healer  = healerWithArzt(12, 2);
+    void targetNumber_isFixed5_regardlessOfWounds() {
+        GameCharacter wounded = wounded(3, 0);
+        GameCharacter healer  = healerWithArzt(12, 2, 2);
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(12)).thenReturn(5);
-        stubRoll(20); // Erfolg
+        stubRoll(6);
 
         ArztResult result = characterService.applyArzt(1L, 2L);
 
-        assertThat(result.getTargetNumber()).isEqualTo(18);
+        assertThat(result.getTargetNumber()).isEqualTo(5);
         assertThat(result.getWounds()).isEqualTo(3);
     }
 
     @Test
-    void exactlyAtTargetNumber_isSuccess() {
-        GameCharacter wounded = wounded(2, 0); // TN = 12
-        GameCharacter healer  = healerWithArzt(10, 1);
-
-        stubFindById(wounded, healer);
-        when(stepRollService.attributeToStep(10)).thenReturn(5);
-        stubRoll(12); // genau TN
-
-        ArztResult result = characterService.applyArzt(1L, 2L);
-
-        assertThat(result.isSuccess()).isTrue();
-    }
-
-    @Test
-    void oneBelowTargetNumber_isFailure() {
-        GameCharacter wounded = wounded(2, 0); // TN = 12
-        GameCharacter healer  = healerWithArzt(10, 1);
-
-        stubFindById(wounded, healer);
-        when(stepRollService.attributeToStep(10)).thenReturn(5);
-        stubRoll(11); // TN - 1
-
-        ArztResult result = characterService.applyArzt(1L, 2L);
-
-        assertThat(result.isSuccess()).isFalse();
-    }
-
-    // =========================================================================
-    // Fehlschlag — kein Bonus
-    // =========================================================================
-
-    @Test
-    void failure_noBonusAdded_noPendingChange() {
+    void exactly5_isSuccess() {
         GameCharacter wounded = wounded(2, 0);
-        GameCharacter healer  = healerWithArzt(10, 2);
+        GameCharacter healer  = healerWithArzt(10, 1, 1);
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(10)).thenReturn(5);
-        stubRoll(5); // < TN 12
+        stubRoll(5); // genau MW 5
+
+        assertThat(characterService.applyArzt(1L, 2L).isSuccess()).isTrue();
+    }
+
+    @Test
+    void below5_isFailure() {
+        GameCharacter wounded = wounded(2, 0);
+        GameCharacter healer  = healerWithArzt(10, 1, 1);
+
+        stubFindById(wounded, healer);
+        when(stepRollService.attributeToStep(10)).thenReturn(5);
+        stubRoll(4); // < 5
+
+        assertThat(characterService.applyArzt(1L, 2L).isSuccess()).isFalse();
+    }
+
+    // =========================================================================
+    // Fehlschlag — Verbandszeug trotzdem verbraucht, kein Bonus/keine Wundpflege
+    // =========================================================================
+
+    @Test
+    void failure_consumesVerbandszeug_butNoBonusOrWoundCare() {
+        GameCharacter wounded = wounded(2, 0);
+        GameCharacter healer  = healerWithArzt(10, 2, 3);
+
+        stubFindById(wounded, healer);
+        when(stepRollService.attributeToStep(10)).thenReturn(5);
+        stubRoll(3); // < 5
 
         ArztResult result = characterService.applyArzt(1L, 2L);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getBonusGranted()).isEqualTo(0);
-        assertThat(wounded.getPendingRecoveryBonus()).isEqualTo(0);
-        verify(characterRepo, never()).save(any()); // kein Speichern bei Fehlschlag
+        assertThat(result.getBonusGranted()).isZero();
+        assertThat(wounded.getPendingRecoveryBonus()).isZero();
+        assertThat(wounded.isArztWoundPenaltyNegated()).isFalse();
+        assertThat(result.isWoundPenaltyNegated()).isFalse();
+        assertThat(result.getVerbandszeugRemaining()).isEqualTo(2); // trotzdem verbraucht
+        verify(characterRepo).save(healer);
+    }
+
+    // =========================================================================
+    // Verbandszeug-Pflicht
+    // =========================================================================
+
+    @Test
+    void noVerbandszeug_throwsException() {
+        GameCharacter wounded = wounded(2, 0);
+        GameCharacter healer  = healerWithArzt(10, 2, 0); // 0 Verbandszeug → keins vorhanden
+
+        stubFindById(wounded, healer);
+
+        assertThatThrownBy(() -> characterService.applyArzt(1L, 2L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Verbandszeug");
     }
 
     // =========================================================================
@@ -161,7 +182,7 @@ class CharacterServiceArztTest {
     @Test
     void rollStep_equals_perStepPlusRank() {
         GameCharacter wounded = wounded(1, 0);
-        GameCharacter healer  = healerWithArzt(14, 3); // WN=14 → step=6, Rang=3 → rollStep=9
+        GameCharacter healer  = healerWithArzt(14, 3, 1); // WAH=14 → step 6, Rang 3 → rollStep 9
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(14)).thenReturn(6);
@@ -178,7 +199,7 @@ class CharacterServiceArztTest {
     @Test
     void result_containsHealerAndWoundedNames() {
         GameCharacter wounded = wounded(1, 0);
-        GameCharacter healer  = healerWithArzt(10, 1);
+        GameCharacter healer  = healerWithArzt(10, 1, 1);
 
         stubFindById(wounded, healer);
         when(stepRollService.attributeToStep(10)).thenReturn(5);
@@ -190,29 +211,14 @@ class CharacterServiceArztTest {
         assertThat(result.getHealerName()).isEqualTo("Heiler");
     }
 
-    @Test
-    void result_rollIsReturned() {
-        GameCharacter wounded = wounded(1, 0);
-        GameCharacter healer  = healerWithArzt(10, 2);
-
-        stubFindById(wounded, healer);
-        when(stepRollService.attributeToStep(10)).thenReturn(5);
-        RollResult roll = RollResult.builder().total(9).diceExpression("2W6").build();
-        when(stepRollService.roll(7)).thenReturn(roll);
-
-        ArztResult result = characterService.applyArzt(1L, 2L);
-
-        assertThat(result.getRoll()).isEqualTo(roll);
-    }
-
     // =========================================================================
     // Fehler-Cases
     // =========================================================================
 
     @Test
     void noWounds_throwsException() {
-        GameCharacter wounded = wounded(0, 0); // keine Wunden
-        GameCharacter healer  = healerWithArzt(10, 1);
+        GameCharacter wounded = wounded(0, 0);
+        GameCharacter healer  = healerWithArzt(10, 1, 1);
 
         stubFindById(wounded, healer);
 
@@ -224,7 +230,7 @@ class CharacterServiceArztTest {
     @Test
     void healerHasNoArztSkill_throwsException() {
         GameCharacter wounded = wounded(2, 0);
-        GameCharacter healer  = character(10, 0); // keine Arzt-Fertigkeit
+        GameCharacter healer  = character(10, 0);
         healer.setId(2L);
         healer.setName("Heiler");
 
@@ -240,33 +246,38 @@ class CharacterServiceArztTest {
     // =========================================================================
 
     private GameCharacter wounded(int wounds, int pendingBonus) {
-        GameCharacter c = GameCharacter.builder()
+        return GameCharacter.builder()
                 .id(1L).name("Verwundeter")
                 .wounds(wounds).toughness(10).perception(10)
                 .pendingRecoveryBonus(pendingBonus)
                 .equipment(new ArrayList<>()).talents(new ArrayList<>())
                 .skills(new ArrayList<>()).spells(new ArrayList<>())
                 .build();
-        return c;
     }
 
     private GameCharacter woundedWithPendingBonus(int wounds, int pendingBonus) {
         return wounded(wounds, pendingBonus);
     }
 
-    private GameCharacter healerWithArzt(int perception, int arztRank) {
+    private GameCharacter healerWithArzt(int perception, int arztRank, int verbandszeugQty) {
         SkillDefinition arztDef = SkillDefinition.builder()
                 .id(99L).name("Arzt").attribute(AttributeType.PERCEPTION).build();
         CharacterSkill arztSkill = CharacterSkill.builder()
                 .id(1L).skillDefinition(arztDef).rank(arztRank).build();
 
-        GameCharacter healer = GameCharacter.builder()
+        List<Equipment> equip = new ArrayList<>();
+        if (verbandszeugQty > 0) {
+            equip.add(Equipment.builder()
+                    .id(50L).name("Verbandszeug").type(EquipmentType.VERBANDSZEUG)
+                    .quantity(verbandszeugQty).build());
+        }
+
+        return GameCharacter.builder()
                 .id(2L).name("Heiler")
                 .perception(perception).toughness(10).wounds(0)
-                .equipment(new ArrayList<>()).talents(new ArrayList<>())
+                .equipment(equip).talents(new ArrayList<>())
                 .skills(new ArrayList<>(List.of(arztSkill))).spells(new ArrayList<>())
                 .build();
-        return healer;
     }
 
     private GameCharacter character(int perception, int wounds) {

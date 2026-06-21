@@ -517,6 +517,8 @@ public class CharacterService {
             c.getEquipment().stream()
                     .filter(e -> e.getType() == target.getType())
                     .forEach(e -> e.setActive(false));
+            // Manuell wieder angelegtes Schild gilt nicht mehr als "automatisch abgelegt"
+            target.setAutoStowed(false);
         }
         target.setActive(active);
         return characterRepo.save(c);

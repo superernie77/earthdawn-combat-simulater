@@ -98,6 +98,12 @@ export interface Equipment {
   amuletStepBonus?: number;
   /** Blutmagie-Schaden (Amulett: 3) — reduziert dauerhaft Bewusstlosigkeits-/Todesschwelle. */
   bloodMagicDamage?: number;
+  /** Waffe: zweihändig zu führen → kein Schild möglich (außer Buckler). */
+  twoHanded?: boolean;
+  /** Schild: Buckler — auch mit zweihändigen Waffen führbar. */
+  buckler?: boolean;
+  /** Schild: vom System wegen Zweihandwaffe automatisch abgelegt (wird bei Einhandangriff wieder angelegt). */
+  autoStowed?: boolean;
 }
 
 export interface AmuletRechargeResult {

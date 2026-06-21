@@ -148,17 +148,25 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 
 ## Equipment System
 
-Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION | AMULET`.
+Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION | AMULET | VERBANDSZEUG`.
 
 | Type | Relevant fields | Effect |
 |---|---|---|
-| WEAPON | `damageBonus` | Shown on character sheet; used manually in combat |
+| WEAPON | `damageBonus`, `twoHanded` | Shown on character sheet; used manually in combat. `twoHanded` → kein Schild (siehe unten) |
 | ARMOR | `physicalArmor`, `mysticalArmor`, `initiativePenalty` | `initiativePenalty` subtracted from `INITIATIVE_STEP` via `ModifierAggregator` |
-| SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty` | Bonuses added to defenses via `ModifierAggregator` |
+| SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty`, `buckler`, `autoStowed` | Bonuses added to defenses via `ModifierAggregator` (nur wenn `active`) |
 | POTION | `quantity`, `healStep`, `extraRecovery` | See Erholungsproben below |
 | AMULET | `charged`, `amuletForSpell`, `amuletStepBonus`, `bloodMagicDamage` | Verzweiflungsschlag-Amulett — siehe unten |
+| VERBANDSZEUG | `quantity` | Arzt-Verbrauchsgegenstand (1× pro Arztprobe) — siehe Arzt |
 
 The "Ausrüstung" tab on the character sheet has separate sections per type. The "Erholung" tab handles recovery tests and potions.
+
+### Ein-/Zweihändige Waffen + Schild-Automatik
+- **`twoHanded`** (WEAPON): Zweihandwaffe — kann nicht mit Schild geführt werden (Ausnahme Buckler).
+- **`buckler`** (SHIELD): darf auch mit zweihändigen Waffen geführt werden.
+- **`autoStowed`** (SHIELD): vom System wegen Zweihandwaffe automatisch abgelegt (markiert es für die automatische Wiederanlegung; manuell abgelegte Schilde haben dieses Flag nicht).
+- **Mechanik** (`CombatService.applyTwoHandedShieldRule`, in `performAttack` vor dem Trefferzweig): Angriff mit Zweihandwaffe legt ein aktives Nicht-Buckler-Schild ab (`active=false`, `autoStowed=true`); Angriff mit Einhandwaffe legt ein `autoStowed`-Schild wieder an (`active=true`, `autoStowed=false`). Da `ModifierAggregator` Schilde nur bei `active==true` wertet, fällt der Verteidigungsbonus automatisch weg. Ergebnis-Felder `CombatActionResult.shieldStowedName` / `shieldRestoredName`. Manuelles Anlegen via `setEquipmentActive` löscht `autoStowed`. Nur `performAttack` (Hauptwaffenangriff); Nachtreten (waffenlos)/Zweitwaffe (Nebenhand) unberührt.
+- **Flyway V27**: `two_handed`, `buckler`, `auto_stowed` auf `character_equipment`.
 
 **API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
 

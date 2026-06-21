@@ -177,7 +177,7 @@ describe('CharacterSheetComponent — derivedTooltip', () => {
 
   it('returns holzhaut tooltip when bonus > 0', () => {
     (comp as any).derived = { holzhautBonus: 4 };
-    expect(comp.derivedTooltip('unconsciousnessRating')).toContain('Holzhaut-Bonus von +4');
+    expect(comp.derivedTooltip('unconsciousnessRating')).toContain('Holzhaut-Bonus +4');
   });
 
   // unbekannte Keys

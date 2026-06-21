@@ -202,6 +202,42 @@ class CharacterServiceRecoveryTest {
     }
 
     // =========================================================================
+    // Arzt-Wundpflege — hebt den Wundabzug für eine Erholungsprobe auf
+    // =========================================================================
+
+    @Test
+    void arztWoundCare_negatesWoundPenalty_andConsumesFlag() {
+        // ZÄH=10 → step 5, Wunden=3, aber Wundpflege aktiv → woundPenalty 0 → rollStep 5
+        GameCharacter c = character(10, 3, 12, 2);
+        c.setArztWoundPenaltyNegated(true);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        stubRoll(8);
+
+        RecoveryTestResult result = characterService.performRecoveryTest(1L);
+
+        assertThat(result.getWoundPenalty()).isZero();
+        assertThat(result.getRollStep()).isEqualTo(5);
+        assertThat(c.isArztWoundPenaltyNegated()).isFalse(); // verbraucht
+    }
+
+    @Test
+    void arztWoundCare_appliesOnlyToNextTest() {
+        // Erste Probe ohne Abzug (Pflege aktiv), zweite wieder mit Abzug
+        GameCharacter c = character(10, 2, 40, 2);
+        c.setArztWoundPenaltyNegated(true);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        stubRoll(6);
+
+        RecoveryTestResult first  = characterService.performRecoveryTest(1L);
+        RecoveryTestResult second = characterService.performRecoveryTest(1L);
+
+        assertThat(first.getWoundPenalty()).isZero();      // Pflege greift
+        assertThat(second.getWoundPenalty()).isEqualTo(2); // danach wieder Abzug
+    }
+
+    // =========================================================================
     // pendingRecoveryBonus — Erholungstrank-Bonus auf reguläre Probe
     // =========================================================================
 

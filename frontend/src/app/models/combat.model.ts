@@ -229,6 +229,10 @@ export interface CombatActionResult {
   blattschussKarmaUsed?: number;
   blattschussRank?: number;
   knockdownResult?: KnockdownResult;
+  /** Name des automatisch abgelegten Schilds (zweihändige Waffe). */
+  shieldStowedName?: string;
+  /** Name des automatisch wieder angelegten Schilds (einhändige Waffe). */
+  shieldRestoredName?: string;
   description: string;
 }
 

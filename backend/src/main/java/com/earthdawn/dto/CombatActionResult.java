@@ -75,5 +75,10 @@ public class CombatActionResult {
     /** Niedergeschlagen-Probe Ergebnis (wenn Wunde zugefügt). */
     private KnockdownResult knockdownResult;
 
+    /** Name des automatisch abgelegten Schilds (zweihändige Waffe), sonst null. */
+    private String shieldStowedName;
+    /** Name des automatisch wieder angelegten Schilds (einhändige Waffe), sonst null. */
+    private String shieldRestoredName;
+
     private String description;
 }

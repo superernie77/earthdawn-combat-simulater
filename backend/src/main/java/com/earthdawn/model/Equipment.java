@@ -111,4 +111,25 @@ public class Equipment {
      */
     @Builder.Default
     private int bloodMagicDamage = 0;
+
+    // --- Ein-/Zweihändige Führung (WEAPON / SHIELD) ---
+
+    /** Waffe: muss zweihändig geführt werden → es kann kein Schild getragen werden (außer Buckler). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean twoHanded = false;
+
+    /** Schild: Buckler — darf auch zusammen mit zweihändigen Waffen geführt werden. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean buckler = false;
+
+    /**
+     * Schild: vom System wegen einer zweihändigen Waffe automatisch abgelegt (active=false).
+     * Wird beim nächsten Angriff mit einer einhändigen Waffe automatisch wieder angelegt.
+     * Manuell abgelegte Schilde haben dieses Flag nicht.
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean autoStowed = false;
 }

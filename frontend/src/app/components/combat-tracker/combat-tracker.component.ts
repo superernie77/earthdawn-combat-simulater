@@ -588,6 +588,16 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <mat-icon>directions_run</mat-icon>
           Ziel kann Ausweichen versuchen
         </div>
+        <div class="dodge-prompt" *ngIf="r.shieldStowedName"
+             style="border-color:#ffb74d;color:#ffb74d">
+          <mat-icon>shield</mat-icon>
+          Schild abgelegt: {{ r.shieldStowedName }} — zweihändige Waffe
+        </div>
+        <div class="dodge-prompt" *ngIf="r.shieldRestoredName"
+             style="border-color:#80cbc4;color:#80cbc4">
+          <mat-icon>shield</mat-icon>
+          Schild wieder angelegt: {{ r.shieldRestoredName }} (einhändige Waffe)
+        </div>
         <div class="dodge-prompt" *ngIf="r.lufttanzBonusReady"
              style="border-color:#29b6f6;color:#29b6f6">
           <mat-icon>air</mat-icon>
@@ -1145,10 +1155,15 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <mat-select [ngModel]="attackDialog.weaponId" (ngModelChange)="onAttackWeaponChange($event)">
             <mat-option [value]="null">Keine Waffe</mat-option>
             <mat-option *ngFor="let e of weaponsOf(attackDialog.attacker)" [value]="e.id">
-              {{ e.name }} (+{{ e.damageBonus }} Schaden)
+              {{ e.name }} (+{{ e.damageBonus }} Schaden){{ e.twoHanded ? ' ✋✋' : '' }}
             </mat-option>
           </mat-select>
         </mat-form-field>
+        <div *ngIf="isTwoHandedWeaponSelected(attackDialog)"
+             style="margin:-6px 0 10px;font-size:0.82rem;color:#ffb74d;display:flex;align-items:center;gap:6px">
+          <mat-icon style="font-size:18px;height:18px;width:18px">shield</mat-icon>
+          Zweihändige Waffe — ein aktives Schild wird automatisch abgelegt (außer Buckler).
+        </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Waffentalent / -fertigkeit</mat-label>
           <mat-select [ngModel]="attackDialog.attackSource" (ngModelChange)="onAttackSourceChange($event)">
@@ -3460,6 +3475,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (!dialog.attacker || !dialog.weaponId) return false;
     return !!(dialog.attacker.character.equipment ?? [])
       .find(e => e.id === dialog.weaponId)?.clawWeapon;
+  }
+
+  /** True, wenn die im Dialog gewählte Waffe zweihändig ist (→ Schild wird abgelegt). */
+  isTwoHandedWeaponSelected(dialog: { attacker?: CombatantState; weaponId?: number }): boolean {
+    if (!dialog.attacker || !dialog.weaponId) return false;
+    return !!(dialog.attacker.character.equipment ?? [])
+      .find(e => e.id === dialog.weaponId)?.twoHanded;
   }
 
   /** Toggle für Karma-auf-Schaden, mit Karma-Ausreichend-Check (1 für Angriff + 1 für Schaden). */

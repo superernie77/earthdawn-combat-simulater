@@ -56,6 +56,46 @@ class ModifierAggregatorTest {
                 .build();
     }
 
+    private Equipment amuletWithBlood(int bloodMagic) {
+        return Equipment.builder()
+                .type(EquipmentType.AMULET)
+                .bloodMagicDamage(bloodMagic)
+                .build();
+    }
+
+    // --- Blutmagie (Verzweiflungsschlag-Amulette) ---
+
+    @Test
+    void bloodMagicDamage_sumsAcrossEquipment() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        c.getEquipment().add(amuletWithBlood(3));
+        c.getEquipment().add(amuletWithBlood(3));
+        assertThat(aggregator.bloodMagicDamage(c)).isEqualTo(6);
+    }
+
+    @Test
+    void unconsciousnessRating_reducedByBloodMagic() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // Basis = ZÄH*2 = 20
+        c.getEquipment().add(amuletWithBlood(3));
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING))
+                .isEqualTo(17); // 20 − 3
+    }
+
+    @Test
+    void deathRating_reducedByBloodMagic() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // Basis = ZÄH*2 + 10 = 30
+        c.getEquipment().add(amuletWithBlood(3));
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.DEATH_RATING))
+                .isEqualTo(27); // 30 − 3
+    }
+
+    @Test
+    void noAmulets_noBloodMagicReduction() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        assertThat(aggregator.bloodMagicDamage(c)).isZero();
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING)).isEqualTo(20);
+    }
+
     // --- Base value: physical defense ---
 
     @Test
