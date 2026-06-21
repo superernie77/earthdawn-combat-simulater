@@ -111,6 +111,51 @@ describe('CombatTrackerComponent — Amulette, Nachtreten, Waffen-Fertigkeiten',
     expect(comp.isTwoHandedWeaponSelected(dialog)).toBe(false);
   });
 
+  // --- Verteidigungs-Tooltip (alle Boni/Mali) ---
+
+  it('defenseTooltip() listet Basis, Schild, Effekte und Gesamt', () => {
+    const c: any = {
+      character: {
+        dexterity: 10, physicalDefenseBonus: 1,
+        equipment: [{ type: 'SHIELD', active: true, physicalDefenseBonus: 3, name: 'Rundschild' }],
+      },
+      activeEffects: [
+        { name: 'Defensive Haltung', modifiers: [{ targetStat: 'PHYSICAL_DEFENSE', operation: 'ADD', value: 3 }] },
+        { name: 'Phantomkrieger', modifiers: [{ targetStat: 'PHYSICAL_DEFENSE', operation: 'ADD', value: 3 }] },
+      ],
+    };
+    const tip = comp.defenseTooltip(c, 'PHYSICAL_DEFENSE');
+    expect(tip).toContain('Basis: 6');               // (10+3)/2 = 6
+    expect(tip).toContain('Konfig-Bonus: +1');
+    expect(tip).toContain('Schild Rundschild: +3');
+    expect(tip).toContain('Defensive Haltung: +3');
+    expect(tip).toContain('Phantomkrieger: +3');
+    expect(tip).toContain('Gesamt: 16');             // 6+1+3+3+3
+  });
+
+  it('defenseTooltip() markiert abgelegtes Schild als nicht zählend', () => {
+    const c: any = {
+      character: {
+        dexterity: 10, physicalDefenseBonus: 0,
+        equipment: [{ type: 'SHIELD', active: false, physicalDefenseBonus: 3, name: 'Rundschild' }],
+      },
+      activeEffects: [],
+    };
+    const tip = comp.defenseTooltip(c, 'PHYSICAL_DEFENSE');
+    expect(tip).toContain('abgelegt, zählt nicht');
+    expect(tip).toContain('Gesamt: 6'); // abgelegtes Schild zählt nicht
+  });
+
+  it('defenseTooltip() zeigt Mali (negative Werte) z.B. Niedergeschlagen', () => {
+    const c: any = {
+      character: { charisma: 10, socialDefenseBonus: 0, equipment: [] },
+      activeEffects: [{ name: 'Niedergeschlagen', modifiers: [{ targetStat: 'SOCIAL_DEFENSE', operation: 'ADD', value: -3 }] }],
+    };
+    const tip = comp.defenseTooltip(c, 'SOCIAL_DEFENSE');
+    expect(tip).toContain('Niedergeschlagen: -3');
+    expect(tip).toContain('Gesamt: 3'); // (10+3)/2=6, -3 = 3
+  });
+
   it('resolveActionType(): Projektilwaffen-Fertigkeit → RANGED, Nahkampfwaffen → MELEE', () => {
     (comp as any).attackDialog = { skillId: 15, attacker: { character: {
       skills: [{ skillDefinition: { id: 15, name: 'Projektilwaffen' }, rank: 2 }], talents: [] } } };

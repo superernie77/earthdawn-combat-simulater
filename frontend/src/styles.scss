@@ -176,3 +176,11 @@ h1, h2, h3, .brand-font {
   letter-spacing: 0.1em;
   margin-bottom: 8px;
 }
+
+// Mehrzeilige Tooltips (z.B. Verteidigungs-Aufschlüsselung mit allen Boni/Mali)
+.multiline-tooltip {
+  white-space: pre-line;
+  max-width: 320px !important;
+  font-size: 12px;
+  line-height: 1.45;
+}

@@ -416,13 +416,13 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </div>
             <!-- Defense Values -->
             <div class="comb-defense-row">
-              <span class="def-chip phys" matTooltip="KV – Körperliche Verteidigung">
+              <span class="def-chip phys" [matTooltip]="defenseTooltip(c, 'PHYSICAL_DEFENSE')" matTooltipClass="multiline-tooltip">
                 <mat-icon>shield</mat-icon> KV {{ pd(c) }}<span *ngIf="effectivePd(c) !== pd(c)" class="def-modified"> ({{ effectivePd(c) }})</span>
               </span>
-              <span class="def-chip myst" matTooltip="MV – Mystische Verteidigung">
+              <span class="def-chip myst" [matTooltip]="defenseTooltip(c, 'SPELL_DEFENSE')" matTooltipClass="multiline-tooltip">
                 <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}<span *ngIf="effectiveSd(c) !== sd(c)" class="def-modified"> ({{ effectiveSd(c) }})</span>
               </span>
-              <span class="def-chip social" matTooltip="SV – Soziale Verteidigung">
+              <span class="def-chip social" [matTooltip]="defenseTooltip(c, 'SOCIAL_DEFENSE')" matTooltipClass="multiline-tooltip">
                 <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
               </span>
             </div>
@@ -3648,7 +3648,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   pd(c: CombatantState): number {
     const base = c.character.physicalDefense ?? Math.floor((c.character.dexterity + 3) / 2);
     const shieldBonus = (c.character.equipment ?? [])
-      .filter(e => e.type === 'SHIELD')
+      .filter(e => e.type === 'SHIELD' && e.active !== false)
       .reduce((sum, e) => sum + (e.physicalDefenseBonus ?? 0), 0);
     return base + (c.character.physicalDefenseBonus ?? 0) + shieldBonus;
   }
@@ -3656,7 +3656,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   sd(c: CombatantState): number {
     const base = c.character.spellDefense ?? Math.floor((c.character.perception + 3) / 2);
     const shieldBonus = (c.character.equipment ?? [])
-      .filter(e => e.type === 'SHIELD')
+      .filter(e => e.type === 'SHIELD' && e.active !== false)
       .reduce((sum, e) => sum + (e.mysticDefenseBonus ?? 0), 0);
     return base + (c.character.spellDefenseBonus ?? 0) + shieldBonus;
   }
@@ -3675,6 +3675,56 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   effectivePd(c: CombatantState): number { return this.pd(c) + this.effectiveDefense(c, 'PHYSICAL_DEFENSE'); }
   effectiveSd(c: CombatantState): number { return this.sd(c) + this.effectiveDefense(c, 'SPELL_DEFENSE'); }
   effectiveSocD(c: CombatantState): number { return this.socD(c) + this.effectiveDefense(c, 'SOCIAL_DEFENSE'); }
+
+  /** Aufschlüsselung einer Verteidigung (Basis + alle Boni/Mali) als mehrzeiliger Tooltip. */
+  defenseTooltip(c: CombatantState, stat: 'PHYSICAL_DEFENSE' | 'SPELL_DEFENSE' | 'SOCIAL_DEFENSE'): string {
+    const ch = c.character;
+    let label: string, base: number, configBonus: number;
+    let shieldField: 'physicalDefenseBonus' | 'mysticDefenseBonus' | null;
+    let total: number;
+    if (stat === 'PHYSICAL_DEFENSE') {
+      label = 'KV – Körperliche Verteidigung';
+      base = ch.physicalDefense ?? Math.floor((ch.dexterity + 3) / 2);
+      configBonus = ch.physicalDefenseBonus ?? 0;
+      shieldField = 'physicalDefenseBonus';
+      total = this.effectivePd(c);
+    } else if (stat === 'SPELL_DEFENSE') {
+      label = 'MV – Mystische Verteidigung';
+      base = ch.spellDefense ?? Math.floor((ch.perception + 3) / 2);
+      configBonus = ch.spellDefenseBonus ?? 0;
+      shieldField = 'mysticDefenseBonus';
+      total = this.effectiveSd(c);
+    } else {
+      label = 'SV – Soziale Verteidigung';
+      base = ch.socialDefense ?? Math.floor((ch.charisma + 3) / 2);
+      configBonus = ch.socialDefenseBonus ?? 0;
+      shieldField = null;
+      total = this.effectiveSocD(c);
+    }
+
+    const sign = (v: number) => (v >= 0 ? '+' : '') + v;
+    const lines: string[] = [label, 'Basis: ' + base];
+    if (configBonus !== 0) lines.push('Konfig-Bonus: ' + sign(configBonus));
+    if (shieldField) {
+      for (const e of (ch.equipment ?? [])) {
+        if (e.type !== 'SHIELD') continue;
+        const v = (shieldField === 'physicalDefenseBonus' ? e.physicalDefenseBonus : e.mysticDefenseBonus) ?? 0;
+        if (v === 0) continue;
+        if (e.active === false) lines.push('Schild ' + e.name + ': ' + sign(v) + ' (abgelegt, zählt nicht)');
+        else lines.push('Schild ' + e.name + ': ' + sign(v));
+      }
+    }
+    for (const eff of (c.activeEffects ?? [])) {
+      for (const m of (eff.modifiers ?? [])) {
+        if (m.targetStat === stat && m.operation === 'ADD' && m.value !== 0) {
+          lines.push(eff.name + ': ' + sign(m.value));
+        }
+      }
+    }
+    lines.push('— — —');
+    lines.push('Gesamt: ' + total);
+    return lines.join('\n');
+  }
 
   pa(c: CombatantState): number {
     const equipBonus = (c.character.equipment ?? []).filter(e => e.type === 'ARMOR').reduce((s, e) => s + (e.physicalArmor ?? 0), 0);
