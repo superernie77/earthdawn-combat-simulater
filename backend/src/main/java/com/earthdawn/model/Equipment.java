@@ -132,4 +132,13 @@ public class Equipment {
     @Column(columnDefinition = "boolean default false")
     @Builder.Default
     private boolean autoStowed = false;
+
+    // --- Sonstige Ausrüstung (Typ GEAR): Bonus auf eine bestimmte Probe ---
+
+    /** Name des Talents/der Fertigkeit, auf die dieser Gegenstand einen Probenbonus gibt (z.B. "Heimlicher Schritt"). */
+    private String probeBonusTalentName;
+
+    /** Höhe des Probenbonus (z.B. +2 für Leichte Stiefel). Wird in ProbeService auf die Würfelstufe addiert. */
+    @Builder.Default
+    private int probeBonusValue = 0;
 }

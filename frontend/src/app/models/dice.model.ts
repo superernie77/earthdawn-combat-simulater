@@ -36,4 +36,6 @@ export interface ProbeResult {
   karmaRoll?: RollResult;
   /** Wundenmalus, der bereits in 'step' eingerechnet wurde — zur Anzeige. */
   woundPenalty?: number;
+  /** Ausrüstungs-Probenbonus (z.B. +2 Leichte Stiefel), bereits in 'step' eingerechnet. */
+  equipmentBonus?: number;
 }

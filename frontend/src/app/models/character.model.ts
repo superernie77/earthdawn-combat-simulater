@@ -64,7 +64,7 @@ export interface CharacterSkill {
   rank: number;
 }
 
-export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION' | 'AMULET' | 'VERBANDSZEUG';
+export type EquipmentType = 'WEAPON' | 'ARMOR' | 'SHIELD' | 'POTION' | 'AMULET' | 'VERBANDSZEUG' | 'GEAR';
 
 export interface Equipment {
   id?: number;
@@ -104,6 +104,10 @@ export interface Equipment {
   buckler?: boolean;
   /** Schild: vom System wegen Zweihandwaffe automatisch abgelegt (wird bei Einhandangriff wieder angelegt). */
   autoStowed?: boolean;
+  /** GEAR: Name des Talents/der Fertigkeit, auf die der Gegenstand einen Probenbonus gibt. */
+  probeBonusTalentName?: string;
+  /** GEAR: Höhe des Probenbonus (z.B. +2 Leichte Stiefel). */
+  probeBonusValue?: number;
 }
 
 export interface AmuletRechargeResult {

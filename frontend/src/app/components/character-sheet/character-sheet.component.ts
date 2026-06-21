@@ -345,6 +345,9 @@ import { ProbeResult } from '../../models/dice.model';
                     {{ lastProbe.successDegree }}
                     <span *ngIf="lastProbe.extraSuccesses > 0"> (+{{ lastProbe.extraSuccesses }})</span>
                   </div>
+                  <div *ngIf="(lastProbe.equipmentBonus ?? 0) > 0" style="font-size:12px;color:#80cbc4">
+                    inkl. +{{ lastProbe.equipmentBonus }} Ausrüstung
+                  </div>
                 </div>
                 <div class="dice-details">
                   <span class="die-result" *ngFor="let d of lastProbe.dice" [class.exploded]="d.exploded">
@@ -644,6 +647,57 @@ import { ProbeResult } from '../../models/dice.model';
                 </mat-form-field>
                 <button mat-stroked-button (click)="addVerbandszeug()">
                   <mat-icon>medical_services</mat-icon> Verbandszeug hinzufügen
+                </button>
+              </div>
+            </div>
+
+            <mat-divider style="margin:16px 0"></mat-divider>
+
+            <!-- Sonstige Ausrüstung (GEAR) — Probenboni -->
+            <div class="equip-section">
+              <div class="section-title">Sonstige Ausrüstung</div>
+              <div style="font-size:12px;color:#999;margin:-4px 0 10px">
+                Gegenstände mit Probenbonus (z.B. <strong>Leichte Stiefel: +2 auf Heimlicher Schritt</strong>).
+                Der Bonus wird automatisch auf die passende Talent-/Fertigkeitsprobe addiert.
+              </div>
+              <div class="equip-list">
+                <div class="equip-item" *ngFor="let g of gear()">
+                  <div class="equip-name">👢 {{ g.name }}</div>
+                  <div class="equip-stats">
+                    <span class="equip-badge shield-phys" *ngIf="g.probeBonusTalentName">
+                      +{{ g.probeBonusValue }} auf {{ g.probeBonusTalentName }}
+                    </span>
+                    <span class="equip-desc" *ngIf="g.description">{{ g.description }}</span>
+                  </div>
+                  <button mat-icon-button color="warn" (click)="removeEquipment(g)" matTooltip="Entfernen">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+                <div class="equip-empty" *ngIf="!gear().length">Keine sonstige Ausrüstung</div>
+              </div>
+              <div style="margin:8px 0">
+                <button mat-stroked-button (click)="addLeichteStiefel()"
+                  matTooltip="Leichte Stiefel: +2 auf Heimlicher Schritt">
+                  <mat-icon>add</mat-icon> Leichte Stiefel
+                </button>
+              </div>
+              <div class="equip-add-form">
+                <mat-form-field appearance="fill" style="flex:2">
+                  <mat-label>Name</mat-label>
+                  <input matInput [(ngModel)]="newGear.name" placeholder="z.B. Leichte Stiefel">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="flex:2">
+                  <mat-label>Bonus auf Talent/Fertigkeit</mat-label>
+                  <mat-select [(ngModel)]="newGear.probeBonusTalentName">
+                    <mat-option *ngFor="let n of probeTargetNames()" [value]="n">{{ n }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:100px">
+                  <mat-label>Bonus</mat-label>
+                  <input matInput type="number" [(ngModel)]="newGear.probeBonusValue" min="0">
+                </mat-form-field>
+                <button mat-stroked-button [disabled]="!newGear.name.trim() || !newGear.probeBonusTalentName" (click)="addGear()">
+                  <mat-icon>add</mat-icon> Hinzufügen
                 </button>
               </div>
             </div>
@@ -1149,6 +1203,7 @@ export class CharacterSheetComponent implements OnInit {
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; buckler: boolean; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, buckler: false, description: '' };
   newPotionQty: number = 1;
   newAmulet: { name: string; amuletForSpell: boolean; description: string } = { name: '', amuletForSpell: false, description: '' };
+  newGear: { name: string; probeBonusTalentName: string; probeBonusValue: number } = { name: '', probeBonusTalentName: '', probeBonusValue: 0 };
   lastAmuletRecharge?: AmuletRechargeResult;
   lastRecovery?: RecoveryTestResult;
   lastHolzhaut?: HolzhautResult;
@@ -1701,6 +1756,44 @@ export class CharacterSheetComponent implements OnInit {
 
   verbandszeug(): Equipment[] {
     return (this.character?.equipment ?? []).filter(e => e.type === 'VERBANDSZEUG');
+  }
+
+  gear(): Equipment[] {
+    return (this.character?.equipment ?? []).filter(e => e.type === 'GEAR');
+  }
+
+  /** Namen aller Talente + Fertigkeiten des Charakters (für die GEAR-Bonus-Zuordnung). */
+  probeTargetNames(): string[] {
+    const talents = (this.character?.talents ?? []).map(t => t.talentDefinition.name);
+    const skills = (this.character?.skills ?? []).map(s => s.skillDefinition.name);
+    return Array.from(new Set([...talents, ...skills])).sort();
+  }
+
+  addGear(): void {
+    if (!this.character?.id || !this.newGear.name.trim() || !this.newGear.probeBonusTalentName) return;
+    const eq: Equipment = {
+      name: this.newGear.name.trim(), type: 'GEAR',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      probeBonusTalentName: this.newGear.probeBonusTalentName,
+      probeBonusValue: this.newGear.probeBonusValue
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
+      this.character = c;
+      this.newGear = { name: '', probeBonusTalentName: '', probeBonusValue: 0 };
+    });
+  }
+
+  /** Schnellanlage: Leichte Stiefel (+2 auf Heimlicher Schritt). */
+  addLeichteStiefel(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Leichte Stiefel', type: 'GEAR',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      probeBonusTalentName: 'Heimlicher Schritt', probeBonusValue: 2
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
   }
 
   /** Gesamtzahl verbleibender Verbandszeug-Anwendungen eines (Heiler-)Charakters. */

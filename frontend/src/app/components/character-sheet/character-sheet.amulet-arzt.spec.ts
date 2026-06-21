@@ -65,6 +65,21 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.bloodMagicDamage()).toBe(0);
   });
 
+  // --- Sonstige Ausrüstung (GEAR) ---
+
+  it('gear() filtert nur GEAR', () => {
+    setEquipment({ type: 'GEAR', probeBonusTalentName: 'Heimlicher Schritt', probeBonusValue: 2 }, { type: 'WEAPON' });
+    expect(comp.gear().length).toBe(1);
+  });
+
+  it('probeTargetNames() listet Talent- und Fertigkeitsnamen eindeutig & sortiert', () => {
+    (comp as any).character = {
+      talents: [{ talentDefinition: { name: 'Heimlicher Schritt' } }, { talentDefinition: { name: 'Klettern' } }],
+      skills: [{ skillDefinition: { name: 'Klettern' } }, { skillDefinition: { name: 'Schwimmen' } }],
+    };
+    expect(comp.probeTargetNames()).toEqual(['Heimlicher Schritt', 'Klettern', 'Schwimmen']);
+  });
+
   // --- getRecoveryRollStep() mit Arzt-Wundpflege ---
 
   it('getRecoveryRollStep() ignoriert den Wundabzug bei aktiver Wundpflege', () => {

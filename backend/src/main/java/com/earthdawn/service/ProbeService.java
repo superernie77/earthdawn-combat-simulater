@@ -26,6 +26,7 @@ public class ProbeService {
         int baseStep;
         String probeName;
         int wounds = character.getWounds();
+        int equipmentBonus = 0;
 
         if (req.getTalentId() != null) {
             CharacterTalent ct = character.getTalents().stream()
@@ -33,8 +34,9 @@ public class ProbeService {
                     .findFirst()
                     .orElseThrow(() -> new EntityNotFoundException("Talent nicht auf Charakter: " + req.getTalentId()));
 
+            equipmentBonus = probeEquipmentBonus(character, ct.getTalentDefinition().getName());
             int attrValue = getAttributeValue(character, ct.getTalentDefinition().getAttribute());
-            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + ct.getRank() + req.getBonusSteps() - wounds);
+            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + ct.getRank() + req.getBonusSteps() + equipmentBonus - wounds);
             probeName = ct.getTalentDefinition().getName() + " (Rang " + ct.getRank() + ")";
 
         } else if (req.getSkillId() != null) {
@@ -43,8 +45,9 @@ public class ProbeService {
                     .findFirst()
                     .orElseThrow(() -> new EntityNotFoundException("Fertigkeit nicht auf Charakter: " + req.getSkillId()));
 
+            equipmentBonus = probeEquipmentBonus(character, cs.getSkillDefinition().getName());
             int attrValue = getAttributeValue(character, cs.getSkillDefinition().getAttribute());
-            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + cs.getRank() + req.getBonusSteps() - wounds);
+            baseStep = Math.max(1, diceService.attributeToStep(attrValue) + cs.getRank() + req.getBonusSteps() + equipmentBonus - wounds);
             probeName = cs.getSkillDefinition().getName() + " (Rang " + cs.getRank() + ")";
 
         } else {
@@ -79,7 +82,18 @@ public class ProbeService {
                 .karmaUsed(karmaRoll != null)
                 .karmaRoll(karmaRoll)
                 .woundPenalty(wounds)
+                .equipmentBonus(equipmentBonus)
                 .build();
+    }
+
+    /** Summe der Ausrüstungs-Probenboni (GEAR) für ein Talent/eine Fertigkeit anhand des Namens. */
+    private int probeEquipmentBonus(GameCharacter c, String probeName) {
+        if (c.getEquipment() == null || probeName == null) return 0;
+        return c.getEquipment().stream()
+                .filter(e -> e.getProbeBonusTalentName() != null
+                          && e.getProbeBonusTalentName().equalsIgnoreCase(probeName))
+                .mapToInt(Equipment::getProbeBonusValue)
+                .sum();
     }
 
     private int getAttributeValue(GameCharacter c, AttributeType attr) {

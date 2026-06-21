@@ -148,7 +148,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 
 ## Equipment System
 
-Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION | AMULET | VERBANDSZEUG`.
+Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, CascadeType.ALL, EAGER). Type is the `EquipmentType` enum: `WEAPON | ARMOR | SHIELD | POTION | AMULET | VERBANDSZEUG | GEAR`.
 
 | Type | Relevant fields | Effect |
 |---|---|---|
@@ -158,6 +158,7 @@ Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, Casca
 | POTION | `quantity`, `healStep`, `extraRecovery` | See Erholungsproben below |
 | AMULET | `charged`, `amuletForSpell`, `amuletStepBonus`, `bloodMagicDamage` | Verzweiflungsschlag-Amulett — siehe unten |
 | VERBANDSZEUG | `quantity` | Arzt-Verbrauchsgegenstand (1× pro Arztprobe) — siehe Arzt |
+| GEAR | `probeBonusTalentName`, `probeBonusValue` | Sonstige Ausrüstung mit Probenbonus auf ein Talent/eine Fertigkeit (z.B. Leichte Stiefel +2 Heimlicher Schritt) |
 
 The "Ausrüstung" tab on the character sheet has separate sections per type. The "Erholung" tab handles recovery tests and potions.
 
@@ -167,6 +168,12 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 - **`autoStowed`** (SHIELD): vom System wegen Zweihandwaffe automatisch abgelegt (markiert es für die automatische Wiederanlegung; manuell abgelegte Schilde haben dieses Flag nicht).
 - **Mechanik** (`CombatService.applyTwoHandedShieldRule`, in `performAttack` vor dem Trefferzweig): Angriff mit Zweihandwaffe legt ein aktives Nicht-Buckler-Schild ab (`active=false`, `autoStowed=true`); Angriff mit Einhandwaffe legt ein `autoStowed`-Schild wieder an (`active=true`, `autoStowed=false`). Da `ModifierAggregator` Schilde nur bei `active==true` wertet, fällt der Verteidigungsbonus automatisch weg. Ergebnis-Felder `CombatActionResult.shieldStowedName` / `shieldRestoredName`. Manuelles Anlegen via `setEquipmentActive` löscht `autoStowed`. Nur `performAttack` (Hauptwaffenangriff); Nachtreten (waffenlos)/Zweitwaffe (Nebenhand) unberührt.
 - **Flyway V27**: `two_handed`, `buckler`, `auto_stowed` auf `character_equipment`.
+
+### Sonstige Ausrüstung (GEAR) — Probenbonus
+- **`probeBonusTalentName`** + **`probeBonusValue`**: GEAR-Gegenstand gibt einen Bonus auf die Probe eines bestimmten Talents/einer Fertigkeit (Match per Name, `equalsIgnoreCase`). Beispiel **Leichte Stiefel**: `probeBonusTalentName="Heimlicher Schritt"`, `probeBonusValue=2`.
+- **Mechanik** (`ProbeService.rollProbe`): Summe der passenden GEAR-Boni wird auf die Würfelstufe addiert (`+ equipmentBonus` neben Attribut-Step + Rang + bonusSteps − Wunden). `ProbeResult.equipmentBonus` zur Anzeige. Mehrere passende Gegenstände stapeln.
+- **Frontend**: „Sonstige Ausrüstung"-Sektion im Ausrüstung-Tab (Schnell-Button „Leichte Stiefel" + generisches Formular mit Talent/Fertigkeit-Auswahl); Probenergebnis zeigt „inkl. +X Ausrüstung".
+- **Flyway V28**: `EquipmentType`-Constraint um `GEAR` erweitert + Spalten `probe_bonus_talent_name`, `probe_bonus_value`.
 
 **API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
 
