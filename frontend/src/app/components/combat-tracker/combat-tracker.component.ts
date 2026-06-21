@@ -222,7 +222,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Zaubervorbereitung abbrechen">
                   <mat-icon>cancel</mat-icon>
                 </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && !isMagicCombatant(c)"
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
                   class="combat-option-btn use-action" [disabled]="c.hasActedThisRound || c.defeated"
                   (click)="useAction(c)"
                   matTooltip="Aktion benutzen (Sonstiges)">
