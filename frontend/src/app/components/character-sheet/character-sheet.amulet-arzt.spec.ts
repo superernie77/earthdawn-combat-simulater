@@ -72,6 +72,22 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.gear().length).toBe(1);
   });
 
+  // --- Zaubermatrizen (normal + erweitert) ---
+
+  it('spellMatrices() enthält normale UND erweiterte Matrizen', () => {
+    (comp as any).character = { talents: [
+      { talentDefinition: { name: 'Zaubermatritze' } },
+      { talentDefinition: { name: 'Erweiterte Matrize' } },
+      { talentDefinition: { name: 'Nahkampfwaffen' } },
+    ] };
+    expect(comp.spellMatrices().length).toBe(2);
+  });
+
+  it('isEnhancedMatrix() erkennt die erweiterte Matrize', () => {
+    expect(comp.isEnhancedMatrix({ talentDefinition: { name: 'Erweiterte Matrize' } } as any)).toBe(true);
+    expect(comp.isEnhancedMatrix({ talentDefinition: { name: 'Zaubermatritze' } } as any)).toBe(false);
+  });
+
   it('probeTargetNames() listet Talent- und Fertigkeitsnamen eindeutig & sortiert', () => {
     (comp as any).character = {
       talents: [{ talentDefinition: { name: 'Heimlicher Schritt' } }, { talentDefinition: { name: 'Klettern' } }],

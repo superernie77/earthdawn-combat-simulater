@@ -210,6 +210,21 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Zaubermatritze' hinzugefügt.");
         }
+        if (talentRepo.findByName(TalentNames.ERWEITERTE_MATRIZE).isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name(TalentNames.ERWEITERTE_MATRIZE)
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Eine erweiterte Matrize hält einen eingewobenen Zauber bereit — " +
+                            "ein Faden ist bereits gewoben, sobald ein Zauber in der Matrize liegt " +
+                            "(benötigter Fadenweben-Aufwand −1). Der Rang entspricht immer dem Kreis des Adepten. " +
+                            "Kann bis zu 3-mal separat gelernt werden. Probe: WN + Rang zum Einweben.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .maxInstances(3)
+                    .rankFromCircle(true)
+                    .build());
+            log.info("Talent 'Erweiterte Matrize' hinzugefügt.");
+        }
         if (talentRepo.findByName("Magische Markierung").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Magische Markierung")

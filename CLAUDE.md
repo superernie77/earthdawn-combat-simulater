@@ -354,6 +354,15 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Additional attacks: Zweitwaffe (DEX), Nachtreten (DEX, waffenlos, nur vs. niedrigere Initiative)
 - Initiative: Tigersprung (DEX, once/round, no roll), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
+- Matrizen: Zaubermatritze (PER, `maxInstances=3`, `rankFromCircle`), **Erweiterte Matrize** (PER, `maxInstances=3`, `rankFromCircle`) — siehe unten
+
+### Zaubermatrizen — Erweiterte Matrize
+- **Zaubermatritze** und **Erweiterte Matrize** halten je einen zugewiesenen Zauber (`CharacterTalent.assignedSpell`), mehrfach lernbar (`maxInstances=3`), Rang = Kreis (`rankFromCircle`).
+- **Erweiterte Matrize**: Liegt ein Zauber in der Matrize, gilt **ein Faden als bereits gewoben** → effektiver Fadenweben-Aufwand = `max(0, spell.threads − 1)`.
+  - `SpellService.weaveThread`: beim Vorbereitungsstart `threadsRequired = max(0, threads − discount)` (discount 1, wenn der Zauber in einer Erweiterten Matrize liegt — `isInErweiterteMatrize`).
+  - `SpellService.castSpell`: ist der effektive Bedarf 0 (z.B. 1-Faden-Zauber in Erweiterter Matrize), kann **direkt ohne Vorbereitung** gewirkt werden.
+  - Frontend: `spellMatrices()` listet beide Typen; erweiterte Matrizen zeigen „1 Faden vorgewoben" und „noch N Fäden".
+  - Keine Migration (nutzt bestehendes `assignedSpell`); Seeding idempotent in `migrateFreeActionTalents()`.
 
 **Skills seeded (Auswahl):** Reiten, diverse Wissens-/Handwerks-/Sozialfertigkeiten, Arzt (PER), sowie die **Waffen-Fertigkeiten Nahkampfwaffen & Projektilwaffen** (DEX, Kategorie „Waffen"). Idempotent via `migrateWeaponSkills()` / `migrateArztSkill()`.
 

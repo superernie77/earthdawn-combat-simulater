@@ -715,8 +715,8 @@ import { ProbeResult } from '../../models/dice.model';
               <div class="matrix-list">
                 <div class="matrix-item" *ngFor="let m of spellMatrices(); let i = index">
                   <div class="matrix-header">
-                    <span class="matrix-label">Matrix {{ i + 1 }}</span>
-                    <span class="matrix-rank">Rang {{ m.rank }} · max. Kreis {{ m.rank }}</span>
+                    <span class="matrix-label">{{ isEnhancedMatrix(m) ? 'Erw. Matrize' : 'Matrix' }} {{ i + 1 }}</span>
+                    <span class="matrix-rank">Rang {{ m.rank }} · max. Kreis {{ m.rank }}<span *ngIf="isEnhancedMatrix(m)"> · 1 Faden vorgewoben</span></span>
                   </div>
                   <mat-form-field appearance="fill" style="flex:1;min-width:200px">
                     <mat-label>Zauber zuweisen</mat-label>
@@ -730,8 +730,11 @@ import { ProbeResult } from '../../models/dice.model';
                   </mat-form-field>
                   <div class="matrix-spell-info" *ngIf="m.assignedSpell">
                     <span class="spell-badge" [ngClass]="spellTypeBadgeClass(m.assignedSpell)">{{ spellTypeLabel(m.assignedSpell) }}</span>
-                    <span class="spell-threads" *ngIf="m.assignedSpell.threads > 0">
+                    <span class="spell-threads" *ngIf="m.assignedSpell.threads > 0 && !isEnhancedMatrix(m)">
                       {{ m.assignedSpell.threads }} {{ m.assignedSpell.threads === 1 ? 'Faden' : 'Fäden' }}
+                    </span>
+                    <span class="spell-threads" *ngIf="m.assignedSpell.threads > 0 && isEnhancedMatrix(m)" matTooltip="1 Faden ist durch die erweiterte Matrize bereits gewoben">
+                      noch {{ (m.assignedSpell.threads - 1) < 1 ? 0 : (m.assignedSpell.threads - 1) }} {{ (m.assignedSpell.threads - 1) === 1 ? 'Faden' : 'Fäden' }} (1 vorgewoben)
                     </span>
                     <span class="spell-threads" *ngIf="m.assignedSpell.threads === 0">Sofortzauber</span>
                   </div>
@@ -1679,10 +1682,16 @@ export class CharacterSheetComponent implements OnInit {
     return [...(this.character?.talents ?? [])].sort((a, b) => b.rank - a.rank);
   }
 
-  /** Alle Zaubermatritze-Instanzen des Charakters, sortiert nach Reihenfolge. */
+  /** Alle Matrizen-Instanzen (normale + erweiterte) des Charakters. */
   spellMatrices(): CharacterTalent[] {
     return (this.character?.talents ?? [])
-      .filter(ct => ct.talentDefinition.name === 'Zaubermatritze');
+      .filter(ct => ct.talentDefinition.name === 'Zaubermatritze'
+                 || ct.talentDefinition.name === 'Erweiterte Matrize');
+  }
+
+  /** True, wenn diese Matrix eine "Erweiterte Matrize" ist (1 Faden vorgewoben). */
+  isEnhancedMatrix(m: CharacterTalent): boolean {
+    return m.talentDefinition.name === 'Erweiterte Matrize';
   }
 
   /** Gelernte Zauber des Charakters, die in diese Matrix passen (Kreis ≤ Rang der Matrix). */

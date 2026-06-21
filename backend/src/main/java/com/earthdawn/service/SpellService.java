@@ -56,11 +56,12 @@ public class SpellService {
             caster.setThreadsRequired(0);
         }
 
-        // Vorbereitung starten?
+        // Vorbereitung starten? Erweiterte Matrize: ein Faden ist bereits gewoben → −1 Aufwand.
         if (caster.getPreparingSpellId() == null) {
+            int discount = isInErweiterteMatrize(caster, spell) ? 1 : 0;
             caster.setPreparingSpellId(spell.getId());
             caster.setThreadsWoven(0);
-            caster.setThreadsRequired(spell.getThreads());
+            caster.setThreadsRequired(Math.max(0, spell.getThreads() - discount));
         }
 
         // Fadenweben-Talent finden
@@ -130,8 +131,12 @@ public class SpellService {
         SpellDefinition spell = spellRepo.findById(req.getSpellId())
                 .orElseThrow(() -> new EntityNotFoundException("Zauber nicht gefunden: " + req.getSpellId()));
 
-        // Fäden-Check
-        if (spell.getThreads() > 0) {
+        // Fäden-Check. Erweiterte Matrize: ein Faden ist vorgewoben → effektiver Bedarf −1.
+        // Ist der effektive Bedarf 0 (z.B. 1-Faden-Zauber in erweiterter Matrize), kann direkt
+        // ohne Vorbereitung gewirkt werden.
+        int castDiscount = isInErweiterteMatrize(caster, spell) ? 1 : 0;
+        int effectiveRequired = Math.max(0, spell.getThreads() - castDiscount);
+        if (spell.getThreads() > 0 && effectiveRequired > 0) {
             if (caster.getPreparingSpellId() == null || !caster.getPreparingSpellId().equals(spell.getId())) {
                 throw new IllegalStateException("Dieser Zauber wurde nicht vorbereitet.");
             }
@@ -364,6 +369,14 @@ public class SpellService {
             if (talent != null) return talent;
         }
         return "Fadenmagie"; // Fallback
+    }
+
+    /** True, wenn der Zauber in einer "Erweiterte Matrize" des Charakters liegt (→ 1 Faden vorgewoben). */
+    private boolean isInErweiterteMatrize(CombatantState caster, SpellDefinition spell) {
+        return caster.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.ERWEITERTE_MATRIZE.equals(t.getTalentDefinition().getName()))
+                .anyMatch(t -> t.getAssignedSpell() != null
+                            && t.getAssignedSpell().getId().equals(spell.getId()));
     }
 
     private String buildSpellDescription(SpellCastResult r, SpellDefinition spell) {

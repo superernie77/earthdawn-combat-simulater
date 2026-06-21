@@ -26,6 +26,7 @@ public final class TalentNames {
     public static final String BLATTSCHUSS             = "Blattschuss";
 
     public static final String ZAUBERMATRITZE            = "Zaubermatritze";
+    public static final String ERWEITERTE_MATRIZE        = "Erweiterte Matrize";
 
     public static final String EFFECT_AGGRESSIVER_ANGRIFF = "Aggressiver Angriff";
     public static final String EFFECT_DEFENSIVE_HALTUNG   = "Defensive Haltung";
