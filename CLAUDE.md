@@ -290,7 +290,7 @@ GET    /api/combat/sessions
 POST   /api/combat/sessions              { name }
 GET    /api/combat/sessions/{id}
 DELETE /api/combat/sessions/{id}
-POST   /api/combat/sessions/{id}/combatants         ?characterId=&isNpc=
+POST   /api/combat/sessions/{id}/combatants         ?characterId=&isNpc=  (auch mitten im Kampf: in ACTION wird Initiative gewürfelt + einsortiert, in DECLARATION muss der Neuzugang noch ansagen)
 DELETE /api/combat/sessions/{id}/combatants/{cId}
 
 POST   /api/combat/sessions/{id}/initiative          → SETUP→ACTIVE, starts round 1 in DECLARATION phase

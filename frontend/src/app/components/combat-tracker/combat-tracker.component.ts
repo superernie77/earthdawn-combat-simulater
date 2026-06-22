@@ -69,7 +69,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           </div>
         </div>
         <div class="header-actions">
-          <button mat-stroked-button *ngIf="session.status === 'SETUP'" (click)="addCharacterPanel = !addCharacterPanel">
+          <button mat-stroked-button *ngIf="session.status === 'SETUP' || session.status === 'ACTIVE'" (click)="addCharacterPanel = !addCharacterPanel">
             <mat-icon>person_add</mat-icon> Kombattant
           </button>
           <button mat-raised-button color="primary" *ngIf="session.status === 'SETUP'" (click)="rollInitiative()">

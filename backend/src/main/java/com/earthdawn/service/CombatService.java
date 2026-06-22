@@ -159,6 +159,31 @@ public class CombatService {
                 .build();
 
         session.getCombatants().add(combatant);
+
+        // Während eines laufenden Kampfes nachträglich beitreten:
+        if (session.getStatus() == CombatStatus.ACTIVE) {
+            String name = displayName != null ? displayName : baseName;
+            if (session.getPhase() == CombatPhase.ACTION) {
+                // Initiative ist bereits gewürfelt → für den Neuzugang würfeln und einsortieren.
+                int initStep = modifiers.getEffectiveValue(combatant, StatType.INITIATIVE_STEP, TriggerContext.ON_INITIATIVE);
+                combatant.setInitiative(diceService.roll(initStep).getTotal());
+                combatant.setHasDeclared(true); // Ansagephase ist vorbei
+                session.getCombatants().sort(Comparator
+                        .comparingInt(CombatantState::getInitiative).reversed()
+                        .thenComparingInt(c -> c.isNpc() ? 1 : 0));
+                for (int i = 0; i < session.getCombatants().size(); i++) {
+                    session.getCombatants().get(i).setInitiativeOrder(i);
+                }
+                addLog(session, name, null, ActionType.INITIATIVE,
+                        name + " betritt den Kampf (Initiative " + combatant.getInitiative() + ").", true);
+            } else {
+                // Ansagephase: Neuzugang muss noch ansagen; Initiative wird beim Übergang gewürfelt.
+                combatant.setHasDeclared(false);
+                addLog(session, name, null, ActionType.COMBAT_OPTION,
+                        name + " betritt den Kampf und muss noch ansagen.", true);
+            }
+        }
+
         CombatSession saved = sessionRepo.save(session);
         broadcast(saved);
         return saved;
