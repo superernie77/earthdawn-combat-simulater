@@ -3,6 +3,7 @@ package com.earthdawn.service;
 import com.earthdawn.dto.DrinkPotionResult;
 import com.earthdawn.dto.RecoveryTestResult;
 import com.earthdawn.dto.RollResult;
+import com.earthdawn.model.DisciplineDefinition;
 import com.earthdawn.model.Equipment;
 import com.earthdawn.model.GameCharacter;
 import com.earthdawn.model.enums.EquipmentType;
@@ -457,8 +458,92 @@ class CharacterServiceRecoveryTest {
     }
 
     // =========================================================================
+    // Karma auf Erholungsprobe (Disziplin-Fähigkeit, 3./5. Kreis)
+    // =========================================================================
+
+    @Test
+    void karmaOnRecovery_eligible_addsKarmaDie_andSpendsKarma() {
+        GameCharacter c = karmaChar("Krieger", 3, 5);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        when(stepRollService.roll(5)).thenReturn(roll(6));  // Basis-Erholungswurf
+        when(stepRollService.roll(4)).thenReturn(roll(4));  // Karmawürfel (Stufe 4)
+
+        RecoveryTestResult r = characterService.performRecoveryTest(1L, true);
+
+        assertThat(r.getKarmaRoll()).isNotNull();
+        assertThat(r.getKarmaRoll().getTotal()).isEqualTo(4);
+        assertThat(r.getHealed()).isEqualTo(10);            // 6 + 4
+        assertThat(c.getKarmaCurrent()).isEqualTo(4);       // 1 Karma ausgegeben
+    }
+
+    @Test
+    void karmaOnRecovery_notRequested_noKarmaDie() {
+        GameCharacter c = karmaChar("Krieger", 3, 5);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        when(stepRollService.roll(5)).thenReturn(roll(6));
+
+        RecoveryTestResult r = characterService.performRecoveryTest(1L, false);
+
+        assertThat(r.getKarmaRoll()).isNull();
+        assertThat(r.getHealed()).isEqualTo(6);
+        assertThat(c.getKarmaCurrent()).isEqualTo(5);
+    }
+
+    @Test
+    void karmaOnRecovery_noKarmaLeft_noKarmaDie() {
+        GameCharacter c = karmaChar("Krieger", 3, 0);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        when(stepRollService.roll(5)).thenReturn(roll(6));
+
+        RecoveryTestResult r = characterService.performRecoveryTest(1L, true);
+
+        assertThat(r.getKarmaRoll()).isNull();
+        assertThat(c.getKarmaCurrent()).isZero();
+    }
+
+    @Test
+    void karmaOnRecovery_ineligibleDiscipline_noKarmaDie() {
+        GameCharacter c = karmaChar("Magier", 5, 5);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        when(stepRollService.roll(5)).thenReturn(roll(6));
+
+        RecoveryTestResult r = characterService.performRecoveryTest(1L, true);
+
+        assertThat(r.getKarmaRoll()).isNull();
+        assertThat(c.getKarmaCurrent()).isEqualTo(5);
+    }
+
+    @ParameterizedTest(name = "{0} Kreis {1} → karmaEligible={2}")
+    @CsvSource({
+        "Krieger,3,true",  "Krieger,2,false",
+        "Elementarist,3,true", "Luftpirat,3,true", "Tiermeister,3,true", "Waffenschmied,3,true",
+        "Kundschafter,4,false", "Kundschafter,5,true",
+        "Magier,7,false", "Dieb,5,false",
+    })
+    void canUseKarmaOnRecovery_matrix(String disc, int circle, boolean expected) {
+        GameCharacter c = karmaChar(disc, circle, 5);
+        assertThat(characterService.canUseKarmaOnRecovery(c)).isEqualTo(expected);
+    }
+
+    // =========================================================================
     // Helper-Methoden
     // =========================================================================
+
+    private GameCharacter karmaChar(String discipline, int circle, int karma) {
+        GameCharacter c = character(10, 0, 30, 2); // ZÄH 10, 30 Schaden (kein Clamp)
+        c.setDiscipline(DisciplineDefinition.builder().name(discipline).build());
+        c.setCircle(circle);
+        c.setKarmaCurrent(karma);
+        return c;
+    }
+
+    private RollResult roll(int total) {
+        return RollResult.builder().total(total).diceExpression("W6").build();
+    }
 
     private GameCharacter character(int toughness, int wounds, int currentDamage, Integer remaining) {
         return GameCharacter.builder()

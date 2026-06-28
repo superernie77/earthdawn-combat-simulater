@@ -133,6 +133,9 @@ public class CharacterService {
             case "physicalDefenseBonus"  -> c.getPhysicalDefenseBonus();
             case "spellDefenseBonus"     -> c.getSpellDefenseBonus();
             case "socialDefenseBonus"    -> c.getSocialDefenseBonus();
+            case "healthBonus"           -> c.getHealthBonus();
+            case "initiativeBonus"       -> c.getInitiativeBonus();
+            case "recoveryBonus"         -> c.getRecoveryBonus();
             default                      -> 0;
         };
     }
@@ -163,6 +166,9 @@ public class CharacterService {
             case "physicalDefenseBonus"  -> c.setPhysicalDefenseBonus(value);
             case "spellDefenseBonus"     -> c.setSpellDefenseBonus(value);
             case "socialDefenseBonus"    -> c.setSocialDefenseBonus(value);
+            case "healthBonus"           -> c.setHealthBonus(value);
+            case "initiativeBonus"       -> c.setInitiativeBonus(value);
+            case "recoveryBonus"         -> c.setRecoveryBonus(value);
             case "notes"                 -> {} // notes werden als String separat behandelt
         }
     }
@@ -602,7 +608,30 @@ public class CharacterService {
     }
 
     /** Reguläre Erholungsprobe: verbraucht einen Tages-Slot, wendet pendingRecoveryBonus an und löscht ihn. */
+    /**
+     * Disziplinen mit Karmabonus auf Erholungsproben und der dafür benötigte Mindestkreis.
+     * Kundschafter erst ab dem 5. Kreis, die übrigen ab dem 3.
+     */
+    private static final java.util.Map<String, Integer> KARMA_RECOVERY_DISCIPLINES = java.util.Map.of(
+            "Elementarist", 3,
+            "Krieger", 3,
+            "Luftpirat", 3,
+            "Tiermeister", 3,
+            "Waffenschmied", 3,
+            "Kundschafter", 5);
+
+    /** True, wenn die Disziplin Karma auf Erholungsproben erlaubt und der Mindestkreis erreicht ist. */
+    public boolean canUseKarmaOnRecovery(GameCharacter c) {
+        if (c == null || c.getDiscipline() == null) return false;
+        Integer minCircle = KARMA_RECOVERY_DISCIPLINES.get(c.getDiscipline().getName());
+        return minCircle != null && c.getCircle() >= minCircle;
+    }
+
     public RecoveryTestResult performRecoveryTest(Long characterId) {
+        return performRecoveryTest(characterId, false);
+    }
+
+    public RecoveryTestResult performRecoveryTest(Long characterId, boolean spendKarma) {
         GameCharacter c = findById(characterId);
 
         int max = getRecoveryTestsMax(c.getToughness());
@@ -623,7 +652,17 @@ public class CharacterService {
         c.setArztWoundPenaltyNegated(false); // Wundpflege verbraucht
 
         RollResult roll = stepRollService.roll(rollStep + bonusSteps);
-        int healed = Math.min(roll.getTotal(), c.getCurrentDamage());
+        int total = roll.getTotal();
+
+        // Karma auf Erholungsprobe (Disziplin-Fähigkeit ab Kreis 3/5): 1 Karma → +W6 (Stufe 4)
+        RollResult karmaRoll = null;
+        if (spendKarma && canUseKarmaOnRecovery(c) && c.getKarmaCurrent() > 0) {
+            karmaRoll = stepRollService.roll(4);
+            total += karmaRoll.getTotal();
+            c.setKarmaCurrent(c.getKarmaCurrent() - 1);
+        }
+
+        int healed = Math.min(total, c.getCurrentDamage());
         c.setCurrentDamage(c.getCurrentDamage() - healed);
         characterRepo.save(c);
 
@@ -633,6 +672,7 @@ public class CharacterService {
                 .rollStep(rollStep)
                 .bonusSteps(bonusSteps)
                 .roll(roll)
+                .karmaRoll(karmaRoll)
                 .healed(healed)
                 .remainingDamage(c.getCurrentDamage())
                 .recoveryTestsRemaining(remaining)

@@ -115,6 +115,20 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.probeTargetNames()).toEqual(['Heimlicher Schritt', 'Klettern', 'Schwimmen']);
   });
 
+  // --- Konfigurierbare Boni (Lebenspunkte / Initiative / Erholungsstufe) ---
+
+  it('getDefenseBonus() liest auch die neuen Stat-Boni vom Charakter', () => {
+    (comp as any).character = { healthBonus: 3, initiativeBonus: -2, recoveryBonus: 1 };
+    expect(comp.getDefenseBonus('healthBonus')).toBe(3);
+    expect(comp.getDefenseBonus('initiativeBonus')).toBe(-2);
+    expect(comp.getDefenseBonus('recoveryBonus')).toBe(1);
+  });
+
+  it('getDefenseBonus() ist 0, wenn ein Stat-Bonus nicht gesetzt ist', () => {
+    (comp as any).character = {};
+    expect(comp.getDefenseBonus('healthBonus')).toBe(0);
+  });
+
   // --- getRecoveryRollStep() mit Arzt-Wundpflege ---
 
   it('getRecoveryRollStep() ignoriert den Wundabzug bei aktiver Wundpflege', () => {

@@ -21,6 +21,7 @@ A local combat tracker for the **Earthdawn 4th Edition (FASA)** pen-and-paper RP
 13. [WebSocket](#websocket)
 14. [Frontend Structure](#frontend-structure)
 15. [Reference Data](#reference-data)
+16. [Versioning](#versioning)
 
 ---
 
@@ -419,6 +420,21 @@ Per-discipline circle bonuses:
 | Kundschafter, Dieb, Troubadour | 5 | 6 |
 | Elementarist, Illusionist, Magier | 3 | 4 |
 | No discipline (fallback) | 5 | 6 |
+
+### Configurable Bonuses (Character Sheet)
+
+Every character carries free-text bonus/malus fields that the player adjusts with `+`/`−` steppers on the **Attribute** tab. They are stored directly on `GameCharacter`, applied inside `ModifierAggregator` (so they flow into both the character sheet's derived stats **and** live combat), and edited via `PATCH /api/characters/{id}/field`.
+
+| Field | Section | Applies to | Notes |
+|---|---|---|---|
+| `physicalDefenseBonus` | Verteidigungs-Boni | KV (Physical Defense) | |
+| `spellDefenseBonus` | Verteidigungs-Boni | MV (Spell Defense) | |
+| `socialDefenseBonus` | Verteidigungs-Boni | SV (Social Defense) | |
+| `healthBonus` | Weitere Boni | **Both** thresholds — Bewusstlosigkeit (BW) **and** Todesschwelle (TD) | mirrors how Holzhaut raises both |
+| `initiativeBonus` | Weitere Boni | Initiativestufe (`INITIATIVE_STEP`) | also affects combat initiative rolls |
+| `recoveryBonus` | Weitere Boni | Erholungsstufe (`RECOVERY_STEP`) | clamped to a minimum of 0 |
+
+All values may be negative (malus). The character-sheet steppers re-fetch the derived stats after each change so the affected values update immediately.
 
 ### Dodge resolution
 
@@ -845,3 +861,23 @@ Krieger, Pfadsucher, Dieb, Schwertkämpfer, Bogenschütze, Waffenmeister, Trouba
 **Illusionist (Circles 1–8):** Phantomwaffe, Nebelwand, Illusorische Wand, Verwirren, Phantomschmerz, Unsichtbarkeit, Phantomtier, Blendlicht, Geheimnisvolle Gestalt, Phantomflamme, Phantomblitzschlag, Geisterschwert, Verwirrende Waffe, Schattenmantel, Illusorischer Wald, Traumgestalt, Ätherische Rüstung, Astrales Auge, Phantomdrachen, Illusorischer Tod, Psychische Lanze, Gedankenleere, ...
 
 **Geisterbeschwörer (Circles 1–8):** Geisterdolch, Geisterhülle, Geisterrüstung, Astrale Wahrnehmung, Astraler Schild, Geisterpfeil, Geisterwächter, Lebensraub, Geisterzunge, Astrales Tor, Geisterheer, Bannfluch, Astraler Körper, Seelenraub, Geisterform, Todeshauch, Geisterbindung, Astraler Sturm, ...
+
+---
+
+## Versioning
+
+The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). The version is kept in sync between `backend/pom.xml` (`<version>`) and `frontend/package.json` (`version`).
+
+### Changelog
+
+#### 1.1.0
+- **Karma auf Erholungsproben** — disciplines may spend 1 Karma for a **+W6 (Step 4)** die on a recovery test. Eligible: **Elementarist, Krieger, Luftpirat, Tiermeister, Waffenschmied** from **3rd circle**, **Kundschafter** from **5th circle**. An optional Karma checkbox appears on the recovery (Erholung) page when discipline and circle qualify; `POST /api/characters/{id}/recovery-test?spendKarma=true`.
+- **Karma auf Initiative** — disciplines **Dieb, Kundschafter, Luftsegler, Schütze** may, from **3rd circle**, spend 1 Karma for a **+W6 (Step 4)** die on their initiative roll. A toggle button appears on the combatant card during the **declaration phase** when discipline and circle qualify; the Karma is deducted when initiative is actually rolled. Backed by Flyway migration `V31`.
+- **Configurable stat bonuses** — in addition to the existing defense bonuses (KV / MV / SV), the **Attribute** tab now exposes a *Weitere Boni* section with bonus/malus steppers for:
+  - **Lebenspunkte** (`healthBonus`) — added to both the unconsciousness **and** death thresholds.
+  - **Initiative** (`initiativeBonus`) — added to the initiative step (also applies in combat).
+  - **Erholungsstufe** (`recoveryBonus`) — added to the recovery step (clamped at 0).
+  - See [Configurable Bonuses](#configurable-bonuses-character-sheet). Backed by Flyway migration `V30`.
+
+#### 1.0.0
+- Initial release: characters, equipment, talents/skills/spells, full ED4 turn-based combat with live WebSocket updates.

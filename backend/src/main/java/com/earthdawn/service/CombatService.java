@@ -220,11 +220,22 @@ public class CombatService {
         // Würfeln pro Kombattant + temporär Rolls speichern für UI-Modal
         java.util.Map<Long, RollResult> rollsById = new java.util.HashMap<>();
         java.util.Map<Long, Integer> stepsById = new java.util.HashMap<>();
+        java.util.Map<Long, RollResult> karmaRollsById = new java.util.HashMap<>();
         for (CombatantState combatant : session.getCombatants()) {
             if (combatant.isDefeated()) continue;
             int initStep = modifiers.getEffectiveValue(combatant, StatType.INITIATIVE_STEP, TriggerContext.ON_INITIATIVE);
             RollResult roll = diceService.roll(initStep);
-            combatant.setInitiative(roll.getTotal());
+            int total = roll.getTotal();
+            // Karma auf Initiative (Disziplin-Fähigkeit ab Kreis 3): 1 Karma → +W6 (Stufe 4)
+            if (combatant.isKarmaInitiativeThisRound()
+                    && canUseKarmaOnInitiative(combatant.getCharacter())
+                    && combatant.getCurrentKarma() > 0) {
+                RollResult karmaRoll = diceService.roll(4);
+                total += karmaRoll.getTotal();
+                combatant.setCurrentKarma(combatant.getCurrentKarma() - 1);
+                karmaRollsById.put(combatant.getId(), karmaRoll);
+            }
+            combatant.setInitiative(total);
             rollsById.put(combatant.getId(), roll);
             stepsById.put(combatant.getId(), initStep);
         }
@@ -263,6 +274,10 @@ public class CombatService {
             if (armorPenalty > 0) {
                 bonusNotes.add("Rüstungsmalus −" + armorPenalty);
             }
+            RollResult karmaRoll = karmaRollsById.get(c.getId());
+            if (karmaRoll != null) {
+                bonusNotes.add("Karma +" + karmaRoll.getTotal());
+            }
 
             details.add(InitiativeRollDetail.builder()
                     .combatantId(c.getId())
@@ -270,7 +285,7 @@ public class CombatService {
                     .npc(c.isNpc())
                     .step(stepsById.getOrDefault(c.getId(), 0))
                     .roll(roll)
-                    .total(roll.getTotal())
+                    .total(c.getInitiative())
                     .order(c.getInitiativeOrder())
                     .bonusNotes(bonusNotes)
                     .build());
@@ -284,6 +299,41 @@ public class CombatService {
                 .forEach(c -> sb.append(c.getCharacter().getName()).append(" (").append(c.getInitiative()).append("), "));
         if (sb.toString().endsWith(", ")) sb.setLength(sb.length() - 2);
         return sb.toString();
+    }
+
+    /** Disziplinen, die ab dem 3. Kreis Karma auf ihre Initiative-Probe einsetzen dürfen. */
+    private static final java.util.Set<String> KARMA_INITIATIVE_DISCIPLINES =
+            java.util.Set.of("Dieb", "Kundschafter", "Luftsegler", "Schütze");
+
+    /** True, wenn die Disziplin Karma auf Initiative erlaubt und der Charakter mindestens im 3. Kreis ist. */
+    private boolean canUseKarmaOnInitiative(GameCharacter c) {
+        return c != null && c.getDiscipline() != null
+                && KARMA_INITIATIVE_DISCIPLINES.contains(c.getDiscipline().getName())
+                && c.getCircle() >= 3;
+    }
+
+    /**
+     * Wählt/entwählt in der Ansagephase, ob ein Kombattant beim Initiativewurf 1 Karma für +W6 (Stufe 4)
+     * einsetzt. Karma wird erst beim tatsächlichen Wurf abgezogen.
+     */
+    public CombatSession setKarmaInitiative(Long sessionId, Long combatantId, boolean spend) {
+        CombatSession session = findById(sessionId);
+        CombatantState c = findCombatant(session, combatantId);
+        if (session.getPhase() != CombatPhase.DECLARATION) {
+            throw new IllegalStateException("Karma auf Initiative kann nur in der Ansagephase gewählt werden.");
+        }
+        if (spend) {
+            if (!canUseKarmaOnInitiative(c.getCharacter())) {
+                throw new IllegalStateException("Diese Disziplin kann (noch) kein Karma auf Initiative einsetzen.");
+            }
+            if (c.getCurrentKarma() <= 0) {
+                throw new IllegalStateException(c.getCharacter().getName() + " hat kein Karma mehr.");
+            }
+        }
+        c.setKarmaInitiativeThisRound(spend);
+        sessionRepo.save(session);
+        broadcast(session);
+        return session;
     }
 
     // --- Attack ---
@@ -463,23 +513,24 @@ public class CombatService {
             result.blattschussCanAddKarma(true).blattschussKarmaUsed(0);
         }
 
+        // Lufttanz-Trigger: Nahkampf, Lufttanz aktiv, Initiative-Vorsprung ≥ 10, noch nicht
+        // ausgelöst/verbraucht. Hängt NICHT vom Treffer ab — der Zusatzangriff wird allein durch
+        // den Initiative-Vorsprung gegen das Ziel des Nahkampfangriffs gewährt (auch bei Fehlschlag).
+        if (req.getActionType() == ActionType.MELEE_ATTACK
+                && attacker.isLufttanzActivatedThisRound()
+                && !attacker.isLufttanzBonusUsedThisRound()
+                && (attacker.getPendingLufttanzTargetId() == null || attacker.getPendingLufttanzTargetId() < 0)) {
+            int initDiff = attacker.getInitiative() - defender.getInitiative();
+            if (initDiff >= 10) {
+                attacker.setPendingLufttanzTargetId(defender.getId());
+                attacker.setPendingLufttanzWeaponId(req.getWeaponId() != null ? req.getWeaponId() : -1L);
+                result.lufttanzBonusReady(true).lufttanzInitiativeDiff(initDiff);
+            }
+        }
+
         if (hit) {
             // 5. Übererfolge: je 5 über VK → +2 Schadensstufen
             int extraSuccesses = (attackTotal - pd) / 5;
-
-            // 5a. Lufttanz-Trigger: Nahkampf, Lufttanz aktiv, Initiative-Vorsprung ≥ 10,
-            // noch nicht ausgelöst und noch nicht verbraucht.
-            if (req.getActionType() == ActionType.MELEE_ATTACK
-                    && attacker.isLufttanzActivatedThisRound()
-                    && !attacker.isLufttanzBonusUsedThisRound()
-                    && (attacker.getPendingLufttanzTargetId() == null || attacker.getPendingLufttanzTargetId() < 0)) {
-                int initDiff = attacker.getInitiative() - defender.getInitiative();
-                if (initDiff >= 10) {
-                    attacker.setPendingLufttanzTargetId(defender.getId());
-                    attacker.setPendingLufttanzWeaponId(req.getWeaponId() != null ? req.getWeaponId() : -1L);
-                    result.lufttanzBonusReady(true).lufttanzInitiativeDiff(initDiff);
-                }
-            }
 
             // 6. Schadensstufe = Stärke-Stufe + Waffe + Übererfolge
             int damageStep = modifiers.getEffectiveValue(attacker, StatType.DAMAGE_STEP, TriggerContext.ON_DAMAGE_DEALT);
@@ -780,6 +831,7 @@ public class CombatService {
             combatant.setPendingLufttanzTargetId(-1L);
             combatant.setPendingLufttanzWeaponId(-1L);
             combatant.setBlattschussUsedThisRound(false);
+            combatant.setKarmaInitiativeThisRound(false);
             clearBlattschussPending(combatant);
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);
@@ -1104,8 +1156,7 @@ public class CombatService {
             int newWounds = defender.getWounds() - prevWounds;
             addLog(session, defName, null, ActionType.DODGE, defName + " nimmt " + netDamage + " Schaden an (kein Ausweichen).", false);
             sessionRepo.save(session);
-            broadcast(session);
-            return DodgeResult.builder()
+            DodgeResult declined = DodgeResult.builder()
                     .defenderName(defName)
                     .rollStep(0).roll(null).karmaRoll(null)
                     .attackTotal(attackTotal).success(false)
@@ -1115,6 +1166,8 @@ public class CombatService {
                     .knockdownResult(kdr)
                     .description(defName + " nimmt " + netDamage + " Schaden an.")
                     .build();
+            broadcastWithModal(session, "DODGE", declined);
+            return declined;
         }
 
         // Ausweichen-Probe
@@ -1164,9 +1217,8 @@ public class CombatService {
         addLog(session, defName, null, ActionType.DODGE, desc, success);
 
         sessionRepo.save(session);
-        broadcast(session);
 
-        return DodgeResult.builder()
+        DodgeResult result = DodgeResult.builder()
                 .defenderName(defName)
                 .rollStep(rollStep).roll(roll).karmaRoll(karmaRoll)
                 .attackTotal(attackTotal).success(success)
@@ -1176,6 +1228,8 @@ public class CombatService {
                 .knockdownResult(knockdownResult)
                 .description(desc)
                 .build();
+        broadcastWithModal(session, "DODGE", result);
+        return result;
     }
 
     /** Package-private: auch von SpellService genutzt */
@@ -2153,11 +2207,12 @@ public class CombatService {
             String desc = defenderName + " nimmt den Angriff an (kein Riposte). " + riposteDamage + " Schaden erhalten.";
             addLog(session, defenderName, null, ActionType.RIPOSTE, desc, false);
             sessionRepo.save(session);
-            broadcast(session);
-            return RiposteResult.builder()
+            RiposteResult declined = RiposteResult.builder()
                     .defenderName(defenderName).attackerName(attackerName)
                     .attackTotal(attackTotal).success(false).riposteAttempted(false)
                     .incomingNetDamage(riposteDamage).description(desc).build();
+            broadcastWithModal(session, "RIPOSTE", declined);
+            return declined;
         }
 
         CharacterTalent ct = defender.getCharacter().getTalents().stream()
@@ -2244,8 +2299,9 @@ public class CombatService {
         result.description(description);
         addLog(session, defenderName, attackerName, ActionType.RIPOSTE, description, success);
         sessionRepo.save(session);
-        broadcast(session);
-        return result.build();
+        RiposteResult built = result.build();
+        broadcastWithModal(session, "RIPOSTE", built);
+        return built;
     }
 
     // --- Manövrieren ---

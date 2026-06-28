@@ -156,6 +156,13 @@ public class CombatController {
         return combatService.undeclareAction(id, combatantId);
     }
 
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/karma-initiative")
+    public CombatSession setKarmaInitiative(@PathVariable Long id,
+                                            @PathVariable Long combatantId,
+                                            @RequestParam boolean spend) {
+        return combatService.setKarmaInitiative(id, combatantId, spend);
+    }
+
     @PostMapping("/sessions/{id}/combatants/{combatantId}/combat-option")
     public CombatSession declareCombatOption(@PathVariable Long id,
                                               @PathVariable Long combatantId,

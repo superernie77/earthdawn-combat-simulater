@@ -203,6 +203,18 @@ import { ProbeResult } from '../../models/dice.model';
                   </div>
                 </div>
 
+                <div class="section-title" style="margin-top:14px">Weitere Boni</div>
+                <div class="defense-bonus-row" *ngFor="let b of statBonusFields">
+                  <span class="derived-label">{{ b.label }}</span>
+                  <div class="ctrl-btns">
+                    <button mat-icon-button (click)="adjustField(b.field, -1)"><mat-icon>remove</mat-icon></button>
+                    <span class="bonus-val" [class.positive]="getDefenseBonus(b.field) > 0" [class.negative]="getDefenseBonus(b.field) < 0">
+                      {{ getDefenseBonus(b.field) >= 0 ? '+' : '' }}{{ getDefenseBonus(b.field) }}
+                    </span>
+                    <button mat-icon-button (click)="adjustField(b.field, 1)"><mat-icon>add</mat-icon></button>
+                  </div>
+                </div>
+
                 <!-- Holzhaut -->
                 <ng-container *ngIf="hasHolzhautTalent()">
                   <div class="section-title" style="margin-top:14px">Holzhaut</div>
@@ -824,11 +836,21 @@ import { ProbeResult } from '../../models/dice.model';
               </span>
             </div>
 
+            <!-- Karma auf Erholungsprobe: Disziplin-Fähigkeit (3./5. Kreis) -->
+            <div *ngIf="canUseKarmaRecovery()"
+              style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:#2a2410;border-radius:6px;border:1px solid #6b5a1e">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#d4b85a;margin:0">
+                <input type="checkbox" [(ngModel)]="recoveryUseKarma" [disabled]="character.karmaCurrent <= 0">
+                <mat-icon style="color:#d4b85a;font-size:18px;height:18px;width:18px">auto_awesome</mat-icon>
+                Karma einsetzen: +W6 (Stufe 4) auf die Probe — {{ character.karmaCurrent }} verfügbar
+              </label>
+            </div>
+
             <div style="display:flex;gap:8px;margin-bottom:20px">
               <button mat-raised-button color="primary"
                 [disabled]="getRecoveryTestsRemaining() <= 0"
                 (click)="doRecoveryTest()"
-                [matTooltip]="'Würfelt ZÄH-Stufe ' + getRecoveryRollStep() + (( character.pendingRecoveryBonus ?? 0) > 0 ? ' +' + character.pendingRecoveryBonus + ' Bonus' : '') + ' und heilt LP'">
+                [matTooltip]="'Würfelt ZÄH-Stufe ' + getRecoveryRollStep() + (( character.pendingRecoveryBonus ?? 0) > 0 ? ' +' + character.pendingRecoveryBonus + ' Bonus' : '') + (canUseKarmaRecovery() && recoveryUseKarma ? ' +Karma (W6)' : '') + ' und heilt LP'">
                 <mat-icon>healing</mat-icon> Erholungsprobe würfeln
               </button>
               <button mat-stroked-button (click)="resetRecoveryTests()" matTooltip="Neuer Tag — Proben auffüllen">
@@ -843,7 +865,7 @@ import { ProbeResult } from '../../models/dice.model';
                 <div class="heal-name" *ngIf="lastRecovery.potionName">{{ lastRecovery.potionName }}</div>
                 <div class="heal-detail">
                   Stufe {{ lastRecovery.rollStep }}<ng-container *ngIf="lastRecovery.bonusSteps > 0"> +{{ lastRecovery.bonusSteps }} Bonus</ng-container>
-                  ({{ lastRecovery.roll?.diceExpression }}) → <strong class="heal-amount">{{ lastRecovery.healed }} LP geheilt</strong>
+                  ({{ lastRecovery.roll?.diceExpression }}<ng-container *ngIf="lastRecovery.karmaRoll"> + Karma {{ lastRecovery.karmaRoll.total }}</ng-container>) → <strong class="heal-amount">{{ lastRecovery.healed }} LP geheilt</strong>
                   <span *ngIf="lastRecovery.remainingDamage > 0"> · {{ lastRecovery.remainingDamage }} LP verbleibend</span>
                   <span *ngIf="lastRecovery.remainingDamage === 0"> · Vollständig geheilt!</span>
                   <em *ngIf="lastRecovery.usedExtraSlot" style="color:#90caf9"> · Extra-Probe</em>
@@ -1209,6 +1231,7 @@ export class CharacterSheetComponent implements OnInit {
   newGear: { name: string; probeBonusTalentName: string; probeBonusValue: number } = { name: '', probeBonusTalentName: '', probeBonusValue: 0 };
   lastAmuletRecharge?: AmuletRechargeResult;
   lastRecovery?: RecoveryTestResult;
+  recoveryUseKarma = false;
   lastHolzhaut?: HolzhautResult;
   lastArzt?: ArztResult;
   allCharacters: Character[] = [];
@@ -1246,6 +1269,12 @@ export class CharacterSheetComponent implements OnInit {
     { field: 'physicalDefenseBonus', label: 'KV-Bonus' },
     { field: 'spellDefenseBonus',    label: 'MV-Bonus' },
     { field: 'socialDefenseBonus',   label: 'SV-Bonus' },
+  ];
+
+  statBonusFields = [
+    { field: 'healthBonus',     label: 'Lebenspunkte-Bonus (BW & TD)' },
+    { field: 'initiativeBonus', label: 'Initiative-Bonus' },
+    { field: 'recoveryBonus',   label: 'Erholungsstufen-Bonus' },
   ];
 
   currencies = [
@@ -1912,13 +1941,28 @@ export class CharacterSheetComponent implements OnInit {
     });
   }
 
+  /** Disziplinen mit Karmabonus auf Erholungsproben → benötigter Mindestkreis. */
+  private static readonly KARMA_RECOVERY_DISCIPLINES: Record<string, number> = {
+    'Elementarist': 3, 'Krieger': 3, 'Luftpirat': 3, 'Tiermeister': 3, 'Waffenschmied': 3, 'Kundschafter': 5,
+  };
+
+  canUseKarmaRecovery(): boolean {
+    const disc = this.character?.discipline?.name;
+    if (!disc) return false;
+    const min = CharacterSheetComponent.KARMA_RECOVERY_DISCIPLINES[disc];
+    return min != null && (this.character?.circle ?? 0) >= min;
+  }
+
   doRecoveryTest(): void {
     if (!this.character?.id) return;
-    this.characterService.performRecoveryTest(this.character.id).subscribe({
+    const useKarma = this.canUseKarmaRecovery() && this.recoveryUseKarma && (this.character.karmaCurrent ?? 0) > 0;
+    this.characterService.performRecoveryTest(this.character.id, useKarma).subscribe({
       next: result => {
         this.lastRecovery = result;
+        this.recoveryUseKarma = false;
         this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
-        this.snack.open(`Erholungsprobe: ${result.healed} LP geheilt (Stufe ${result.rollStep}, Wurf: ${result.roll?.total})`, 'OK', { duration: 4000 });
+        const karmaTxt = result.karmaRoll ? ` + Karma ${result.karmaRoll.total}` : '';
+        this.snack.open(`Erholungsprobe: ${result.healed} LP geheilt (Stufe ${result.rollStep}, Wurf: ${result.roll?.total}${karmaTxt})`, 'OK', { duration: 4000 });
       },
       error: err => this.snack.open(err?.error?.message ?? 'Fehler bei Erholungsprobe', 'OK', { duration: 3000 })
     });

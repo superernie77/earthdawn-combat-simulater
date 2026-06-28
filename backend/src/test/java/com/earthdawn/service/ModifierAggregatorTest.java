@@ -406,4 +406,47 @@ class ModifierAggregatorTest {
         assertThat(aggregator.getEffectiveValue(state, StatType.INITIATIVE_STEP, TriggerContext.ALWAYS))
                 .isEqualTo(2); // 5 - 2 (armor) - 1 (shield) = 2
     }
+
+    // --- Konfigurierbare Boni: Lebenspunkte / Initiative / Erholungsstufe ---
+
+    @Test
+    void healthBonus_addsToBothThresholds() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // BW = 20, TD = 30
+        c.setHealthBonus(3);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING)).isEqualTo(23);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.DEATH_RATING)).isEqualTo(33);
+    }
+
+    @Test
+    void healthBonus_negativeLowersThresholds() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        c.setHealthBonus(-4);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING)).isEqualTo(16);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.DEATH_RATING)).isEqualTo(26);
+    }
+
+    @Test
+    void initiativeBonus_addsToInitiativeStep_characterAndCombatant() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base init step = 5
+        c.setInitiativeBonus(2);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.INITIATIVE_STEP)).isEqualTo(7);
+        assertThat(aggregator.getEffectiveValue(stateFor(c), StatType.INITIATIVE_STEP, TriggerContext.ALWAYS)).isEqualTo(7);
+    }
+
+    @Test
+    void recoveryBonus_addsToRecoveryStep_andClampsAtZero() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10); // base recovery step = 5
+        c.setRecoveryBonus(2);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.RECOVERY_STEP)).isEqualTo(7);
+        c.setRecoveryBonus(-99);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.RECOVERY_STEP)).isZero();
+    }
+
+    @Test
+    void noStatBonuses_baselineUnchanged() {
+        GameCharacter c = charWith(10, 10, 10, 10, 10, 10);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.UNCONSCIOUSNESS_RATING)).isEqualTo(20);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.INITIATIVE_STEP)).isEqualTo(5);
+        assertThat(aggregator.getBaseValueFromCharacter(c, StatType.RECOVERY_STEP)).isEqualTo(5);
+    }
 }

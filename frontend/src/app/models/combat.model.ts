@@ -86,6 +86,7 @@ export interface CombatantState {
   pendingLufttanzTargetId: number;
   pendingLufttanzWeaponId: number;
   blattschussUsedThisRound: boolean;
+  karmaInitiativeThisRound?: boolean;
   pendingBlattschussDefenderId: number;
   pendingBlattschussTotal: number;
   pendingBlattschussKarmaUsed: number;

@@ -112,6 +112,13 @@ export class CombatService {
     );
   }
 
+  setKarmaInitiative(sessionId: number, combatantId: number, spend: boolean): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/karma-initiative?spend=${spend}`,
+      {}
+    );
+  }
+
   declareCombatOption(sessionId: number, combatantId: number, option: string): Observable<CombatSession> {
     return this.http.post<CombatSession>(
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/combat-option`,

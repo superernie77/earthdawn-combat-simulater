@@ -302,6 +302,15 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   matTooltip="Lufttanz: +Rang auf Initiative; bei Initiative-Vorsprung ≥10 ein Bonus-Nahkampfangriff. Ansagephase, 1×/Runde, kostet 2 Überanstrengung.">
                   <mat-icon>air</mat-icon> Lufttanz
                 </button>
+                <!-- Karma auf Initiative: Disziplin-Fähigkeit ab Kreis 3 -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && canUseKarmaInitiative(c) && !c.defeated"
+                  class="combat-option-btn karma-init-btn"
+                  [class.active]="c.karmaInitiativeThisRound"
+                  [disabled]="!c.karmaInitiativeThisRound && c.currentKarma <= 0"
+                  (click)="toggleKarmaInitiative(c)"
+                  matTooltip="Karma auf Initiative: 1 Karma → +W6 (Stufe 4) auf den Initiativewurf dieser Runde. Disziplin-Fähigkeit ab dem 3. Kreis.">
+                  <mat-icon>auto_awesome</mat-icon> {{ c.karmaInitiativeThisRound ? 'Karma-Init ✓' : 'Karma-Init' }}
+                </button>
                 <!-- Lufttanz-Bonusangriff: nur wenn pending -->
                 <button mat-raised-button color="warn"
                   *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingLufttanzTargetId >= 0 && !c.defeated"
@@ -3169,6 +3178,12 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'SPOT_ARMOR_FLAW':
         this.spotArmorFlawModal = { open: true, result: payload };
         break;
+      case 'DODGE':
+        this.dodgeModal = { open: true, result: payload };
+        break;
+      case 'RIPOSTE':
+        this.riposteModal = { open: true, result: payload };
+        break;
     }
   }
 
@@ -3185,6 +3200,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (this.manoeuverModal) this.manoeuverModal.open = false;
     if (this.spotArmorFlawModal) this.spotArmorFlawModal.open = false;
     if (this.dodgeModal) this.dodgeModal.open = false;
+    if (this.riposteModal) this.riposteModal.open = false;
     if (this.standUpModal) this.standUpModal.open = false;
     if (this.threadweaveModal) this.threadweaveModal.open = false;
     if (this.spellCastModal) this.spellCastModal.open = false;
@@ -4658,6 +4674,25 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   hasLufttanzTalent(c: CombatantState): boolean {
     return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Lufttanz');
+  }
+
+  /** Disziplinen, die ab dem 3. Kreis Karma auf ihre Initiative einsetzen dürfen. */
+  private static readonly KARMA_INIT_DISCIPLINES = ['Dieb', 'Kundschafter', 'Luftsegler', 'Schütze'];
+
+  canUseKarmaInitiative(c: CombatantState): boolean {
+    const disc = c.character?.discipline?.name;
+    return !!disc
+      && CombatTrackerComponent.KARMA_INIT_DISCIPLINES.includes(disc)
+      && (c.character?.circle ?? 0) >= 3;
+  }
+
+  toggleKarmaInitiative(c: CombatantState): void {
+    if (!this.session) return;
+    const spend = !c.karmaInitiativeThisRound;
+    this.combatService.setKarmaInitiative(this.session.id, c.id, spend).subscribe({
+      next: s => this.session = s,
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
   }
 
   performLufttanz(c: CombatantState): void {

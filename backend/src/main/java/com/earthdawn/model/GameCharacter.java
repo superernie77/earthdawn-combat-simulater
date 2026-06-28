@@ -55,6 +55,16 @@ public class GameCharacter {
     @Builder.Default private int spellDefenseBonus = 0;
     @Column(columnDefinition = "integer default 0")
     @Builder.Default private int socialDefenseBonus = 0;
+
+    /** Konfigurierbarer Bonus/Malus auf Lebenspunkte — addiert auf Bewusstlosigkeits- UND Todesschwelle. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int healthBonus = 0;
+    /** Konfigurierbarer Bonus/Malus auf die Initiativestufe. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int initiativeBonus = 0;
+    /** Konfigurierbarer Bonus/Malus auf die Erholungsstufe. */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int recoveryBonus = 0;
     private Integer unconsciousnessRating;
     private Integer deathRating;
     private Integer physicalArmor;

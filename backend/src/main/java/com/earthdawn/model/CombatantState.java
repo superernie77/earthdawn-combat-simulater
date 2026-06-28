@@ -114,6 +114,14 @@ public class CombatantState {
     @Builder.Default
     private boolean blattschussUsedThisRound = false;
 
+    /**
+     * In der Ansagephase gewählt: beim Initiativewurf dieser Runde wird 1 Karma ausgegeben und ein
+     * W6 (Stufe 4) zur Initiative addiert. Nur für berechtigte Disziplinen ab dem 3. Kreis.
+     */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean karmaInitiativeThisRound = false;
+
     /** ID des Verteidigers eines pending Blattschuss-Angriffs (Fehlschlag, weitere Karma möglich). -1 = keiner. */
     @Column(columnDefinition = "bigint default -1")
     @Builder.Default

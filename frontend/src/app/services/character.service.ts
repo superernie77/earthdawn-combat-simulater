@@ -161,8 +161,8 @@ export class CharacterService {
 
   // --- Erholungsproben ---
 
-  performRecoveryTest(characterId: number): Observable<RecoveryTestResult> {
-    return this.http.post<RecoveryTestResult>(`${this.base}/${characterId}/recovery-test`, {});
+  performRecoveryTest(characterId: number, spendKarma = false): Observable<RecoveryTestResult> {
+    return this.http.post<RecoveryTestResult>(`${this.base}/${characterId}/recovery-test?spendKarma=${spendKarma}`, {});
   }
 
   drinkPotion(characterId: number, potionId: number): Observable<DrinkPotionResult> {

@@ -184,6 +184,11 @@ export interface Character {
   spellDefenseBonus: number;
   socialDefenseBonus: number;
 
+  // Konfigurierbarer Bonus/Malus auf Lebenspunkte (BW & TD), Initiative und Erholungsstufe
+  healthBonus?: number;
+  initiativeBonus?: number;
+  recoveryBonus?: number;
+
   // Waffe
   weaponName: string;
   weaponDamageStep: number;
@@ -259,6 +264,8 @@ export interface RecoveryTestResult {
   rollStep: number;
   bonusSteps: number;
   roll: RollResult | null;
+  /** Karmawürfel (W6/Stufe 4), falls eingesetzt — sonst null. */
+  karmaRoll?: RollResult | null;
   healed: number;
   remainingDamage: number;
   recoveryTestsRemaining: number;
@@ -321,6 +328,9 @@ export function emptyCharacter(): Character {
     physicalDefenseBonus: 0,
     spellDefenseBonus: 0,
     socialDefenseBonus: 0,
+    healthBonus: 0,
+    initiativeBonus: 0,
+    recoveryBonus: 0,
     talents: [],
     skills: [],
     equipment: [],

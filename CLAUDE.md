@@ -113,10 +113,18 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 ### Lufttanz
 - **Aktivierung**: Freie Aktion in der **DECLARATION-Phase**, 2 Schaden, 1×/Runde (`lufttanzActivatedThisRound`).
 - **Initiative-Effekt**: ActiveEffect mit `+rank` auf `INITIATIVE_STEP` (mathematisch identisch zu „Lufttanzstufe = Rang+DEX statt DEX-Stufe"). Erlischt nach 1 Runde.
-- **Bonus-Trigger**: In `performAttack` nach erfolgreichem `MELEE_ATTACK`: wenn `attacker.initiative - defender.initiative ≥ 10` und Lufttanz aktiviert und Bonus noch nicht verbraucht → `pendingLufttanzTargetId` + `pendingLufttanzWeaponId` werden auf `attacker` gesetzt. `CombatActionResult.lufttanzBonusReady = true` und `lufttanzInitiativeDiff` zur Anzeige.
+- **Bonus-Trigger**: In `performAttack` bei jedem `MELEE_ATTACK` — **unabhängig von Treffer/Fehlschlag** (der Zusatzangriff wird allein durch den Initiative-Vorsprung gewährt, nicht durch einen erfolgreichen Angriff): wenn `attacker.initiative - defender.initiative ≥ 10` und Lufttanz aktiviert und Bonus noch nicht verbraucht → `pendingLufttanzTargetId` + `pendingLufttanzWeaponId` werden auf `attacker` gesetzt. `CombatActionResult.lufttanzBonusReady = true` und `lufttanzInitiativeDiff` zur Anzeige. Der Trigger steht **vor** dem `if (hit)`-Block, damit er auch bei Fehlschlag (und im Riposte/Ausweichen-Early-Return) feuert.
 - **Bonus-Angriff**: `POST /api/combat/sessions/{id}/lufttanz-attack` (`LufttanzAttackRequest`). Führt regulären `performAttack` mit gespeichertem Ziel und Waffe aus, verbraucht **kein** `hasActedThisRound`, setzt `lufttanzBonusUsedThisRound=true` und löscht pending-Felder vor dem Aufruf — verhindert dadurch Selbst-Retrigger.
 - **CombatantState** Felder: `lufttanzActivatedThisRound`, `lufttanzBonusUsedThisRound`, `pendingLufttanzTargetId` (-1 = none), `pendingLufttanzWeaponId` (-1). Alle 4 werden in `nextRound()` zurückgesetzt.
 - **Flyway V15**: 4 neue Spalten auf `combatant_states`.
+
+### Karma auf Initiative (Disziplin-Fähigkeit ab Kreis 3)
+- **Berechtigung**: Disziplin ∈ {**Dieb, Kundschafter, Luftsegler, Schütze**} **und** `circle >= 3` (`CombatService.canUseKarmaOnInitiative`).
+- **Auswahl**: In der **Ansagephase** (DECLARATION) setzt `POST /api/combat/sessions/{id}/combatants/{cId}/karma-initiative?spend=true|false` das Flag `karmaInitiativeThisRound` auf `CombatantState`. Validiert Phase, Berechtigung und Karma > 0. Karma wird **noch nicht** abgezogen.
+- **Einlösung**: In `rerollInitiative` wird — wenn das Flag gesetzt, die Disziplin/Kreis berechtigt und Karma > 0 — **1 Karma abgezogen** und ein **W6 (Stufe 4)** (`diceService.roll(4)`) zur Initiative addiert. Anzeige im Initiative-Modal als `Karma +X` in `bonusNotes`; `total` zeigt Basiswurf + Karma.
+- **Reset**: `karmaInitiativeThisRound` wird in `nextRound()` zurückgesetzt.
+- **Frontend**: Toggle-Button „Karma-Init" auf der Kombattanten-Karte in der Ansagephase, sichtbar via `canUseKarmaInitiative(c)` (gleiche Disziplin-/Kreis-Bedingung). Deaktiviert ohne Karma.
+- **Flyway V31**: `combatant_states.karma_initiative_this_round` (boolean, default false).
 
 ### Schwachstelle erkennen
 - **Wurf**: WAH-Step + Rang vs. **max(MV, physische Rüstung)** des Ziels
@@ -144,6 +152,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 
 ## Character Sheet — Configurable Bonuses
 - **Defense bonuses**: `physicalDefenseBonus`, `spellDefenseBonus`, `socialDefenseBonus` (int, default 0) on `GameCharacter` — added on top of the formula/override value in `ModifierAggregator`. Editable via +/− steppers in the "Verteidigungs-Boni" section on the Attribute tab.
+- **Stat bonuses** (Flyway V30): `healthBonus`, `initiativeBonus`, `recoveryBonus` (int, default 0) on `GameCharacter`, edited via +/− steppers in the "Weitere Boni" section on the Attribute tab (`statBonusFields` in `CharacterSheetComponent`, same generic `adjustField`/`getDefenseBonus` path). Applied in **both** `getBaseValue`/`getBaseValueFromCharacter` of `ModifierAggregator`: `healthBonus` → added to `UNCONSCIOUSNESS_RATING` **and** `DEATH_RATING`; `initiativeBonus` → `INITIATIVE_STEP` (also in combat); `recoveryBonus` → `RECOVERY_STEP` (clamped via `Math.max(0, …)`). All may be negative. Field get/set wired in `CharacterService.getCurrentFieldValue`/`applyFieldValue`.
 - **Armor initiative penalty**: `initiativePenalty` field on `Equipment` (int, default 0) — automatically subtracted from `INITIATIVE_STEP` in `ModifierAggregator`. Entered when adding armor; shown as orange badge.
 
 ## Equipment System
@@ -194,6 +203,7 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 - **Erholungstrank** (`extraRecovery=false`): +`healStep` bonus steps, consumes one daily slot.
 - **Heiltrank** (`extraRecovery=true`): +`healStep` bonus steps, grants an extra test (ignores daily limit).
 - **`healStep`** default 7 for both types (ED4 standard). Quantity decrements by 1 on use.
+- **Karma auf Erholungsprobe**: `POST /api/characters/{id}/recovery-test?spendKarma=true` → bei berechtigter Disziplin und Karma > 0 wird 1 Karma abgezogen und ein **W6 (Stufe 4)** (`stepRollService.roll(4)`) auf den Erholungswurf addiert; Ergebnis als `RecoveryTestResult.karmaRoll`. Berechtigung (`CharacterService.canUseKarmaOnRecovery`): Disziplin → Mindestkreis — **Elementarist/Krieger/Luftpirat/Tiermeister/Waffenschmied ab Kreis 3, Kundschafter erst ab Kreis 5**. Frontend: Karma-Checkbox (`recoveryUseKarma`) auf der Erholung-Seite, sichtbar via `canUseKarmaRecovery()`.
 - **Reset**: `POST /api/characters/{id}/recovery-test/reset` → sets `recoveryTestsRemaining = max` (new day).
 - **Frontend**: Tab "Erholung" shows slot dots, "Erholungsprobe würfeln" button, "Neuer Tag" reset, potion list with Trinken-button. `lastRecovery` (type `RecoveryTestResult`) displays last result.
 
@@ -273,7 +283,7 @@ DELETE /api/characters/{id}/equipment/{equipmentId}
 POST   /api/characters/{id}/equipment/{equipmentId}/recharge-amulet → opfert Erholungsprobe (≥3 lädt Amulett), gibt AmuletRechargeResult
 POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speichert als holzhautBonus (überschreibt)
 POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
-POST   /api/characters/{id}/recovery-test         { potionId? } → Erholungsprobe würfeln (optionaler Trank-Bonus); gibt RecoveryTestResult
+POST   /api/characters/{id}/recovery-test         ?spendKarma=true|false → Erholungsprobe würfeln (optionaler Karmawürfel bei berechtigter Disziplin ab Kreis 3/5); gibt RecoveryTestResult
 POST   /api/characters/{id}/recovery-test/reset   → Neuer Tag: setzt recoveryTestsRemaining auf Max (aus ZÄH)
 POST   /api/characters/{id}/arzt                  { healerCharacterId } → Arztprobe (MW 5, verbraucht 1 Verbandszeug); gibt ArztResult
 
@@ -298,6 +308,7 @@ POST   /api/combat/sessions/{id}/next-round          → increments round, clear
 
 POST   /api/combat/sessions/{id}/combatants/{cId}/declare    ?stance=NONE|AGGRESSIVE|DEFENSIVE&actionType=WEAPON|SPELL
 POST   /api/combat/sessions/{id}/combatants/{cId}/undeclare  → undo declaration (change allowed)
+POST   /api/combat/sessions/{id}/combatants/{cId}/karma-initiative  ?spend=true|false  → Karma-auf-Initiative wählen (Ansagephase, Disziplin ab Kreis 3)
 
 POST   /api/combat/sessions/{id}/attack              AttackActionRequest
 POST   /api/combat/sessions/{id}/dodge               DodgeRequest

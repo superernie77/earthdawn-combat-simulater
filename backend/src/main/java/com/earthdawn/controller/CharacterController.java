@@ -181,8 +181,9 @@ public class CharacterController {
 
     /** Reguläre Erholungsprobe: verbraucht einen Tages-Slot, wendet ausstehenden Bonus an. */
     @PostMapping("/{id}/recovery-test")
-    public RecoveryTestResult performRecoveryTest(@PathVariable Long id) {
-        return characterService.performRecoveryTest(id);
+    public RecoveryTestResult performRecoveryTest(@PathVariable Long id,
+                                                  @RequestParam(defaultValue = "false") boolean spendKarma) {
+        return characterService.performRecoveryTest(id, spendKarma);
     }
 
     /** Trank trinken: Erholungstrank setzt Pending-Bonus, Heiltrank gibt sofortige Extra-Probe. */
