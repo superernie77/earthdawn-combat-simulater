@@ -150,11 +150,11 @@ import { Character } from '../../models/character.model';
               <button *ngFor="let t of activeChar.talents"
                 class="ability-chip"
                 [class.selected]="selectedProbe?.id === t.talentDefinition.id && selectedProbe?.type === 'talent'"
-                (click)="selectProbe('talent', t.talentDefinition.id!, t.talentDefinition.name, probeStepFor(t.talentDefinition.attribute, t.rank))"
-                [matTooltip]="t.talentDefinition.attribute + ' · Rang ' + t.rank">
+                (click)="selectProbe('talent', t.talentDefinition.id!, t.talentDefinition.name, probeStepFor(t.talentDefinition.attribute, t.rank, t.talentDefinition.name))"
+                [matTooltip]="t.talentDefinition.attribute + ' · Rang ' + t.rank + (equipmentProbeBonus(t.talentDefinition.name) > 0 ? ' · +' + equipmentProbeBonus(t.talentDefinition.name) + ' Ausrüstung' : '')">
                 <span class="ability-name">{{ t.talentDefinition.name }}</span>
                 <span class="ability-rank">{{ t.rank }}</span>
-                <span class="ability-step">Step {{ probeStepFor(t.talentDefinition.attribute, t.rank) }}</span>
+                <span class="ability-step">Step {{ probeStepFor(t.talentDefinition.attribute, t.rank, t.talentDefinition.name) }}</span>
               </button>
             </div>
           </div>
@@ -165,11 +165,11 @@ import { Character } from '../../models/character.model';
               <button *ngFor="let s of activeChar.skills"
                 class="ability-chip"
                 [class.selected]="selectedProbe?.id === s.skillDefinition.id && selectedProbe?.type === 'skill'"
-                (click)="selectProbe('skill', s.skillDefinition.id!, s.skillDefinition.name, probeStepFor(s.skillDefinition.attribute, s.rank))"
-                [matTooltip]="s.skillDefinition.attribute + ' · Rang ' + s.rank">
+                (click)="selectProbe('skill', s.skillDefinition.id!, s.skillDefinition.name, probeStepFor(s.skillDefinition.attribute, s.rank, s.skillDefinition.name))"
+                [matTooltip]="s.skillDefinition.attribute + ' · Rang ' + s.rank + (equipmentProbeBonus(s.skillDefinition.name) > 0 ? ' · +' + equipmentProbeBonus(s.skillDefinition.name) + ' Ausrüstung' : '')">
                 <span class="ability-name">{{ s.skillDefinition.name }}</span>
                 <span class="ability-rank">{{ s.rank }}</span>
-                <span class="ability-step">Step {{ probeStepFor(s.skillDefinition.attribute, s.rank) }}</span>
+                <span class="ability-step">Step {{ probeStepFor(s.skillDefinition.attribute, s.rank, s.skillDefinition.name) }}</span>
               </button>
             </div>
           </div>
@@ -690,9 +690,17 @@ export class DiceRollerComponent implements OnInit {
     return Math.floor((value - 1) / 3);
   }
 
-  probeStepFor(attribute: string, rank: number): number {
+  probeStepFor(attribute: string, rank: number, name?: string): number {
     const wounds = this.activeChar?.wounds ?? 0;
-    return Math.max(1, this.attrToStep(this.attrValue(attribute)) + rank - wounds);
+    const equip = name ? this.equipmentProbeBonus(name) : 0;
+    return Math.max(1, this.attrToStep(this.attrValue(attribute)) + rank + equip - wounds);
+  }
+
+  /** Ausrüstungs-Probenbonus (GEAR, z.B. Leichte Stiefel) für ein Talent/eine Fertigkeit anhand des Namens. */
+  equipmentProbeBonus(name: string): number {
+    return (this.activeChar?.equipment ?? [])
+      .filter(e => e.type === 'GEAR' && (e.probeBonusTalentName ?? '').toLowerCase() === name.toLowerCase())
+      .reduce((sum, e) => sum + (e.probeBonusValue ?? 0), 0);
   }
 
   /** Wunden des aktiven Charakters zur Anzeige (Wundenmalus auf Würfe). */
