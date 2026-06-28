@@ -154,7 +154,7 @@ import { Character } from '../../models/character.model';
                 [matTooltip]="t.talentDefinition.attribute + ' · Rang ' + t.rank + (equipmentProbeBonus(t.talentDefinition.name) > 0 ? ' · +' + equipmentProbeBonus(t.talentDefinition.name) + ' Ausrüstung' : '')">
                 <span class="ability-name">{{ t.talentDefinition.name }}</span>
                 <span class="ability-rank">{{ t.rank }}</span>
-                <span class="ability-step">Step {{ probeStepFor(t.talentDefinition.attribute, t.rank, t.talentDefinition.name) }}</span>
+                <span class="ability-step">Step {{ probeStepFor(t.talentDefinition.attribute, t.rank, t.talentDefinition.name) }}<span class="ability-equip-bonus" *ngIf="equipmentProbeBonus(t.talentDefinition.name) > 0" [matTooltip]="'inkl. +' + equipmentProbeBonus(t.talentDefinition.name) + ' durch Ausrüstung'"> (+{{ equipmentProbeBonus(t.talentDefinition.name) }})</span></span>
               </button>
             </div>
           </div>
@@ -169,7 +169,7 @@ import { Character } from '../../models/character.model';
                 [matTooltip]="s.skillDefinition.attribute + ' · Rang ' + s.rank + (equipmentProbeBonus(s.skillDefinition.name) > 0 ? ' · +' + equipmentProbeBonus(s.skillDefinition.name) + ' Ausrüstung' : '')">
                 <span class="ability-name">{{ s.skillDefinition.name }}</span>
                 <span class="ability-rank">{{ s.rank }}</span>
-                <span class="ability-step">Step {{ probeStepFor(s.skillDefinition.attribute, s.rank, s.skillDefinition.name) }}</span>
+                <span class="ability-step">Step {{ probeStepFor(s.skillDefinition.attribute, s.rank, s.skillDefinition.name) }}<span class="ability-equip-bonus" *ngIf="equipmentProbeBonus(s.skillDefinition.name) > 0" [matTooltip]="'inkl. +' + equipmentProbeBonus(s.skillDefinition.name) + ' durch Ausrüstung'"> (+{{ equipmentProbeBonus(s.skillDefinition.name) }})</span></span>
               </button>
             </div>
           </div>
@@ -178,7 +178,7 @@ import { Character } from '../../models/character.model';
           <div class="probe-controls" *ngIf="selectedProbe">
             <span class="selected-probe-label">
               <mat-icon style="font-size:16px;height:16px;width:16px;vertical-align:middle">casino</mat-icon>
-              {{ selectedProbe.name }} · Step {{ selectedProbe.step }}
+              {{ selectedProbe.name }} · Step {{ selectedProbe.step }}<span class="ability-equip-bonus" *ngIf="equipmentProbeBonus(selectedProbe.name) > 0"> (inkl. +{{ equipmentProbeBonus(selectedProbe.name) }} Ausrüstung)</span>
             </span>
             <mat-form-field appearance="fill" style="width:100px">
               <mat-label>Zielwert (TN)</mat-label>
@@ -418,6 +418,7 @@ import { Character } from '../../models/character.model';
       border-radius: 8px; padding: 1px 8px; color: #c9a84c;
     }
     .ability-step { font-size: 0.8rem; color: #888; }
+    .ability-equip-bonus { color: #80cbc4; font-weight: 700; }
 
     .probe-controls {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
