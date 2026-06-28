@@ -361,7 +361,8 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - **Erweiterte Matrize**: Liegt ein Zauber in der Matrize, gilt **ein Faden als bereits gewoben** → effektiver Fadenweben-Aufwand = `max(0, spell.threads − 1)`.
   - `SpellService.weaveThread`: beim Vorbereitungsstart `threadsRequired = max(0, threads − discount)` (discount 1, wenn der Zauber in einer Erweiterten Matrize liegt — `isInErweiterteMatrize`).
   - `SpellService.castSpell`: ist der effektive Bedarf 0 (z.B. 1-Faden-Zauber in Erweiterter Matrize), kann **direkt ohne Vorbereitung** gewirkt werden.
-  - Frontend: `spellMatrices()` listet beide Typen; erweiterte Matrizen zeigen „1 Faden vorgewoben" und „noch N Fäden".
+  - Frontend: `spellMatrices()` listet beide Typen; erweiterte Matrizen zeigen „1 Faden vorgewoben" und „noch N Fäden" (`matrixRemainingThreads`).
+  - `CharacterService.assignSpellToMatrix` akzeptiert **beide** Matrix-Typen (ZAUBERMATRITZE + ERWEITERTE_MATRIZE).
   - Keine Migration (nutzt bestehendes `assignedSpell`); Seeding idempotent in `migrateFreeActionTalents()`.
 
 **Skills seeded (Auswahl):** Reiten, diverse Wissens-/Handwerks-/Sozialfertigkeiten, Arzt (PER), sowie die **Waffen-Fertigkeiten Nahkampfwaffen & Projektilwaffen** (DEX, Kategorie „Waffen"). Idempotent via `migrateWeaponSkills()` / `migrateArztSkill()`.

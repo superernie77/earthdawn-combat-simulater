@@ -88,6 +88,25 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.isEnhancedMatrix({ talentDefinition: { name: 'Zaubermatritze' } } as any)).toBe(false);
   });
 
+  it('matrixRemainingThreads(): erweiterte Matrize webt 1 Faden vor (Bedarf −1)', () => {
+    // 2-Faden-Zauber in erweiterter Matrize → noch 1 Faden
+    expect(comp.matrixRemainingThreads({
+      talentDefinition: { name: 'Erweiterte Matrize' }, assignedSpell: { threads: 2 },
+    } as any)).toBe(1);
+    // 1-Faden-Zauber in erweiterter Matrize → 0 (direkt wirkbar)
+    expect(comp.matrixRemainingThreads({
+      talentDefinition: { name: 'Erweiterte Matrize' }, assignedSpell: { threads: 1 },
+    } as any)).toBe(0);
+    // normale Matrize → voller Bedarf
+    expect(comp.matrixRemainingThreads({
+      talentDefinition: { name: 'Zaubermatritze' }, assignedSpell: { threads: 2 },
+    } as any)).toBe(2);
+    // kein Zauber zugewiesen → 0
+    expect(comp.matrixRemainingThreads({
+      talentDefinition: { name: 'Erweiterte Matrize' }, assignedSpell: null,
+    } as any)).toBe(0);
+  });
+
   it('probeTargetNames() listet Talent- und Fertigkeitsnamen eindeutig & sortiert', () => {
     (comp as any).character = {
       talents: [{ talentDefinition: { name: 'Heimlicher Schritt' } }, { talentDefinition: { name: 'Klettern' } }],

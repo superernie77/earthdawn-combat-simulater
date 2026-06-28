@@ -734,7 +734,7 @@ import { ProbeResult } from '../../models/dice.model';
                       {{ m.assignedSpell.threads }} {{ m.assignedSpell.threads === 1 ? 'Faden' : 'Fäden' }}
                     </span>
                     <span class="spell-threads" *ngIf="m.assignedSpell.threads > 0 && isEnhancedMatrix(m)" matTooltip="1 Faden ist durch die erweiterte Matrize bereits gewoben">
-                      noch {{ (m.assignedSpell.threads - 1) < 1 ? 0 : (m.assignedSpell.threads - 1) }} {{ (m.assignedSpell.threads - 1) === 1 ? 'Faden' : 'Fäden' }} (1 vorgewoben)
+                      noch {{ matrixRemainingThreads(m) }} {{ matrixRemainingThreads(m) === 1 ? 'Faden' : 'Fäden' }} (1 vorgewoben)
                     </span>
                     <span class="spell-threads" *ngIf="m.assignedSpell.threads === 0">Sofortzauber</span>
                   </div>
@@ -1687,6 +1687,12 @@ export class CharacterSheetComponent implements OnInit {
     return (this.character?.talents ?? [])
       .filter(ct => ct.talentDefinition.name === 'Zaubermatritze'
                  || ct.talentDefinition.name === 'Erweiterte Matrize');
+  }
+
+  /** Noch zu webende Fäden des Matrix-Zaubers — erweiterte Matrize hat bereits 1 Faden vorgewoben. */
+  matrixRemainingThreads(m: CharacterTalent): number {
+    const threads = m.assignedSpell?.threads ?? 0;
+    return Math.max(0, threads - (this.isEnhancedMatrix(m) ? 1 : 0));
   }
 
   /** True, wenn diese Matrix eine "Erweiterte Matrize" ist (1 Faden vorgewoben). */

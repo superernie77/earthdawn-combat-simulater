@@ -343,7 +343,9 @@ public class CharacterService {
                 .findFirst()
                 .orElseThrow(() -> new EntityNotFoundException("Talent nicht gefunden: " + talentId));
 
-        if (!TalentNames.ZAUBERMATRITZE.equals(matrix.getTalentDefinition().getName())) {
+        String matrixName = matrix.getTalentDefinition().getName();
+        if (!TalentNames.ZAUBERMATRITZE.equals(matrixName)
+                && !TalentNames.ERWEITERTE_MATRIZE.equals(matrixName)) {
             throw new IllegalArgumentException("Nur Zaubermatrizen können Zauber zugewiesen werden.");
         }
 
