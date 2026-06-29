@@ -72,6 +72,31 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.gear().length).toBe(1);
   });
 
+  it('addSchwimmkristall() legt GEAR +3 auf Schwimmen mit Unterwasseratmung an', () => {
+    (comp as any).character = { id: 1 };
+    const addEquipment = jest.fn().mockReturnValue({ subscribe: (cb: any) => cb({ id: 1 }) });
+    (comp as any).characterService = { addEquipment };
+
+    comp.addSchwimmkristall();
+
+    expect(addEquipment).toHaveBeenCalledTimes(1);
+    const [charId, eq] = addEquipment.mock.calls[0];
+    expect(charId).toBe(1);
+    expect(eq.name).toBe('Schwimmkristall');
+    expect(eq.type).toBe('GEAR');
+    expect(eq.probeBonusTalentName).toBe('Schwimmen');
+    expect(eq.probeBonusValue).toBe(3);
+    expect(eq.description).toContain('Unterwasseratmung');
+  });
+
+  it('addSchwimmkristall() tut nichts ohne Charakter-ID', () => {
+    (comp as any).character = {};
+    const addEquipment = jest.fn();
+    (comp as any).characterService = { addEquipment };
+    comp.addSchwimmkristall();
+    expect(addEquipment).not.toHaveBeenCalled();
+  });
+
   // --- Zaubermatrizen (normal + erweitert) ---
 
   it('spellMatrices() enthält normale UND erweiterte Matrizen', () => {

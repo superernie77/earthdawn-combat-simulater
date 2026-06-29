@@ -687,10 +687,14 @@ import { ProbeResult } from '../../models/dice.model';
                 </div>
                 <div class="equip-empty" *ngIf="!gear().length">Keine sonstige Ausrüstung</div>
               </div>
-              <div style="margin:8px 0">
+              <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
                 <button mat-stroked-button (click)="addLeichteStiefel()"
                   matTooltip="Leichte Stiefel: +2 auf Heimlicher Schritt">
                   <mat-icon>add</mat-icon> Leichte Stiefel
+                </button>
+                <button mat-stroked-button (click)="addSchwimmkristall()"
+                  matTooltip="Schwimmkristall: +3 auf Schwimmen, erlaubt Unterwasseratmung von Rang Minuten">
+                  <mat-icon>add</mat-icon> Schwimmkristall
                 </button>
               </div>
               <div class="equip-add-form">
@@ -1845,6 +1849,19 @@ export class CharacterSheetComponent implements OnInit {
       damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
       physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
       probeBonusTalentName: 'Heimlicher Schritt', probeBonusValue: 2
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
+  }
+
+  /** Schnellanlage: Schwimmkristall (+3 auf Schwimmen, erlaubt Unterwasseratmung von Rang Minuten). */
+  addSchwimmkristall(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Schwimmkristall', type: 'GEAR',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      probeBonusTalentName: 'Schwimmen', probeBonusValue: 3,
+      description: 'Erlaubt Unterwasseratmung von Rang Minuten.'
     };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
   }

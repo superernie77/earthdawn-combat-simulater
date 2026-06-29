@@ -166,3 +166,75 @@ describe('CombatTrackerComponent — Amulette, Nachtreten, Waffen-Fertigkeiten',
     expect((comp as any).resolveActionType()).toBe('MELEE_ATTACK');
   });
 });
+
+describe('CombatTrackerComponent — Zauberauswahl nur aus Matrizen', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  function combatant(): any {
+    return { character: {
+      spells: [
+        { spellDefinition: { id: 1, name: 'Feuerball', threads: 2 } },
+        { spellDefinition: { id: 2, name: 'Eisnadeln', threads: 0 } },
+        { spellDefinition: { id: 3, name: 'Lichtblitz', threads: 0 } }, // nicht in Matrize
+      ],
+      talents: [
+        { talentDefinition: { name: 'Zaubermatritze' }, assignedSpell: { id: 1 } },
+        { talentDefinition: { name: 'Erweiterte Matrize' }, assignedSpell: { id: 2 } },
+        { talentDefinition: { name: 'Nahkampfwaffen' } },                 // keine Matrize
+        { talentDefinition: { name: 'Zaubermatritze' }, assignedSpell: null }, // leere Matrize
+      ],
+    } };
+  }
+
+  it('matrixSpellIds() sammelt nur Zauber aus normalen + erweiterten Matrizen', () => {
+    const ids = comp.matrixSpellIds(combatant());
+    expect([...ids].sort()).toEqual([1, 2]);
+  });
+
+  it('spellsOf() bietet nur Matrix-Zauber an (Lichtblitz fehlt)', () => {
+    expect(comp.spellsOf(combatant()).map(s => s.spellDefinition.id).sort()).toEqual([1, 2]);
+  });
+
+  it('readySpellsOf() zeigt 0-Faden-Zauber nur, wenn in Matrize', () => {
+    // ohne preparingSpellId: nur threads===0 UND in Matrize → Eisnadeln(2), nicht Lichtblitz(3)
+    const ready = comp.readySpellsOf(combatant());
+    expect(ready.map(s => s.spellDefinition.id)).toEqual([2]);
+  });
+
+  it('readySpellsOf() bei fertig vorbereitetem Zauber nur diesen, wenn in Matrize', () => {
+    const c = combatant();
+    c.preparingSpellId = 1; c.threadsWoven = 2; c.threadsRequired = 2;
+    expect(comp.readySpellsOf(c).map((s: any) => s.spellDefinition.id)).toEqual([1]);
+  });
+
+  it('ohne Matrizen werden keine Zauber angeboten', () => {
+    const c: any = { character: { spells: [{ spellDefinition: { id: 9, threads: 0 } }], talents: [] } };
+    expect(comp.spellsOf(c)).toEqual([]);
+    expect(comp.readySpellsOf(c)).toEqual([]);
+  });
+});
+
+describe('CombatTrackerComponent — Angriffsdialog nur Waffen-Angriffstalente', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  it('attackTalentsOf() liefert nur die vier Waffen-Angriffstalente, nach Rang sortiert', () => {
+    const c: any = { character: { talents: [
+      { talentDefinition: { id: 1, name: 'Nahkampfwaffen', attackTalent: true }, rank: 3 },
+      { talentDefinition: { id: 2, name: 'Spruchzauberei', attackTalent: true }, rank: 5 }, // attackTalent, aber Zauber → raus
+      { talentDefinition: { id: 3, name: 'Verspotten', attackTalent: false }, rank: 4 },     // Nicht-Angriff → raus
+      { talentDefinition: { id: 4, name: 'Schwimmen', attackTalent: false }, rank: 2 },       // raus
+      { talentDefinition: { id: 5, name: 'Waffenloser Kampf', attackTalent: true }, rank: 6 },
+      { talentDefinition: { id: 6, name: 'Wurfwaffen', attackTalent: true }, rank: 1 },
+      { talentDefinition: { id: 7, name: 'Projektilwaffen', attackTalent: true }, rank: 4 },
+    ] } };
+    expect(comp.attackTalentsOf(c).map((t: any) => t.talentDefinition.name))
+      .toEqual(['Waffenloser Kampf', 'Projektilwaffen', 'Nahkampfwaffen', 'Wurfwaffen']);
+  });
+
+  it('attackTalentsOf() ist leer ohne passende Talente', () => {
+    const c: any = { character: { talents: [{ talentDefinition: { name: 'Spruchzauberei', attackTalent: true }, rank: 5 }] } };
+    expect(comp.attackTalentsOf(c)).toEqual([]);
+  });
+});

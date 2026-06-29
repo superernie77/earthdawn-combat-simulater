@@ -616,11 +616,15 @@ public class CombatService {
             int netDamage = Math.max(0, damageTotal - armor);
 
             // 7. Reaktionsmöglichkeiten des Verteidigers (Riposte und/oder Ausweichen)
-            boolean defenderHasRiposte = req.getActionType() == ActionType.MELEE_ATTACK
+            // Gegen einen Angriff aus dem Toten Winkel sind keine aktiven Verteidigungstalente erlaubt.
+            boolean blindSpot = hasActiveEffect(defender, TalentNames.EFFECT_TOTER_WINKEL);
+            boolean defenderHasRiposte = !blindSpot
+                    && req.getActionType() == ActionType.MELEE_ATTACK
                     && defender.getCharacter().getTalents().stream()
                     .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
                     && defender.getPendingRiposteAttackTotal() < 0;
-            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+            boolean defenderHasDodge = !blindSpot
+                    && defender.getCharacter().getTalents().stream()
                     .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
 
             if (defenderHasRiposte || defenderHasDodge) {
@@ -1025,6 +1029,83 @@ public class CombatService {
     }
 
     // --- Effekte ---
+
+    /** True, wenn der Kombattant einen aktiven Effekt mit dem angegebenen Namen trägt. */
+    private boolean hasActiveEffect(CombatantState c, String name) {
+        return c.getActiveEffects() != null
+                && c.getActiveEffects().stream().anyMatch(e -> name.equals(e.getName()));
+    }
+
+    private ModifierEntry gmModifier(StatType stat, double value) {
+        return ModifierEntry.builder()
+                .targetStat(stat).operation(ModifierOperation.ADD)
+                .value(value).triggerContext(TriggerContext.ALWAYS).build();
+    }
+
+    /**
+     * Wendet eine manuell vom Meister aktivierte GM-Bedingung an. Die Bedingungen lassen sich nicht
+     * automatisch berechnen (Position, Anzahl Angreifer), daher entscheidet der Meister.
+     *  - TOTER_WINKEL: −2 KV/MV; gegen dieses Ziel sind keine aktiven Verteidigungstalente
+     *    (Ausweichen/Riposte) möglich (in performAttack unterdrückt).
+     *  - BEDRAENGT: −2 auf Angriffsproben, KV und MV. Jede weitere Anwendung (Überwältigt) verstärkt
+     *    die Mali kumulativ um je −1.
+     */
+    public CombatSession applyGmCondition(Long sessionId, Long combatantId, String type, int rounds) {
+        CombatSession session = findById(sessionId);
+        CombatantState c = findCombatant(session, combatantId);
+        String t = type == null ? "" : type.trim().toUpperCase();
+        switch (t) {
+            case "TOTER_WINKEL" -> {
+                c.getActiveEffects().removeIf(e -> TalentNames.EFFECT_TOTER_WINKEL.equals(e.getName()));
+                c.getActiveEffects().add(ActiveEffect.builder()
+                        .combatantState(c)
+                        .name(TalentNames.EFFECT_TOTER_WINKEL)
+                        .description("Angriff aus dem Toten Winkel: −2 KV/MV; keine aktiven Verteidigungstalente (Ausweichen/Riposte) möglich.")
+                        .sourceType(SourceType.CONDITION)
+                        .negative(true)
+                        .remainingRounds(rounds)
+                        .modifiers(List.of(
+                                gmModifier(StatType.PHYSICAL_DEFENSE, -2),
+                                gmModifier(StatType.SPELL_DEFENSE, -2)))
+                        .build());
+                addLog(session, null, c.getCharacter().getName(), ActionType.EFFECT_ADDED,
+                        "Toter Winkel: −2 KV/MV, keine aktive Verteidigung möglich.", true);
+            }
+            case "BEDRAENGT" -> {
+                ActiveEffect existing = c.getActiveEffects().stream()
+                        .filter(e -> TalentNames.EFFECT_BEDRAENGT.equals(e.getName()))
+                        .findFirst().orElse(null);
+                int magnitude = -2;
+                if (existing != null) {
+                    int current = existing.getModifiers().stream()
+                            .filter(m -> m.getTargetStat() == StatType.PHYSICAL_DEFENSE)
+                            .mapToInt(m -> (int) m.getValue()).findFirst().orElse(-2);
+                    magnitude = current - 1; // Überwältigt: kumulativ −1
+                    c.getActiveEffects().remove(existing);
+                }
+                int sources = (-magnitude) - 1; // −2 → 1 Quelle, −3 → 2 Quellen, ...
+                String desc = "Bedrängt" + (sources > 1 ? " (überwältigt ×" + sources + ")" : "")
+                        + ": " + magnitude + " auf Angriffsproben, KV und MV.";
+                c.getActiveEffects().add(ActiveEffect.builder()
+                        .combatantState(c)
+                        .name(TalentNames.EFFECT_BEDRAENGT)
+                        .description(desc)
+                        .sourceType(SourceType.CONDITION)
+                        .negative(true)
+                        .remainingRounds(rounds)
+                        .modifiers(List.of(
+                                gmModifier(StatType.ATTACK_STEP, magnitude),
+                                gmModifier(StatType.PHYSICAL_DEFENSE, magnitude),
+                                gmModifier(StatType.SPELL_DEFENSE, magnitude)))
+                        .build());
+                addLog(session, null, c.getCharacter().getName(), ActionType.EFFECT_ADDED, desc, true);
+            }
+            default -> throw new IllegalArgumentException("Unbekannte GM-Bedingung: " + type);
+        }
+        CombatSession saved = sessionRepo.save(session);
+        broadcast(saved);
+        return saved;
+    }
 
     public CombatSession addEffect(Long sessionId, Long combatantId, ActiveEffect effect) {
         CombatSession session = findById(sessionId);

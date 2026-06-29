@@ -90,6 +90,13 @@ export class CombatService {
     );
   }
 
+  applyGmCondition(sessionId: number, combatantId: number, type: 'TOTER_WINKEL' | 'BEDRAENGT', rounds: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/gm-condition?type=${type}&rounds=${rounds}`,
+      {}
+    );
+  }
+
   removeEffect(sessionId: number, combatantId: number, effectId: number): Observable<CombatSession> {
     return this.http.delete<CombatSession>(
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/effects/${effectId}`

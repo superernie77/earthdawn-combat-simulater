@@ -142,6 +142,14 @@ public class CombatController {
         return combatService.removeEffect(id, combatantId, effectId);
     }
 
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/gm-condition")
+    public CombatSession applyGmCondition(@PathVariable Long id,
+                                          @PathVariable Long combatantId,
+                                          @RequestParam String type,
+                                          @RequestParam(defaultValue = "1") int rounds) {
+        return combatService.applyGmCondition(id, combatantId, type, rounds);
+    }
+
     @PostMapping("/sessions/{id}/combatants/{combatantId}/declare")
     public CombatSession declareAction(@PathVariable Long id,
                                         @PathVariable Long combatantId,

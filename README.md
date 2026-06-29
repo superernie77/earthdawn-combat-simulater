@@ -871,6 +871,12 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 ### Changelog
 
 #### 1.1.0
+- **Attack dialog limited to weapon attack talents** — the attack source dropdown now only offers the weapon attack talents (**Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf**) plus the weapon skills; unrelated talents and Spruchzauberei (spell-cast flow) are no longer listed.
+- **GM conditions (manually activated)** — two new GM-applied combat conditions (target + duration chosen in the GM-effect dialog):
+  - **Toter Winkel** (blind-spot attack): −2 KV/MV on the target, and **no active defense talents** (Ausweichen/Riposte) may be used against it (suppressed in `performAttack`).
+  - **Bedrängt** (harried): −2 to attack rolls, KV and MV. Re-applying stacks cumulatively by −1 each (*Überwältigt*). Combines additively with Toter Winkel.
+- **Schwimmen (Talent + Fertigkeit)** — new STR-based *Schwimmen* talent **and** skill, seeded idempotently. Plus the magic item **Schwimmkristall** (GEAR quick-add): **+3 auf Schwimmen** and "Erlaubt Unterwasseratmung von Rang Minuten".
+- **Combat spell selection limited to matrices** — in combat, the thread-weave and cast dialogs only offer spells assigned to a **Zaubermatritze** or **Erweiterte Matrize**.
 - **Karma auf Erholungsproben** — disciplines may spend 1 Karma for a **+W6 (Step 4)** die on a recovery test. Eligible: **Elementarist, Krieger, Luftpirat, Tiermeister, Waffenschmied** from **3rd circle**, **Kundschafter** from **5th circle**. An optional Karma checkbox appears on the recovery (Erholung) page when discipline and circle qualify; `POST /api/characters/{id}/recovery-test?spendKarma=true`.
 - **Karma auf Initiative** — disciplines **Dieb, Kundschafter, Luftsegler, Schütze** may, from **3rd circle**, spend 1 Karma for a **+W6 (Step 4)** die on their initiative roll. A toggle button appears on the combatant card during the **declaration phase** when discipline and circle qualify; the Karma is deducted when initiative is actually rolled. Backed by Flyway migration `V31`.
 - **Configurable stat bonuses** — in addition to the existing defense bonuses (KV / MV / SV), the **Attribute** tab now exposes a *Weitere Boni* section with bonus/malus steppers for:
@@ -878,6 +884,9 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
   - **Initiative** (`initiativeBonus`) — added to the initiative step (also applies in combat).
   - **Erholungsstufe** (`recoveryBonus`) — added to the recovery step (clamped at 0).
   - See [Configurable Bonuses](#configurable-bonuses-character-sheet). Backed by Flyway migration `V30`.
+- **Dice breakdown on recovery & initiative** — recovery tests now show the individual rolled dice (incl. the karma die and the combined total); the initiative karma die is rendered as its own die (like every other roll) instead of a "+ Karma" bonus chip.
+- **Fix — dodge/riposte result sync** — when a defender uses Ausweichen or Riposte, the resolution result is now pushed to **all** spectators via WebSocket (previously only the acting client saw it).
+- **Fix — Lufttanz bonus attack** — the extra melee attack is now offered whenever the initiative lead is ≥ 10, **regardless of whether the triggering attack hits** (previously gated on a hit).
 
 #### 1.0.0
 - Initial release: characters, equipment, talents/skills/spells, full ED4 turn-based combat with live WebSocket updates.

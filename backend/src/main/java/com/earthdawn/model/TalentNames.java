@@ -31,4 +31,8 @@ public final class TalentNames {
     public static final String EFFECT_AGGRESSIVER_ANGRIFF = "Aggressiver Angriff";
     public static final String EFFECT_DEFENSIVE_HALTUNG   = "Defensive Haltung";
     public static final String EFFECT_MANOEUVER           = "Manövrieren-Bonus";
+
+    // GM-Bedingungen (manuell durch den Meister aktiviert)
+    public static final String EFFECT_TOTER_WINKEL        = "Toter Winkel";
+    public static final String EFFECT_BEDRAENGT           = "Bedrängt";
 }

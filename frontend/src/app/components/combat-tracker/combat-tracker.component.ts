@@ -1185,9 +1185,6 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             <mat-option *ngFor="let t of attackTalentsOf(attackDialog.attacker)" [value]="'t:' + t.talentDefinition.id">
               ⚔ {{ t.talentDefinition.name }} (Rang {{ t.rank }})
             </mat-option>
-            <mat-option *ngFor="let t of nonAttackTalentsOf(attackDialog.attacker)" [value]="'t:' + t.talentDefinition.id">
-              {{ t.talentDefinition.name }} (Rang {{ t.rank }})
-            </mat-option>
             <mat-option *ngFor="let s of weaponSkillsOf(attackDialog.attacker)" [value]="'s:' + s.skillDefinition.id">
               🎯 {{ s.skillDefinition.name }} (Fertigkeit, Rang {{ s.rank }})
             </mat-option>
@@ -1295,6 +1292,23 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </mat-option>
           </mat-select>
         </mat-form-field>
+
+        <!-- Spezial-Bedingungen (manuell aktiviert, Position/Anzahl nicht automatisch berechenbar) -->
+        <div style="border:1px solid #3a4a52;border-radius:6px;padding:8px;margin-bottom:12px;background:#10181c">
+          <div style="font-size:12px;color:#80deea;margin-bottom:6px">Spezial-Bedingungen (Dauer aus „Runden" unten)</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button mat-stroked-button [disabled]="!gmEffectDialog.targetId"
+              (click)="applyGmCondition('TOTER_WINKEL')"
+              matTooltip="Angriff aus dem Toten Winkel: −2 KV/MV; das Ziel darf keine aktiven Verteidigungstalente (Ausweichen/Riposte) einsetzen.">
+              <mat-icon>visibility_off</mat-icon> Toter Winkel
+            </button>
+            <button mat-stroked-button [disabled]="!gmEffectDialog.targetId"
+              (click)="applyGmCondition('BEDRAENGT')"
+              matTooltip="Bedrängt: −2 auf Angriffsproben, KV und MV. Erneut anwenden = Überwältigt (kumulativ −1 pro weiterer Quelle).">
+              <mat-icon>groups</mat-icon> Bedrängt
+            </button>
+          </div>
+        </div>
 
         <!-- Bonus/Malus Toggle + Stärke -->
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
@@ -3518,12 +3532,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return (this.session?.combatants ?? []).filter(c => c.id !== excludeId && !c.defeated);
   }
 
-  attackTalentsOf(c?: CombatantState) {
-    return (c?.character.talents ?? []).filter(t => t.talentDefinition.attackTalent).sort((a, b) => b.rank - a.rank);
-  }
+  /** Waffen-Angriffstalente, die im Angriffsdialog auswählbar sind. Spruchzauberei läuft über den
+   *  Zauber-/Wirken-Flow und gehört nicht in den Waffenangriff. */
+  private static readonly WEAPON_ATTACK_TALENTS = ['Nahkampfwaffen', 'Projektilwaffen', 'Wurfwaffen', 'Waffenloser Kampf'];
 
-  nonAttackTalentsOf(c?: CombatantState) {
-    return (c?.character.talents ?? []).filter(t => !t.talentDefinition.attackTalent);
+  attackTalentsOf(c?: CombatantState) {
+    return (c?.character.talents ?? [])
+      .filter(t => CombatTrackerComponent.WEAPON_ATTACK_TALENTS.includes(t.talentDefinition.name))
+      .sort((a, b) => b.rank - a.rank);
   }
 
   weaponsOf(c?: CombatantState) {
@@ -3913,18 +3929,35 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return this.MAGIC_DISCIPLINES.includes(c.character.discipline?.name ?? '');
   }
 
+  /** Talente, die als Zaubermatrize zählen (normal oder erweitert). */
+  private static readonly MATRIX_TALENTS = ['Zaubermatritze', 'Erweiterte Matrize'];
+
+  /** IDs aller Zauber, die in einer (normalen oder erweiterten) Matrize des Charakters liegen. */
+  matrixSpellIds(c?: CombatantState): Set<number> {
+    const ids = new Set<number>();
+    for (const t of c?.character.talents ?? []) {
+      if (CombatTrackerComponent.MATRIX_TALENTS.includes(t.talentDefinition.name) && t.assignedSpell) {
+        ids.add(t.assignedSpell.id);
+      }
+    }
+    return ids;
+  }
+
+  /** Nur Zauber, die in einer Matrize einliegen — im Kampf sind ausschließlich diese wirkbar. */
   spellsOf(c?: CombatantState): CharacterSpell[] {
-    return c?.character.spells ?? [];
+    const inMatrix = this.matrixSpellIds(c);
+    return (c?.character.spells ?? []).filter(s => inMatrix.has(s.spellDefinition.id));
   }
 
   readySpellsOf(c?: CombatantState): CharacterSpell[] {
     if (!c) return [];
+    const inMatrix = this.matrixSpellIds(c);
     // If a spell is being prepared and threads are complete, only that spell can be cast
     if (c.preparingSpellId && c.threadsWoven >= c.threadsRequired) {
-      return (c.character.spells ?? []).filter(s => s.spellDefinition.id === c.preparingSpellId);
+      return (c.character.spells ?? []).filter(s => s.spellDefinition.id === c.preparingSpellId && inMatrix.has(s.spellDefinition.id));
     }
-    // Also show 0-thread spells that can be cast without weaving
-    return (c.character.spells ?? []).filter(s => s.spellDefinition.threads === 0);
+    // Also show 0-thread spells that can be cast without weaving — nur aus einer Matrize
+    return (c.character.spells ?? []).filter(s => s.spellDefinition.threads === 0 && inMatrix.has(s.spellDefinition.id));
   }
 
   canCastSpell(c: CombatantState): boolean {
@@ -4896,6 +4929,22 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
           'Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 }
         )
       });
+  }
+
+  /** Wendet eine manuell aktivierte GM-Spezialbedingung (Toter Winkel / Bedrängt) auf das Ziel an. */
+  applyGmCondition(type: 'TOTER_WINKEL' | 'BEDRAENGT'): void {
+    if (!this.session || !this.gmEffectDialog.targetId) return;
+    const rounds = this.gmEffectDialog.rounds ?? 1;
+    const label = type === 'TOTER_WINKEL' ? 'Toter Winkel' : 'Bedrängt';
+    this.combatService.applyGmCondition(this.session.id, this.gmEffectDialog.targetId, type, rounds).subscribe({
+      next: s => {
+        this.session = s;
+        const targetName = this.combatantNameById(this.gmEffectDialog.targetId);
+        this.closeGmEffectDialog();
+        this.snack.open(`${label} auf ${targetName ?? '?'} angewendet.`, 'OK', { duration: 3000 });
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 4000 })
+    });
   }
 
   /** Baut die ModifierEntry-Definitionen für den gewählten Stat-Schlüssel. */

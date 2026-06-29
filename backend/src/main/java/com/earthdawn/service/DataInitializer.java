@@ -52,6 +52,7 @@ public class DataInitializer {
             migrateUtilityTalents();
             migrateArztSkill();
             migrateWeaponSkills();
+            migrateSchwimmenSkill();
             migratePhantomkrieger();
             return;
         }
@@ -553,9 +554,21 @@ public class DataInitializer {
             skill("Magierkunde",   AttributeType.PERCEPTION, "Magie und Sprüche",      "Wissen"),
             skill("Theologie",     AttributeType.PERCEPTION, "Religion und Götter",    "Wissen"),
             skill("Nahkampfwaffen", AttributeType.DEXTERITY, "Nahkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.", "Waffen"),
-            skill("Projektilwaffen", AttributeType.DEXTERITY, "Fernkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.", "Waffen")
+            skill("Projektilwaffen", AttributeType.DEXTERITY, "Fernkampfangriff als Fertigkeit (GES + Rang vs. KV). Wie das Talent, aber ohne Karma.", "Waffen"),
+            skill("Schwimmen",     AttributeType.STRENGTH,   "Schwimmt durch Gewässer und gegen Strömungen. STÄ + Rang vs. Schwierigkeitswert.", "Bewegung")
         );
         skillRepo.saveAll(skills);
+    }
+
+    /** Idempotent: fügt die Fertigkeit Schwimmen hinzu (für bestehende DBs). STÄ-basiert. */
+    private void migrateSchwimmenSkill() {
+        if (!skillRepo.existsByName("Schwimmen")) {
+            skillRepo.save(SkillDefinition.builder()
+                    .name("Schwimmen").attribute(AttributeType.STRENGTH)
+                    .description("Schwimmt durch Gewässer und gegen Strömungen. STÄ + Rang vs. Schwierigkeitswert.")
+                    .category("Bewegung").build());
+            log.info("Fertigkeit 'Schwimmen' hinzugefügt.");
+        }
     }
 
     /** Idempotent: fügt die Waffen-Fertigkeiten hinzu (für bestehende DBs). Funktionieren wie die
@@ -1242,6 +1255,16 @@ public class DataInitializer {
                     .attackTalent(false)
                     .build());
             log.info("Talent 'Klettern' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Schwimmen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Schwimmen")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Schwimmt durch Gewässer und gegen Strömungen. STÄ + Rang vs. Schwierigkeitswert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Schwimmen' hinzugefügt.");
         }
         if (talentRepo.findByName("Spurenlesen").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()

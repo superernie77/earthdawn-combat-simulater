@@ -95,6 +95,36 @@ class ProbeServiceTest {
         assertThat(r.getEquipmentBonus()).isEqualTo(3); // 2 + 1
     }
 
+    @Test
+    void schwimmkristall_addsThreeToStrengthBasedSchwimmenProbe() {
+        GameCharacter c = character();
+        c.setStrength(10); // STÄ-Step 5
+        TalentDefinition def = TalentDefinition.builder().id(8L).name("Schwimmen").attribute(AttributeType.STRENGTH).build();
+        c.getTalents().add(CharacterTalent.builder().id(8L).talentDefinition(def).rank(4).build());
+        c.getEquipment().add(gear("Schwimmkristall", "Schwimmen", 3));
+        when(characterRepo.findById(1L)).thenReturn(Optional.of(c));
+
+        ProbeResult r = probeService.rollProbe(probeFor(8L, null));
+
+        assertThat(r.getEquipmentBonus()).isEqualTo(3);
+        assertThat(r.getStep()).isEqualTo(12); // STÄ-Step 5 + Rang 4 + 3 (Kristall)
+    }
+
+    @Test
+    void schwimmkristall_appliesToSchwimmenSkillToo() {
+        GameCharacter c = character();
+        c.setStrength(10);
+        SkillDefinition def = SkillDefinition.builder().id(9L).name("Schwimmen").attribute(AttributeType.STRENGTH).build();
+        c.getSkills().add(CharacterSkill.builder().id(2L).skillDefinition(def).rank(2).build());
+        c.getEquipment().add(gear("Schwimmkristall", "Schwimmen", 3));
+        when(characterRepo.findById(1L)).thenReturn(Optional.of(c));
+
+        ProbeResult r = probeService.rollProbe(probeFor(null, 9L));
+
+        assertThat(r.getEquipmentBonus()).isEqualTo(3);
+        assertThat(r.getStep()).isEqualTo(10); // 5 + Rang 2 + 3
+    }
+
     // --- Helpers ---
 
     private GameCharacter character() {

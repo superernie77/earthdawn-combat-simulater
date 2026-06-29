@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow-Konventionen
+- **Changelog immer pflegen**: Bei jedem neuen Feature / Fix den `README.md`-Changelog unter der aktuellen (unveröffentlichten) Version aktualisieren — sowie diese `CLAUDE.md`, wenn sich Architektur/Mechanik/Endpunkte ändern. Gilt für jede Änderung, nicht erst beim Release.
+
 ## What This Is
 A local dev tool for simulating Earthdawn 4th Edition (FASA) pen-and-paper RPG combat.
 Characters with attributes, disciplines, talents and skills are managed and used in
@@ -75,6 +78,7 @@ docker compose -f docker-compose.prod.yml logs -f --tail 100 earthdawn-backend
 - **Spruchzauberei** (Spell Casting): PER-Step + Spruchzauberei-Talent vs. target's spell defense (or fixed difficulty).
 - **Effect types**: DAMAGE (rolls WIL-Step + effectStep - armor), BUFF/DEBUFF (adds ActiveEffect), HEAL (rolls effectStep).
 - Discipline-to-weaving-talent map: Elementarist→Elementarismus, Illusionist→Illusionismus, Magier→Magie, Geisterbeschwörer→Geisterbeschwörung.
+- **Nur Matrix-Zauber im Kampf**: Die Zauberauswahl im Kampf (Faden-weben- und Wirken-Dialog) bietet ausschließlich Zauber an, die in einer **Matrize** (Zaubermatritze **oder** Erweiterte Matrize) einliegen. Frontend `CombatTrackerComponent.matrixSpellIds()` filtert `spellsOf()` und `readySpellsOf()` auf `talent.assignedSpell`-IDs dieser Matrix-Talente.
 
 ### Free Actions (Freie Aktionen)
 - Do **not** consume `hasActedThisRound` — unlimited per round.
@@ -150,6 +154,11 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 - **Riposte**: Reaktion nach Nahkampftreffer. DEX-Step + Rang vs. Angriffswurf. Schaden wird gehalten in `pendingRiposteAttackTotal`; nach Riposte-Entscheid aufgelöst. Extraerfolge → Gegenangriff. Kostet 2 Schaden.
 - **Tigersprung**: Freie Aktion (1×/Runde). Kein Wurf. Initiative += Rang. `tigersprungUsedThisRound`-Flag, reset by `nextRound()`. Kostet 1 Schaden.
 
+### GM-Bedingungen (manuell aktiviert)
+Vom Meister aktivierte Zustände (Bedingungen wie Position/Anzahl Angreifer sind nicht automatisch berechenbar). Endpoint `POST .../combatants/{cId}/gm-condition?type=&rounds=`, Service `CombatService.applyGmCondition`. Im Frontend als Preset-Buttons im GM-Effekt-Dialog (Ziel + „Runden" aus dem Dialog).
+- **Toter Winkel** (`EFFECT_TOTER_WINKEL`): ActiveEffect −2 `PHYSICAL_DEFENSE` + −2 `SPELL_DEFENSE`. **Gegen ein Ziel im Toten Winkel sind keine aktiven Verteidigungstalente möglich** — `performAttack` setzt `defenderHasRiposte`/`defenderHasDodge` auf false, wenn `hasActiveEffect(defender, EFFECT_TOTER_WINKEL)`. Erneutes Anwenden ersetzt den Effekt (Refresh).
+- **Bedrängt** (`EFFECT_BEDRAENGT`): ActiveEffect −2 auf `ATTACK_STEP` (Aktionsproben) + `PHYSICAL_DEFENSE` + `SPELL_DEFENSE`. **Überwältigt**: erneutes Anwenden ersetzt den Effekt und verstärkt alle drei Mali kumulativ um je −1 (−2 → −3 → −4 …). Kombiniert mit Toter Winkel stapeln sich die VK-Mali (Engine summiert).
+
 ## Character Sheet — Configurable Bonuses
 - **Defense bonuses**: `physicalDefenseBonus`, `spellDefenseBonus`, `socialDefenseBonus` (int, default 0) on `GameCharacter` — added on top of the formula/override value in `ModifierAggregator`. Editable via +/− steppers in the "Verteidigungs-Boni" section on the Attribute tab.
 - **Stat bonuses** (Flyway V30): `healthBonus`, `initiativeBonus`, `recoveryBonus` (int, default 0) on `GameCharacter`, edited via +/− steppers in the "Weitere Boni" section on the Attribute tab (`statBonusFields` in `CharacterSheetComponent`, same generic `adjustField`/`getDefenseBonus` path). Applied in **both** `getBaseValue`/`getBaseValueFromCharacter` of `ModifierAggregator`: `healthBonus` → added to `UNCONSCIOUSNESS_RATING` **and** `DEATH_RATING`; `initiativeBonus` → `INITIATIVE_STEP` (also in combat); `recoveryBonus` → `RECOVERY_STEP` (clamped via `Math.max(0, …)`). All may be negative. Field get/set wired in `CharacterService.getCurrentFieldValue`/`applyFieldValue`.
@@ -181,7 +190,8 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 ### Sonstige Ausrüstung (GEAR) — Probenbonus
 - **`probeBonusTalentName`** + **`probeBonusValue`**: GEAR-Gegenstand gibt einen Bonus auf die Probe eines bestimmten Talents/einer Fertigkeit (Match per Name, `equalsIgnoreCase`). Beispiel **Leichte Stiefel**: `probeBonusTalentName="Heimlicher Schritt"`, `probeBonusValue=2`.
 - **Mechanik** (`ProbeService.rollProbe`): Summe der passenden GEAR-Boni wird auf die Würfelstufe addiert (`+ equipmentBonus` neben Attribut-Step + Rang + bonusSteps − Wunden). `ProbeResult.equipmentBonus` zur Anzeige. Mehrere passende Gegenstände stapeln.
-- **Frontend**: „Sonstige Ausrüstung"-Sektion im Ausrüstung-Tab (Schnell-Button „Leichte Stiefel" + generisches Formular mit Talent/Fertigkeit-Auswahl); Probenergebnis zeigt „inkl. +X Ausrüstung".
+- **Frontend**: „Sonstige Ausrüstung"-Sektion im Ausrüstung-Tab (Schnell-Buttons „Leichte Stiefel" und „Schwimmkristall" + generisches Formular mit Talent/Fertigkeit-Auswahl); Probenergebnis zeigt „inkl. +X Ausrüstung".
+- **Schwimmkristall**: GEAR-Schnellanlage `addSchwimmkristall()` — `probeBonusTalentName="Schwimmen"`, `probeBonusValue=3`, `description="Erlaubt Unterwasseratmung von Rang Minuten."` (Beschreibung wird in der GEAR-Liste angezeigt). **Schwimmen** (STÄ) gibt es sowohl als **Talent** (`migrateUtilityTalents()`, wie Klettern/Heimlicher Schritt) als auch als **Fertigkeit** (`seedSkills()` + idempotent `migrateSchwimmenSkill()`); der GEAR-Bonus matcht per Name und greift bei beiden.
 - **Flyway V28**: `EquipmentType`-Constraint um `GEAR` erweitert + Spalten `probe_bonus_talent_name`, `probe_bonus_value`.
 
 **API**: `POST /api/characters/{id}/equipment` (body: Equipment), `DELETE /api/characters/{id}/equipment/{equipmentId}`, `PATCH /api/characters/{id}/equipment/{equipmentId}?quantity=N`.
@@ -333,6 +343,7 @@ POST   /api/combat/sessions/{id}/combatants/{cId}/blattschuss-add-karma → roll
 PATCH  /api/combat/sessions/{id}/combatants/{cId}/value  ?field=damage|wounds|karma|initiative|defeated&delta=
 POST   /api/combat/sessions/{id}/combatants/{cId}/effects
 DELETE /api/combat/sessions/{id}/combatants/{cId}/effects/{effectId}
+POST   /api/combat/sessions/{id}/combatants/{cId}/gm-condition  ?type=TOTER_WINKEL|BEDRAENGT&rounds=  → GM-Spezialbedingung anwenden
 POST   /api/combat/sessions/{id}/combatants/{cId}/combat-option  ?option=USE_ACTION
 
 POST   /api/combat/sessions/{id}/weave-thread        ThreadweaveRequest
