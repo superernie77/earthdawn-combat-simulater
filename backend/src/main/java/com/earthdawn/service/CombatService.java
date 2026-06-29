@@ -274,17 +274,13 @@ public class CombatService {
             if (armorPenalty > 0) {
                 bonusNotes.add("Rüstungsmalus −" + armorPenalty);
             }
-            RollResult karmaRoll = karmaRollsById.get(c.getId());
-            if (karmaRoll != null) {
-                bonusNotes.add("Karma +" + karmaRoll.getTotal());
-            }
-
             details.add(InitiativeRollDetail.builder()
                     .combatantId(c.getId())
                     .combatantName(c.getCharacter().getName())
                     .npc(c.isNpc())
                     .step(stepsById.getOrDefault(c.getId(), 0))
                     .roll(roll)
+                    .karmaRoll(karmaRollsById.get(c.getId()))
                     .total(c.getInitiative())
                     .order(c.getInitiativeOrder())
                     .bonusNotes(bonusNotes)

@@ -945,6 +945,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
                   <span *ngIf="d.exploded" class="explode-mini">💥</span>
                 </div>
+                <div class="die-mini" *ngIf="r.karmaRoll" style="border-color:#d4b85a" [class.exploded]="r.karmaRoll.exploded">
+                  <span class="die-mini-sides" style="color:#d4b85a">★ W{{ r.karmaRoll.dice[0].sides }}</span>
+                  <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.dice[0].rolls.length > 1" class="die-mini-sum"> = {{ r.karmaRoll.total }}</span></span>
+                  <span *ngIf="r.karmaRoll.exploded" class="explode-mini">💥</span>
+                </div>
               </div>
               <div class="init-effects" *ngIf="r.bonusNotes?.length">
                 <span class="init-effect-chip" *ngFor="let n of r.bonusNotes">✦ {{ n }}</span>

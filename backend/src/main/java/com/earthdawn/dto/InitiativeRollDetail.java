@@ -14,7 +14,9 @@ public class InitiativeRollDetail {
     private int step;
     /** Detaillierter Würfelwurf — Würfel-Liste, Total, Explosionen. */
     private RollResult roll;
-    /** Endgültiges Total (= roll.total). */
+    /** Karmawürfel (W6/Stufe 4) auf die Initiative, falls eingesetzt — sonst null. */
+    private RollResult karmaRoll;
+    /** Endgültiges Total (= roll.total + ggf. karmaRoll.total). */
     private int total;
     /** Reihenfolge in der Initiative (0 = handelt zuerst). */
     private int order;

@@ -870,6 +870,15 @@ import { ProbeResult } from '../../models/dice.model';
                   <span *ngIf="lastRecovery.remainingDamage === 0"> · Vollständig geheilt!</span>
                   <em *ngIf="lastRecovery.usedExtraSlot" style="color:#90caf9"> · Extra-Probe</em>
                 </div>
+                <div class="heal-detail" style="font-family:monospace;color:#bba89a;margin-top:2px" *ngIf="lastRecovery.roll">
+                  Würfel:
+                  <ng-container *ngFor="let d of lastRecovery.roll.dice; let i = index"><ng-container *ngIf="i > 0"> + </ng-container>[{{ d.rolls.join('+') }}<ng-container *ngIf="d.exploded">★</ng-container>]</ng-container>
+                  = <strong style="color:#e0d5c0">{{ lastRecovery.roll.total }}</strong>
+                  <ng-container *ngIf="lastRecovery.karmaRoll">
+                    · Karma [{{ lastRecovery.karmaRoll.dice[0].rolls.join('+') }}<ng-container *ngIf="lastRecovery.karmaRoll.dice[0].exploded">★</ng-container>] = {{ lastRecovery.karmaRoll.total }}
+                    → Gesamt <strong style="color:#e0d5c0">{{ lastRecovery.roll.total + lastRecovery.karmaRoll.total }}</strong>
+                  </ng-container>
+                </div>
               </div>
             </div>
 

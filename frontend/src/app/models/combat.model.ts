@@ -116,6 +116,8 @@ export interface InitiativeRollDetail {
   npc: boolean;
   step: number;
   roll: RollResult;
+  /** Karmawürfel (W6/Stufe 4), falls eingesetzt — sonst null. */
+  karmaRoll?: RollResult | null;
   total: number;
   order: number;
   /** Aktive Effekte mit Auswirkung auf die Initiative-Probe (z.B. "Tigersprung +3"). */
