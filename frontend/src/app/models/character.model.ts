@@ -100,6 +100,8 @@ export interface Equipment {
   bloodMagicDamage?: number;
   /** Waffe: zweihändig zu führen → kein Schild möglich (außer Buckler). */
   twoHanded?: boolean;
+  /** Waffe: zugeordnetes Angriffstalent/-fertigkeit (leer = bei jedem Angriff wählbar). */
+  attackTalentName?: string;
   /** Schild: Buckler — auch mit zweihändigen Waffen führbar. */
   buckler?: boolean;
   /** Schild: vom System wegen Zweihandwaffe automatisch abgelegt (wird bei Einhandangriff wieder angelegt). */

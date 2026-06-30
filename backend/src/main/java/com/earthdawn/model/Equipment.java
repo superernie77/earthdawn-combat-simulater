@@ -141,4 +141,13 @@ public class Equipment {
     /** Höhe des Probenbonus (z.B. +2 für Leichte Stiefel). Wird in ProbeService auf die Würfelstufe addiert. */
     @Builder.Default
     private int probeBonusValue = 0;
+
+    // --- Waffen: Zuordnung zu einem Angriffstalent/-fertigkeit ---
+
+    /**
+     * Name des Angriffstalents/der -fertigkeit, mit der diese Waffe genutzt wird
+     * (z.B. "Nahkampfwaffen", "Projektilwaffen", "Wurfwaffen", "Waffenloser Kampf").
+     * Leer/null = keiner Zuordnung → Waffe steht bei jedem Angriff zur Auswahl (rückwärtskompatibel).
+     */
+    private String attackTalentName;
 }

@@ -871,6 +871,9 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 ### Changelog
 
 #### 1.1.0
+- **Weapons assignable to an attack talent** — a weapon can be tied to an attack talent/skill (Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf) via `Equipment.attackTalentName`. In combat the weapon dropdown then only offers weapons matching the selected talent/skill; weapons left unassigned stay available for every attack (backward compatible). Flyway `V32`.
+- **Richer combat log** — the log is now ordered newest-first (chronologically descending) and attack entries show the exact dice breakdown for the **attack** and **damage** rolls (individual dice, karma die, total), the **strain** cost, and all applied **modifiers** (attack/damage bonus notes). Stored per entry in `CombatLog.rollDetailsJson`.
+- **Combat end broadcast** — ending a combat now pushes a synchronized "Kampf beendet" modal to **all** connected clients (plus a persistent 🏁 badge in the tracker), so spectators are notified rather than left on a frozen screen.
 - **Attack dialog limited to weapon attack talents** — the attack source dropdown now only offers the weapon attack talents (**Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf**) plus the weapon skills; unrelated talents and Spruchzauberei (spell-cast flow) are no longer listed.
 - **GM conditions (manually activated)** — two new GM-applied combat conditions (target + duration chosen in the GM-effect dialog):
   - **Toter Winkel** (blind-spot attack): −2 KV/MV on the target, and **no active defense talents** (Ausweichen/Riposte) may be used against it (suppressed in `performAttack`).

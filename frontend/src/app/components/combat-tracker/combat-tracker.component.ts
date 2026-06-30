@@ -81,6 +81,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             {{ session.phase === 'DECLARATION' ? '📢 Ansagephase' : '⚔ Aktionsphase' }}
             <span *ngIf="session.phase === 'DECLARATION'"> ({{ declarationProgress() }})</span>
           </span>
+          <span *ngIf="session.status === 'FINISHED'" class="phase-badge"
+                style="background:rgba(239,154,154,0.15);border:1px solid #ef9a9a;color:#ef9a9a">
+            🏁 Kampf beendet
+          </span>
           <button mat-stroked-button *ngIf="session.status === 'ACTIVE'" (click)="openGmEffectDialog()"
                   matTooltip="Beliebigen Bonus/Malus-Effekt auf einen Kombattanten anwenden">
             <mat-icon>auto_fix_normal</mat-icon> GM-Effekt
@@ -471,6 +475,27 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 [class]="'combat-log-entry ' + (entry.success ? 'success' : isSystem(entry.actionType) ? 'system' : 'failure')">
                 <span class="round-badge">R{{ entry.round }}</span>
                 {{ entry.description }}
+                <div class="log-roll-details" *ngIf="entry.details as d"
+                     style="margin-top:4px;font-size:0.78rem;font-family:monospace;color:#bdb2a0;border-left:2px solid #4a4030;padding-left:6px">
+                  <div>
+                    <span style="color:#c9a84c">Angriff</span> St {{ d.attackStep }}:
+                    <ng-container *ngFor="let die of d.attackRoll?.dice; let i = index"><span *ngIf="i>0"> + </span>[{{ die.rolls.join('+') }}<span *ngIf="die.exploded">★</span>]</ng-container>
+                    = <strong style="color:#e0d5c0">{{ d.attackRoll?.total }}</strong><span *ngIf="d.attackKarma"> +Karma[{{ d.attackKarma.dice[0].rolls.join('+') }}]={{ d.attackKarma.total }}</span>
+                    vs VK {{ d.defenseValue }}
+                  </div>
+                  <div *ngIf="d.attackMods?.length" style="color:#9aa0a6">↳ {{ d.attackMods.join(' · ') }}</div>
+                  <ng-container *ngIf="d.hit && !d.pendingRiposte && !d.pendingDodge">
+                    <div>
+                      <span style="color:#ef9a9a">Schaden</span> St {{ d.damageStep }}:
+                      <ng-container *ngFor="let die of d.damageRoll?.dice; let i = index"><span *ngIf="i>0"> + </span>[{{ die.rolls.join('+') }}<span *ngIf="die.exploded">★</span>]</ng-container>
+                      = {{ d.damageRoll?.total }}<span *ngIf="d.damageKarma"> +Karma {{ d.damageKarma.total }}</span>
+                      − {{ d.armor }} Rüst = <strong style="color:#e0d5c0">{{ d.netDamage }}</strong><span *ngIf="d.extraSuccesses > 0" style="color:#9aa0a6"> ({{ d.extraSuccesses }} Übererfolg)</span>
+                      <span *ngIf="d.woundDealt" style="color:#ef5350;font-weight:700"> · WUNDE</span>
+                    </div>
+                    <div *ngIf="d.damageMods?.length" style="color:#9aa0a6">↳ {{ d.damageMods.join(' · ') }}</div>
+                  </ng-container>
+                  <div *ngIf="d.strain" style="color:#ce93d8">Strain: {{ d.strain }} Überanstrengung</div>
+                </div>
               </div>
             </div>
           </div>
@@ -965,6 +990,26 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
+    <!-- Kampf beendet Modal (synchronisiert an alle Clients) -->
+    <div class="result-modal" *ngIf="combatEndedModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" style="text-align:center">
+        <h3 style="justify-content:center"><mat-icon style="vertical-align:middle;margin-right:6px;color:#ef9a9a">flag</mat-icon>Kampf beendet</h3>
+        <p style="color:#ccc;margin:8px 0 4px">
+          „{{ combatEndedModal.name }}" wurde nach {{ combatEndedModal.round }} Runde(n) beendet.
+        </p>
+        <p style="color:#999;font-size:0.85rem;margin:0 0 8px">
+          Schaden, Wunden und Karma aller Charaktere wurden auf die Datenblätter übertragen.
+        </p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button mat-stroked-button style="flex:1" (click)="dismissModal()">Schließen</button>
+          <button mat-raised-button color="primary" style="flex:1" (click)="dismissModal(); router.navigate(['/combat'])">
+            <mat-icon>list</mat-icon> Zur Übersicht
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Tigersprung Result Modal -->
     <div class="result-modal" *ngIf="tigersprungModal.open">
       <div class="dialog-backdrop" (click)="dismissModal()"></div>
@@ -1168,7 +1213,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <mat-label>Waffe</mat-label>
           <mat-select [ngModel]="attackDialog.weaponId" (ngModelChange)="onAttackWeaponChange($event)">
             <mat-option [value]="null">Keine Waffe</mat-option>
-            <mat-option *ngFor="let e of weaponsOf(attackDialog.attacker)" [value]="e.id">
+            <mat-option *ngFor="let e of attackWeaponsFor(attackDialog.attacker)" [value]="e.id">
               {{ e.name }} (+{{ e.damageBonus }} Schaden){{ e.twoHanded ? ' ✋✋' : '' }}
             </mat-option>
           </mat-select>
@@ -2981,6 +3026,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   riposteModal: { open: boolean; result?: RiposteResult } = { open: false };
 
+  combatEndedModal: { open: boolean; name?: string; round?: number } = { open: false };
+
   manoeuverDialog: {
     open: boolean;
     actor?: CombatantState;
@@ -3120,7 +3167,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.combatService.findById(id).subscribe({
       next: s => {
         this.session = s;
-        this.logEntries = s.log ?? [];
+        this.logEntries = this.toLogEntries(s.log);
         this.syncLiveModal(s);
       },
       error: err => {
@@ -3131,7 +3178,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
     this.wsSub = this.wsService.subscribeToSession(id).subscribe(s => {
       this.session = s;
-      this.logEntries = s.log ?? [];
+      this.logEntries = this.toLogEntries(s.log);
       this.syncLiveModal(s);
       this.scheduleAutofight();
     });
@@ -3203,6 +3250,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'RIPOSTE':
         this.riposteModal = { open: true, result: payload };
         break;
+      case 'COMBAT_ENDED':
+        this.combatEndedModal = { open: true, name: payload?.name, round: payload?.round };
+        break;
     }
   }
 
@@ -3220,6 +3270,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (this.spotArmorFlawModal) this.spotArmorFlawModal.open = false;
     if (this.dodgeModal) this.dodgeModal.open = false;
     if (this.riposteModal) this.riposteModal.open = false;
+    if (this.combatEndedModal) this.combatEndedModal.open = false;
     if (this.standUpModal) this.standUpModal.open = false;
     if (this.threadweaveModal) this.threadweaveModal.open = false;
     if (this.spellCastModal) this.spellCastModal.open = false;
@@ -3546,6 +3597,18 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     return (c?.character.equipment ?? []).filter(e => e.type === 'WEAPON').sort((a, b) => b.damageBonus - a.damageBonus);
   }
 
+  /**
+   * Waffen, die im Angriffsdialog zum gewählten Talent/zur Fertigkeit passen:
+   * alle ohne Zuordnung (rückwärtskompatibel) plus die dem gewählten Angriffstalent zugeordneten.
+   * Ohne gewähltes Talent werden alle Waffen angeboten.
+   */
+  attackWeaponsFor(c?: CombatantState) {
+    const all = this.weaponsOf(c);
+    const src = this.selectedAttackSourceName();
+    if (!src) return all;
+    return all.filter(w => !w.attackTalentName || w.attackTalentName === src);
+  }
+
   /** Geladene Verzweiflungsschlag-Amulette des Kombattanten, gefiltert nach Zauber/physisch. */
   amuletsOf(c: CombatantState | undefined, forSpell: boolean) {
     return (c?.character.equipment ?? [])
@@ -3605,6 +3668,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     } else {
       this.attackDialog.talentId = undefined;
       this.attackDialog.skillId = undefined;
+    }
+    // Gewählte Waffe verwerfen, wenn sie zum neuen Talent nicht (mehr) passt.
+    if (this.attackDialog.weaponId != null
+        && !this.attackWeaponsFor(this.attackDialog.attacker).some(w => w.id === this.attackDialog.weaponId)) {
+      this.attackDialog.weaponId = undefined;
     }
     if (this.attackDialog.attacker) {
       this.pushDialogState(
@@ -3800,6 +3868,17 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   isSystem(actionType: string): boolean {
     return ['INITIATIVE', 'ROUND_CHANGE', 'EFFECT_ADDED', 'EFFECT_REMOVED', 'VALUE_CHANGED'].includes(actionType);
+  }
+
+  /** Protokoll-Einträge fürs UI: chronologisch absteigend (neueste oben) + geparste Wurf-Details. */
+  private toLogEntries(log: any[] | undefined): any[] {
+    return (log ?? [])
+      .map(e => ({ ...e, details: e.rollDetailsJson ? this.safeParseJson(e.rollDetailsJson) : null }))
+      .reverse();
+  }
+
+  private safeParseJson(s: string): any {
+    try { return JSON.parse(s); } catch { return null; }
   }
 
   openDodgeDialog(): void {
@@ -4418,7 +4497,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         const actionType = this.autofightDeclareType(undeclared);
         const stance = actionType === 'SPELL' ? 'NONE' : this.autofightStance(undeclared);
         this.combatService.declareAction(sessionId, undeclared.id, stance, actionType).subscribe({
-          next: s => { this.session = s; this.logEntries = s.log ?? []; this.scheduleAutofight(); },
+          next: s => { this.session = s; this.logEntries = this.toLogEntries(s.log); this.scheduleAutofight(); },
           error: err => this.snack.open('Autofight (Ansage): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
         });
       }
@@ -4441,7 +4520,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
             this.standUpModal = { open: true, result };
             this.autoCloseModal(this.standUpModal);
             this.combatService.findById(sessionId).subscribe(s => {
-              this.session = s; this.logEntries = s.log ?? [];
+              this.session = s; this.logEntries = this.toLogEntries(s.log);
             });
           },
           error: err => this.snack.open('Autofight (Aufstehen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
@@ -4453,7 +4532,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       const target = this.autofightTarget(actor);
       if (!target) {
         this.combatService.declareCombatOption(sessionId, actor.id, 'USE_ACTION').subscribe({
-          next: s => { this.session = s; this.logEntries = s.log ?? []; this.scheduleAutofight(); },
+          next: s => { this.session = s; this.logEntries = this.toLogEntries(s.log); this.scheduleAutofight(); },
           error: err => this.snack.open('Autofight (Überspringen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
         });
         return;
@@ -4473,7 +4552,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
               this.combatSenseModal = { open: true, result };
               this.autoCloseModal(this.combatSenseModal);
               this.combatService.findById(sessionId).subscribe(s => {
-                this.session = s; this.logEntries = s.log ?? [];
+                this.session = s; this.logEntries = this.toLogEntries(s.log);
               });
             },
             error: err => this.snack.open('Autofight (Kampfsinn): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
@@ -4489,7 +4568,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
             this.acrobaticModal = { open: true, result };
             this.autoCloseModal(this.acrobaticModal);
             this.combatService.findById(sessionId).subscribe(s => {
-              this.session = s; this.logEntries = s.log ?? [];
+              this.session = s; this.logEntries = this.toLogEntries(s.log);
             });
           },
           error: err => this.snack.open('Autofight (Akrobatik): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
@@ -4513,7 +4592,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
               this.spellCastModal = { open: true, result };
               this.autoCloseModal(this.spellCastModal);
               this.combatService.findById(sessionId).subscribe(s => {
-                this.session = s; this.logEntries = s.log ?? [];
+                this.session = s; this.logEntries = this.toLogEntries(s.log);
               });
             },
             error: err => this.snack.open('Autofight (Zauber): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
@@ -4564,7 +4643,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
                   this.dodgeModal = { open: true, result: dodgeResult };
                   this.autoCloseModal(this.dodgeModal);
                   this.combatService.findById(sessionId).subscribe(s => {
-                    this.session = s; this.logEntries = s.log ?? [];
+                    this.session = s; this.logEntries = this.toLogEntries(s.log);
                   });
                 },
                 error: err => this.snack.open('Autofight (Ausweichen): ' + (err?.error?.message ?? err.message), 'OK', { duration: 3000 })
@@ -4572,13 +4651,13 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
             } else {
               // Manual defender: keep result modal open; WS update after dodge resolution resumes autofight
               this.combatService.findById(sessionId).subscribe(s => {
-                this.session = s; this.logEntries = s.log ?? [];
+                this.session = s; this.logEntries = this.toLogEntries(s.log);
               });
             }
           } else {
             this.autoCloseModal(this.resultModal);
             this.combatService.findById(sessionId).subscribe(s => {
-              this.session = s; this.logEntries = s.log ?? [];
+              this.session = s; this.logEntries = this.toLogEntries(s.log);
             });
           }
         },

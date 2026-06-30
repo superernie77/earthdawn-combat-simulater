@@ -170,7 +170,7 @@ Equipment is stored as `Equipment` entities on `GameCharacter` (OneToMany, Casca
 
 | Type | Relevant fields | Effect |
 |---|---|---|
-| WEAPON | `damageBonus`, `twoHanded` | Shown on character sheet; used manually in combat. `twoHanded` → kein Schild (siehe unten) |
+| WEAPON | `damageBonus`, `twoHanded`, `attackTalentName` | Shown on character sheet; used manually in combat. `twoHanded` → kein Schild (siehe unten). `attackTalentName` (Flyway V32, nullable) ordnet die Waffe einem Angriffstalent/-fertigkeit zu — im Angriffsdialog werden dann nur passende Waffen + unzugeordnete (null) angeboten (`attackWeaponsFor`). |
 | ARMOR | `physicalArmor`, `mysticalArmor`, `initiativePenalty` | `initiativePenalty` subtracted from `INITIATIVE_STEP` via `ModifierAggregator` |
 | SHIELD | `physicalDefenseBonus`, `mysticDefenseBonus`, `initiativePenalty`, `buckler`, `autoStowed` | Bonuses added to defenses via `ModifierAggregator` (nur wenn `active`) |
 | POTION | `quantity`, `healStep`, `extraRecovery` | See Erholungsproben below |
@@ -358,6 +358,8 @@ POST   /api/combat/sessions/{id}/end
 - Endpoint: `/ws` (SockJS)
 - Topic: `/topic/combat/{sessionId}` — broadcasts full `CombatSession` on every state change
 - Frontend subscribes in `CombatTrackerComponent` via `WebSocketService`
+- **Kampfprotokoll**: `logEntries` werden im Frontend **absteigend** (neueste oben) angezeigt (`toLogEntries`). Angriffe schreiben strukturierte Wurf-/Modifikator-Details nach `CombatLog.rollDetailsJson` (`attackLogJson`): Angriffs- und Schadenswurf (Einzelwürfel, Karmawürfel, Total), Strain (Überanstrengung) und Modifikatoren (`attackBonusNotes`/`damageBonusNotes`). Das Frontend parst `rollDetailsJson` und rendert eine Detailzeile pro Eintrag.
+- **Synchronisierte Modale** (`broadcastWithModal` → `liveModal` → Frontend `openLocalModalForType`): u.a. `ATTACK_RESULT`, `INITIATIVE`, `DODGE`, `RIPOSTE`, `TAUNT`, `MANOEUVER`, … sowie **`COMBAT_ENDED`** — `endCombat()` broadcastet ein „Kampf beendet"-Modal an alle Clients (Payload `name`/`round`). Im Tracker zusätzlich ein persistentes „🏁 Kampf beendet"-Badge bei `status === 'FINISHED'`.
 
 ## Reference Data (DataInitializer)
 Seeded automatically (idempotent) on first start via migration methods in `migrateDodgeTalent()` and `migrateFreeActionTalents()`:

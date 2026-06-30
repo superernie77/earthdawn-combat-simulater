@@ -238,3 +238,41 @@ describe('CombatTrackerComponent — Angriffsdialog nur Waffen-Angriffstalente',
     expect(comp.attackTalentsOf(c)).toEqual([]);
   });
 });
+
+describe('CombatTrackerComponent — Waffen nach Angriffstalent gefiltert', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  function combatant(): any {
+    return { character: {
+      talents: [
+        { talentDefinition: { id: 1, name: 'Nahkampfwaffen' }, rank: 3 },
+        { talentDefinition: { id: 2, name: 'Projektilwaffen' }, rank: 2 },
+      ],
+      skills: [{ skillDefinition: { id: 5, name: 'Wurfwaffen' }, rank: 4 }],
+      equipment: [
+        { id: 10, type: 'WEAPON', name: 'Schwert', damageBonus: 3, attackTalentName: 'Nahkampfwaffen' },
+        { id: 11, type: 'WEAPON', name: 'Bogen', damageBonus: 2, attackTalentName: 'Projektilwaffen' },
+        { id: 12, type: 'WEAPON', name: 'Dolch', damageBonus: 1 }, // ohne Zuordnung
+      ],
+    } };
+  }
+
+  it('zeigt nur passende + unzugeordnete Waffen für das gewählte Talent', () => {
+    const c = combatant();
+    (comp as any).attackDialog = { attacker: c, talentId: 1, skillId: undefined }; // Nahkampfwaffen
+    expect(comp.attackWeaponsFor(c).map((w: any) => w.name)).toEqual(['Schwert', 'Dolch']);
+  });
+
+  it('filtert nach gewählter Fertigkeit (Wurfwaffen → nur unzugeordnete)', () => {
+    const c = combatant();
+    (comp as any).attackDialog = { attacker: c, talentId: undefined, skillId: 5 }; // Wurfwaffen
+    expect(comp.attackWeaponsFor(c).map((w: any) => w.name)).toEqual(['Dolch']);
+  });
+
+  it('ohne gewähltes Talent werden alle Waffen angeboten', () => {
+    const c = combatant();
+    (comp as any).attackDialog = { attacker: c, talentId: undefined, skillId: undefined };
+    expect(comp.attackWeaponsFor(c).map((w: any) => w.name)).toEqual(['Schwert', 'Bogen', 'Dolch']);
+  });
+});

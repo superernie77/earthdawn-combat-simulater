@@ -661,7 +661,8 @@ public class CombatService {
                         ? " (Riposte oder Ausweichen möglich!)"
                         : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
                 addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
-                        req.getActionType(), actionResult.getDescription() + tag, hit);
+                        req.getActionType(), actionResult.getDescription() + tag, hit,
+                        attackLogJson(actionResult, blattschussActive ? 2 : 0));
                 if (amuletsUsed || shieldChanged) characterRepo.save(attacker.getCharacter());
                 sessionRepo.save(session);
                 broadcastWithModal(session, "ATTACK_RESULT", actionResult);
@@ -701,7 +702,8 @@ public class CombatService {
         actionResult.setDescription(buildDescription(actionResult));
 
         addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
-                req.getActionType(), actionResult.getDescription(), hit);
+                req.getActionType(), actionResult.getDescription(), hit,
+                attackLogJson(actionResult, blattschussActive ? 2 : 0));
 
         if (amuletsUsed || shieldChanged) characterRepo.save(attacker.getCharacter());
         sessionRepo.save(session);
@@ -1024,7 +1026,11 @@ public class CombatService {
                 "Kampf beendet! Schaden, Wunden und Karma aller Charaktere wurden auf die Datenblätter übertragen.", true);
         dialogStates.remove(sessionId);
         CombatSession saved = sessionRepo.save(session);
-        broadcast(saved);
+        // Synchronisiertes "Kampf beendet"-Modal für alle Zuschauer
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("name", saved.getName());
+        payload.put("round", saved.getRound());
+        broadcastWithModal(saved, "COMBAT_ENDED", payload);
         return saved;
     }
 
@@ -2993,6 +2999,11 @@ public class CombatService {
 
     void addLog(CombatSession session, String actorName, String targetName,
                 ActionType actionType, String description, boolean success) {
+        addLog(session, actorName, targetName, actionType, description, success, null);
+    }
+
+    void addLog(CombatSession session, String actorName, String targetName,
+                ActionType actionType, String description, boolean success, String rollDetailsJson) {
         CombatLog entry = CombatLog.builder()
                 .combatSession(session)
                 .round(session.getRound())
@@ -3001,9 +3012,41 @@ public class CombatService {
                 .actorName(actorName)
                 .targetName(targetName)
                 .description(description)
+                .rollDetailsJson(rollDetailsJson)
                 .success(success)
                 .build();
         session.getLog().add(entry);
+    }
+
+    /** Strukturierte Wurf-/Modifikator-Details für einen Angriff (für die Protokoll-Anzeige). */
+    private String attackLogJson(CombatActionResult r, int strain) {
+        java.util.Map<String, Object> d = new java.util.LinkedHashMap<>();
+        d.put("type", "ATTACK");
+        d.put("attackStep", r.getAttackStep());
+        d.put("attackRoll", r.getAttackRoll());
+        d.put("attackKarma", r.getKarmaRoll());
+        d.put("attackMods", r.getAttackBonusNotes());
+        d.put("defenseValue", r.getDefenseValue());
+        d.put("hit", r.isHit());
+        d.put("pendingRiposte", r.isHitPendingRiposte());
+        d.put("pendingDodge", r.isHitPendingDodge());
+        if (r.isHit()) {
+            d.put("extraSuccesses", r.getExtraSuccesses());
+            d.put("damageStep", r.getDamageStep());
+            d.put("damageRoll", r.getDamageRoll());
+            d.put("damageKarma", r.getDamageKarmaRoll());
+            d.put("damageMods", r.getDamageBonusNotes());
+            d.put("armor", r.getArmorValue());
+            d.put("netDamage", r.getNetDamage());
+            d.put("woundDealt", r.isWoundDealt());
+        }
+        if (strain > 0) d.put("strain", strain);
+        try {
+            return objectMapper.writeValueAsString(d);
+        } catch (JsonProcessingException e) {
+            log.warn("Konnte Angriffs-Logdetails nicht serialisieren: {}", e.getMessage());
+            return null;
+        }
     }
 
     void broadcast(CombatSession session) {
