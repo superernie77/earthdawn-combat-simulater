@@ -387,6 +387,7 @@ import { ProbeResult } from '../../models/dice.model';
                   <div class="equip-stats">
                     <span class="equip-badge weapon">+{{ e.damageBonus }} Schaden</span>
                     <span class="equip-badge" *ngIf="e.attackTalentName" style="background:rgba(66,165,245,0.15);border:1px solid #42a5f5;color:#90caf9" matTooltip="Im Kampf nur bei diesem Angriffstalent/-fertigkeit wählbar">⚔ {{ e.attackTalentName }}</span>
+                    <span class="equip-badge" *ngIf="e.tailWeapon" style="background:rgba(129,199,132,0.15);border:1px solid #81c784;color:#a5d6a7" matTooltip="Schwanzwaffe (T'skrang-Schwanzangriff)">🦎 Schwanzwaffe</span>
                     <span class="equip-badge two-handed-badge" *ngIf="e.twoHanded" matTooltip="Zweihändig: kann nicht zusammen mit einem Schild geführt werden (außer Buckler)">✋✋ Zweihändig</span>
                     <span class="equip-badge claw-badge" *ngIf="e.clawWeapon" matTooltip="Krallenhand: ersetzt STR-Stufe, Karma auf Schaden möglich, nicht entwaffenbar">Krallenhand</span>
                     <span class="equip-badge secondary-weapon" *ngIf="character.secondaryWeaponId === e.id" matTooltip="Wird als Zweitwaffe verwendet">⚔ Zweitwaffe</span>
@@ -427,6 +428,13 @@ import { ProbeResult } from '../../models/dice.model';
                   <mat-select [(ngModel)]="newWeapon.attackTalentName">
                     <mat-option [value]="''">— beliebig —</mat-option>
                     <mat-option *ngFor="let n of weaponAttackTalents" [value]="n">{{ n }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:150px" matTooltip="Am Schwanz befestigte Waffe (bis Größe 2) — nur für den T'skrang-Schwanzangriff wählbar.">
+                  <mat-label>Schwanzwaffe</mat-label>
+                  <mat-select [(ngModel)]="newWeapon.tailWeapon">
+                    <mat-option [value]="false">Nein</mat-option>
+                    <mat-option [value]="true">Ja (Schwanz)</mat-option>
                   </mat-select>
                 </mat-form-field>
                 <mat-form-field appearance="fill" style="flex:3">
@@ -1247,7 +1255,7 @@ export class CharacterSheetComponent implements OnInit {
   /** Angriffstalente/-fertigkeiten, denen eine Waffe zugeordnet werden kann. */
   weaponAttackTalents = ['Nahkampfwaffen', 'Projektilwaffen', 'Wurfwaffen', 'Waffenloser Kampf'];
 
-  newWeapon: { name: string; damageBonus: number; twoHanded: boolean; attackTalentName: string; description: string } = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', description: '' };
+  newWeapon: { name: string; damageBonus: number; twoHanded: boolean; attackTalentName: string; tailWeapon: boolean; description: string } = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', tailWeapon: false, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; buckler: boolean; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, buckler: false, description: '' };
   newPotionQty: number = 1;
@@ -1931,10 +1939,10 @@ export class CharacterSheetComponent implements OnInit {
 
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
-    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, twoHanded: this.newWeapon.twoHanded, attackTalentName: this.newWeapon.attackTalentName || undefined, description: this.newWeapon.description };
+    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, twoHanded: this.newWeapon.twoHanded, attackTalentName: this.newWeapon.attackTalentName || undefined, tailWeapon: this.newWeapon.tailWeapon, description: this.newWeapon.description };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
-      this.newWeapon = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', description: '' };
+      this.newWeapon = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', tailWeapon: false, description: '' };
     });
   }
 

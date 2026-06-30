@@ -86,6 +86,7 @@ export interface CombatantState {
   pendingLufttanzTargetId: number;
   pendingLufttanzWeaponId: number;
   blattschussUsedThisRound: boolean;
+  schwanzangriffUsedThisRound?: boolean;
   karmaInitiativeThisRound?: boolean;
   pendingBlattschussDefenderId: number;
   pendingBlattschussTotal: number;
@@ -573,6 +574,15 @@ export interface NachtretenRequest {
   sessionId: number;
   actorCombatantId: number;
   defenderCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface SchwanzangriffRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  defenderCombatantId: number;
+  weaponId?: number;
   bonusSteps: number;
   spendKarma: boolean;
 }

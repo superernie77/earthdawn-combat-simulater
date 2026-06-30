@@ -35,4 +35,7 @@ public final class TalentNames {
     // GM-Bedingungen (manuell durch den Meister aktiviert)
     public static final String EFFECT_TOTER_WINKEL        = "Toter Winkel";
     public static final String EFFECT_BEDRAENGT           = "Bedrängt";
+
+    // T'skrang-Schwanzangriff: −2 auf alle Proben in dieser Runde
+    public static final String EFFECT_SCHWANZANGRIFF      = "Schwanzangriff";
 }

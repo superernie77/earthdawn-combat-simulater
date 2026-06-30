@@ -272,6 +272,12 @@ public class CombatController {
         return combatService.performNachtreten(id, req);
     }
 
+    @PostMapping("/sessions/{id}/schwanzangriff")
+    public CombatActionResult performSchwanzangriff(@PathVariable Long id, @RequestBody SchwanzangriffRequest req) {
+        req.setSessionId(id);
+        return combatService.performSchwanzangriff(id, req);
+    }
+
     @PostMapping("/sessions/{id}/combatants/{combatantId}/lufttanz")
     public LufttanzActivationResult performLufttanz(@PathVariable Long id, @PathVariable Long combatantId) {
         return combatService.performLufttanz(id, combatantId);

@@ -99,6 +99,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 | **Manövrieren** | DEX | KV des Ziels | +successes×2 KV (ON_MELEE_DEFENSE) + pending attack bonus für 1 Runde. |
 | **Zweitwaffe** | DEX | KV des Ziels | Zusätzlicher Waffenangriff. Eigener once-per-round-Flag (`zweitWaffeUsedThisRound`). Kann nach Hauptangriff oder statt ihm eingesetzt werden. |
 | **Nachtreten** | DEX | KV des Ziels | Zusätzlicher **waffenloser** Angriff (Einfache Aktion). Schaden = reine STR-Stufe (+2/Übererfolg), kein Waffenbonus. Eigener once-per-round-Flag (`nachtretenUsedThisRound`), verbraucht **kein** `hasActedThisRound`. **Nur gegen Ziele mit niedrigerer Initiative** (`attacker.initiative > defender.initiative`). Riposte/Ausweichen des Ziels wie beim Nahkampf. Endpoint `POST /sessions/{id}/nachtreten` (`NachtretenRequest`). Flyway V25. |
+| **Schwanzangriff** (T'skrang-Rassenfähigkeit) | DEX (Waffenloser Kampf) | KV des Ziels | Zusätzlicher waffenloser Schwanzangriff, **nur für Race `TSKRANG`** (kein Talent nötig). Probe = DEX-Stufe + Waffenloser-Kampf-Rang (Talent **oder** Fertigkeit, 0 wenn keiner) + Bonus − Wunden − 2. Schaden = STR-Stufe (+2/Übererfolg) + optionale **Schwanzwaffe** (`Equipment.tailWeapon=true`, sonst Fehler). **Keine Überanstrengung**, aber **−2 auf alle Proben dieser Runde** als ActiveEffect `Schwanzangriff` (`ATTACK_STEP −2`, 1 Runde). Once-per-round-Flag `schwanzangriffUsedThisRound` (reset in `nextRound()`), verbraucht **kein** `hasActedThisRound`. Riposte/Ausweichen wie beim Nahkampf. Endpoint `POST /sessions/{id}/schwanzangriff` (`SchwanzangriffRequest`). Flyway V33. Mischung aus Krallenhand (STR-Schaden) und Zweitwaffe (Zusatzangriff). |
 
 **Successes formula** for all main-action talents: `1 + floor((total − TN) / 5)` on success.
 
@@ -335,6 +336,7 @@ POST   /api/combat/sessions/{id}/riposte             RiposteRequest { defenderCo
 POST   /api/combat/sessions/{id}/manoeuver           ManoeuverRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/zweitwaffe          ZweitwaffeRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/nachtreten          NachtretenRequest { actorCombatantId, defenderCombatantId, bonusSteps, spendKarma } — waffenloser Zusatzangriff, nur vs. niedrigere Initiative
+POST   /api/combat/sessions/{id}/schwanzangriff       SchwanzangriffRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma } — T'skrang-Schwanzangriff, −2 auf alle Proben der Runde
 POST   /api/combat/sessions/{id}/combatants/{cId}/tigersprung   → no body; initiative += rank, costs 1 damage
 POST   /api/combat/sessions/{id}/combatants/{cId}/lufttanz      → no body; +rank initiative (DECLARATION), enables bonus melee attack, costs 2 damage
 POST   /api/combat/sessions/{id}/lufttanz-attack                LufttanzAttackRequest (bonus melee attack, no hasActedThisRound consumed)

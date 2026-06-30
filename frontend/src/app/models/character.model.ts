@@ -102,6 +102,8 @@ export interface Equipment {
   twoHanded?: boolean;
   /** Waffe: zugeordnetes Angriffstalent/-fertigkeit (leer = bei jedem Angriff wählbar). */
   attackTalentName?: string;
+  /** Waffe: am Schwanz befestigte Schwanzwaffe (nur für T'skrang-Schwanzangriff). */
+  tailWeapon?: boolean;
   /** Schild: Buckler — auch mit zweihändigen Waffen führbar. */
   buckler?: boolean;
   /** Schild: vom System wegen Zweihandwaffe automatisch abgelegt (wird bei Einhandangriff wieder angelegt). */

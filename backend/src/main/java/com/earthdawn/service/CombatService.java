@@ -828,6 +828,7 @@ public class CombatService {
             combatant.setTigersprungUsedThisRound(false);
             combatant.setZweitWaffeUsedThisRound(false);
             combatant.setNachtretenUsedThisRound(false);
+            combatant.setSchwanzangriffUsedThisRound(false);
             combatant.setLufttanzActivatedThisRound(false);
             combatant.setLufttanzBonusUsedThisRound(false);
             combatant.setPendingLufttanzTargetId(-1L);
@@ -2985,6 +2986,148 @@ public class CombatService {
         actionResult.setDescription(buildDescription(actionResult));
         addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
                 ActionType.NACHTRETEN, actionResult.getDescription(), hit);
+        sessionRepo.save(session);
+        broadcast(session);
+        return actionResult;
+    }
+
+    // --- Schwanzangriff (T'skrang-Rassenfähigkeit) ---
+
+    /**
+     * T'skrang-Schwanzangriff: zusätzlicher waffenloser Angriff mit dem Schwanz (1×/Runde, zusätzlich zur
+     * Hauptaktion). Probe über Waffenloser Kampf (DEX-Stufe + Rang), Schaden über STÄ-Stufe (+ optionale
+     * Schwanzwaffe). Kostet keine Überanstrengung, verleiht aber −2 auf alle Proben in dieser Runde.
+     */
+    public CombatActionResult performSchwanzangriff(Long sessionId, SchwanzangriffRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState attacker = findCombatant(session, req.getActorCombatantId());
+        CombatantState defender = findCombatant(session, req.getDefenderCombatantId());
+
+        if (attacker.isDefeated()) throw new IllegalStateException(attacker.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (attacker.getCharacter().getRace() != Race.TSKRANG)
+            throw new IllegalStateException("Schwanzangriff ist eine T'skrang-Rassenfähigkeit.");
+        if (attacker.isSchwanzangriffUsedThisRound())
+            throw new IllegalStateException("Schwanzangriff wurde bereits in dieser Runde eingesetzt.");
+
+        attacker.setSchwanzangriffUsedThisRound(true);
+
+        // −2 auf alle Proben dieser Runde (riskant). Als ActiveEffect für die übrigen Würfe der Runde.
+        attacker.getActiveEffects().removeIf(e -> TalentNames.EFFECT_SCHWANZANGRIFF.equals(e.getName()));
+        attacker.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(attacker)
+                .name(TalentNames.EFFECT_SCHWANZANGRIFF)
+                .description("Schwanzangriff: −2 auf alle Proben in dieser Runde.")
+                .sourceType(SourceType.CONDITION)
+                .negative(true)
+                .remainingRounds(1)
+                .modifiers(List.of(gmModifier(StatType.ATTACK_STEP, -2)))
+                .build());
+
+        // Probe: Waffenloser Kampf (Talent oder Fertigkeit), DEX-Stufe + Rang − Wunden − 2 (Schwanzangriff-Malus)
+        int wkRank = attacker.getCharacter().getTalents().stream()
+                .filter(t -> "Waffenloser Kampf".equals(t.getTalentDefinition().getName()))
+                .findFirst().map(CharacterTalent::getRank)
+                .orElseGet(() -> attacker.getCharacter().getSkills().stream()
+                        .filter(s -> "Waffenloser Kampf".equals(s.getSkillDefinition().getName()))
+                        .findFirst().map(CharacterSkill::getRank).orElse(0));
+        int dexStep = Math.max(1, diceService.attributeToStep(attacker.getCharacter().getDexterity()) - attacker.getWounds());
+        int attackStep = Math.max(1, dexStep + wkRank + req.getBonusSteps() - 2);
+        if (attacker.getPendingAttackBonus() != 0) {
+            attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
+            attacker.setPendingAttackBonus(0);
+        }
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            attacker.setCurrentKarma(Math.max(0, attacker.getCurrentKarma() - 1));
+        }
+
+        RollResult attackRoll = diceService.roll(attackStep);
+        int attackTotal = attackRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int pd = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_DEFENSE, TriggerContext.ON_MELEE_DEFENSE);
+        if (defender.getPendingDefenseBonus() != 0) {
+            pd += defender.getPendingDefenseBonus();
+            defender.setPendingDefenseBonus(0);
+        }
+        boolean hit = attackTotal >= pd;
+
+        // Optionale Schwanzwaffe (muss tailWeapon=true sein)
+        com.earthdawn.model.Equipment tailWeapon = req.getWeaponId() != null
+                ? attacker.getCharacter().getEquipment().stream()
+                    .filter(e -> e.getId().equals(req.getWeaponId())).findFirst().orElse(null)
+                : null;
+        if (tailWeapon != null && !tailWeapon.isTailWeapon()) {
+            throw new IllegalStateException("Beim Schwanzangriff sind nur am Schwanz befestigte Waffen (Schwanzwaffe) erlaubt.");
+        }
+
+        CombatActionResult.CombatActionResultBuilder result = CombatActionResult.builder()
+                .actorName(attacker.getCharacter().getName())
+                .targetName(defender.getCharacter().getName())
+                .actionType(ActionType.SCHWANZANGRIFF)
+                .attackStep(attackStep).attackRoll(attackRoll).karmaRoll(karmaRoll)
+                .defenseValue(pd).hit(hit);
+
+        if (hit) {
+            int extraSucc = (attackTotal - pd) / 5;
+            int strStep = diceService.attributeToStep(attacker.getCharacter().getStrength());
+            int weaponBonus = tailWeapon != null ? tailWeapon.getDamageBonus() : 0;
+            int damageStep = Math.max(1, strStep + weaponBonus + extraSucc * 2);
+            RollResult damageRoll = diceService.roll(damageStep);
+            int armor = modifiers.getEffectiveValue(defender, StatType.PHYSICAL_ARMOR, TriggerContext.ON_DAMAGE_RECEIVED);
+            int net = Math.max(0, damageRoll.getTotal() - armor);
+
+            boolean defenderHasRiposte = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.RIPOSTE.equals(t.getTalentDefinition().getName()))
+                    && defender.getPendingRiposteAttackTotal() < 0;
+            boolean defenderHasDodge = defender.getCharacter().getTalents().stream()
+                    .anyMatch(t -> TalentNames.AUSWEICHEN.equals(t.getTalentDefinition().getName()));
+
+            if (defenderHasRiposte || defenderHasDodge) {
+                if (defenderHasRiposte) {
+                    defender.setPendingRiposteAttackTotal(attackTotal);
+                    defender.setPendingRiposteAttackerId(attacker.getId());
+                    defender.setPendingRiposteDamage(net);
+                    result.hitPendingRiposte(true).riposteDefenderId(defender.getId());
+                }
+                if (defenderHasDodge) {
+                    defender.setPendingDodgeDamage(net);
+                    defender.setPendingDodgeAttackTotal(attackTotal);
+                    defender.setPendingDamageStep(damageStep);
+                    defender.setPendingArmorValue(armor);
+                    try { defender.setPendingDamageRollJson(objectMapper.writeValueAsString(damageRoll)); } catch (JsonProcessingException e) { log.error("Fehler beim Serialisieren des Schadenswurfs", e); }
+                    result.hitPendingDodge(true).dodgeDefenderId(defender.getId()).pendingDodgeDamage(net);
+                }
+                result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                      .armorValue(armor).netDamage(net);
+                CombatActionResult actionResult = result.build();
+                actionResult.setDescription(buildDescription(actionResult));
+                String tag = defenderHasRiposte && defenderHasDodge
+                        ? " (Riposte oder Ausweichen möglich!)"
+                        : defenderHasRiposte ? " (Riposte möglich!)" : " (Ausweichen möglich!)";
+                addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                        ActionType.SCHWANZANGRIFF, actionResult.getDescription() + tag, hit);
+                sessionRepo.save(session);
+                broadcast(session);
+                return actionResult;
+            }
+
+            int prevWounds = defender.getWounds();
+            KnockdownResult kdr = applyDamageToDefender(session, defender, net);
+            int newWounds = defender.getWounds() - prevWounds;
+            result.extraSuccesses(extraSucc).damageStep(damageStep).damageRoll(damageRoll)
+                  .armorValue(armor).netDamage(net)
+                  .woundDealt(newWounds > 0).newWounds(newWounds)
+                  .totalWounds(defender.getWounds())
+                  .targetDefeated(defender.isDefeated()).knockdownResult(kdr);
+        }
+
+        CombatActionResult actionResult = result.build();
+        actionResult.setDescription(buildDescription(actionResult));
+        addLog(session, attacker.getCharacter().getName(), defender.getCharacter().getName(),
+                ActionType.SCHWANZANGRIFF, actionResult.getDescription(), hit);
         sessionRepo.save(session);
         broadcast(session);
         return actionResult;

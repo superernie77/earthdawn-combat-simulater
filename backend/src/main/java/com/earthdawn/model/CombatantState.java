@@ -89,6 +89,11 @@ public class CombatantState {
     @Builder.Default
     private boolean nachtretenUsedThisRound = false;
 
+    /** Schwanzangriff (T'skrang) bereits in dieser Runde eingesetzt. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean schwanzangriffUsedThisRound = false;
+
     /** Lufttanz wurde in dieser Runde aktiviert (Initiative-Bonus, ermöglicht Bonusangriff). */
     @Column(columnDefinition = "boolean default false")
     @Builder.Default

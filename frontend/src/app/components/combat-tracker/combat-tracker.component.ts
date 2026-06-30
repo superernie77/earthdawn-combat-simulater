@@ -32,6 +32,7 @@ import {
   TigersprungResult,
   ZweitwaffeRequest,
   NachtretenRequest,
+  SchwanzangriffRequest,
   SpotArmorFlawRequest, SpotArmorFlawResult,
   LufttanzActivationResult, LufttanzAttackRequest,
   InitiativeRollDetail, DialogState
@@ -347,6 +348,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openNachtretenDialog(c)"
                   matTooltip="Nachtreten: zusätzlicher waffenloser Angriff (GES + Rang vs. KV, waffenloser STR-Schaden). Einfache Aktion, 1×/Runde, kostet 1 Überanstrengung. Nur gegen Ziele mit niedrigerer Initiative.">
                   <mat-icon>sports_martial_arts</mat-icon> Nachtreten
+                </button>
+                <!-- Schwanzangriff: T'skrang-Rassenfähigkeit -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isTskrang(c) && !c.defeated"
+                  class="combat-option-btn schwanzangriff-btn"
+                  [disabled]="c.schwanzangriffUsedThisRound"
+                  (click)="openSchwanzangriffDialog(c)"
+                  matTooltip="Schwanzangriff (T'skrang): zusätzlicher waffenloser Angriff mit dem Schwanz (Waffenloser Kampf vs. KV, STR-Schaden, optional Schwanzwaffe). 1×/Runde. −2 auf alle Proben in dieser Runde.">
+                  <mat-icon>pets</mat-icon> Schwanzangriff
                 </button>
                 <button mat-icon-button *ngIf="session!.status === 'SETUP'"
                   color="warn" (click)="removeCombatant(c.id)" matTooltip="Entfernen">
@@ -1185,6 +1194,47 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
           <button mat-stroked-button (click)="nachtretenDialog.open = false">Abbrechen</button>
           <button mat-raised-button color="primary" [disabled]="!nachtretenDialog.defenderId" (click)="performNachtreten()">
             <mat-icon>sports_martial_arts</mat-icon> Nachtreten
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schwanzangriff Dialog (T'skrang) -->
+    <div class="attack-dialog" *ngIf="schwanzangriffDialog.open">
+      <div class="dialog-backdrop" (click)="schwanzangriffDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#a5d6a7">pets</mat-icon>Schwanzangriff: {{ schwanzangriffDialog.actor?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="schwanzangriffDialog.defenderId">
+            <mat-option *ngFor="let c of schwanzangriffTargets(schwanzangriffDialog.actor)" [value]="c.id">
+              {{ cn(c) }} (Ini {{ c.initiative }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Schwanzwaffe (optional)</mat-label>
+          <mat-select [(ngModel)]="schwanzangriffDialog.weaponId">
+            <mat-option [value]="null">Waffenlos (STR-Schaden)</mat-option>
+            <mat-option *ngFor="let e of tailWeaponsOf(schwanzangriffDialog.actor)" [value]="e.id">{{ e.name }} (+{{ e.damageBonus }})</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          Waffenloser Kampf vs. KV — STR-Schaden (+ Schwanzwaffe). 1×/Runde. <strong style="color:#ef9a9a">−2 auf alle Proben in dieser Runde.</strong>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="schwanzangriffDialog.spendKarma"
+            [class.disabled]="(schwanzangriffDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(schwanzangriffDialog.actor?.currentKarma ?? 0) > 0 && (schwanzangriffDialog.spendKarma = !schwanzangriffDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(schwanzangriffDialog.actor?.currentKarma ?? 0) <= 0">{{ schwanzangriffDialog.actor?.currentKarma ?? 0 }}</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="schwanzangriffDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" [disabled]="!schwanzangriffDialog.defenderId" (click)="performSchwanzangriff()">
+            <mat-icon>pets</mat-icon> Schwanzangriff
           </button>
         </div>
       </div>
@@ -3063,6 +3113,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     spendKarma: boolean;
   } = { open: false, spendKarma: false };
 
+  schwanzangriffDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    defenderId?: number;
+    weaponId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
   aufspringenDialog: {
     open: boolean;
     combatant?: CombatantState;
@@ -4933,6 +4991,48 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.combatService.performNachtreten(this.session.id, req).subscribe({
       next: result => {
         this.nachtretenDialog.open = false;
+        this.resultModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Schwanzangriff (T'skrang) ---
+
+  isTskrang(c: CombatantState): boolean {
+    return c.character?.race === 'TSKRANG';
+  }
+
+  /** Am Schwanz befestigte Waffen des Kombattanten. */
+  tailWeaponsOf(c?: CombatantState) {
+    return (c?.character.equipment ?? []).filter(e => e.type === 'WEAPON' && e.tailWeapon);
+  }
+
+  /** Mögliche Ziele für den Schwanzangriff: nicht besiegt, nicht der Anwender. */
+  schwanzangriffTargets(actor?: CombatantState): CombatantState[] {
+    if (!actor) return [];
+    return (this.session?.combatants ?? []).filter(c => c.id !== actor.id && !c.defeated);
+  }
+
+  openSchwanzangriffDialog(actor: CombatantState): void {
+    this.schwanzangriffDialog = { open: true, actor, defenderId: undefined, weaponId: undefined, spendKarma: false };
+  }
+
+  performSchwanzangriff(): void {
+    const actor = this.schwanzangriffDialog.actor;
+    if (!this.session || !actor || !this.schwanzangriffDialog.defenderId) return;
+    const req: SchwanzangriffRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: actor.id,
+      defenderCombatantId: this.schwanzangriffDialog.defenderId,
+      weaponId: this.schwanzangriffDialog.weaponId ?? undefined,
+      bonusSteps: 0,
+      spendKarma: this.schwanzangriffDialog.spendKarma
+    };
+    this.combatService.performSchwanzangriff(this.session.id, req).subscribe({
+      next: result => {
+        this.schwanzangriffDialog.open = false;
         this.resultModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },

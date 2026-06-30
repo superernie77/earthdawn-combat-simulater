@@ -150,4 +150,8 @@ public class Equipment {
      * Leer/null = keiner Zuordnung → Waffe steht bei jedem Angriff zur Auswahl (rückwärtskompatibel).
      */
     private String attackTalentName;
+
+    /** Schwanzwaffe: am Schwanz befestigte Nahkampfwaffe (bis Größe 2) — nur für T'skrang-Schwanzangriff wählbar. */
+    @Builder.Default
+    private boolean tailWeapon = false;
 }

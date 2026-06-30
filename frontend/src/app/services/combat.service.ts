@@ -16,6 +16,7 @@ import {
   TigersprungResult,
   ZweitwaffeRequest,
   NachtretenRequest,
+  SchwanzangriffRequest,
   SpotArmorFlawRequest, SpotArmorFlawResult,
   LufttanzActivationResult, LufttanzAttackRequest
 } from '../models/combat.model';
@@ -234,6 +235,10 @@ export class CombatService {
 
   performNachtreten(sessionId: number, req: NachtretenRequest): Observable<CombatActionResult> {
     return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/nachtreten`, req);
+  }
+
+  performSchwanzangriff(sessionId: number, req: SchwanzangriffRequest): Observable<CombatActionResult> {
+    return this.http.post<CombatActionResult>(`${this.base}/sessions/${sessionId}/schwanzangriff`, req);
   }
 
   performLufttanz(sessionId: number, combatantId: number): Observable<LufttanzActivationResult> {

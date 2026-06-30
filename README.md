@@ -871,6 +871,7 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 ### Changelog
 
 #### 1.1.0
+- **Schwanzangriff (T'skrang tail attack)** — racial ability for T'skrang: an extra unarmed tail attack (1×/round, doesn't consume the main action), resolved via Waffenloser Kampf vs. physical defense with STR-based damage. A melee weapon can be tail-mounted via the new `tailWeapon` flag (`🦎 Schwanzwaffe`). Using it imposes **−2 on all rolls that round**. A mix of Krallenhand and Zweitwaffe. Flyway `V33`.
 - **Weapons assignable to an attack talent** — a weapon can be tied to an attack talent/skill (Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf) via `Equipment.attackTalentName`. In combat the weapon dropdown then only offers weapons matching the selected talent/skill; weapons left unassigned stay available for every attack (backward compatible). Flyway `V32`.
 - **Richer combat log** — the log is now ordered newest-first (chronologically descending) and attack entries show the exact dice breakdown for the **attack** and **damage** rolls (individual dice, karma die, total), the **strain** cost, and all applied **modifiers** (attack/damage bonus notes). Stored per entry in `CombatLog.rollDetailsJson`.
 - **Combat end broadcast** — ending a combat now pushes a synchronized "Kampf beendet" modal to **all** connected clients (plus a persistent 🏁 badge in the tracker), so spectators are notified rather than left on a frozen screen.
