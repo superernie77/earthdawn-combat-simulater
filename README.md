@@ -870,6 +870,9 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 
 ### Changelog
 
+#### 1.2.0 (in development)
+- _No changes yet._
+
 #### 1.1.0
 - **Schwanzangriff (T'skrang tail attack)** — racial ability for T'skrang: an extra unarmed tail attack (1×/round, doesn't consume the main action), resolved via Waffenloser Kampf vs. physical defense with STR-based damage. A melee weapon can be tail-mounted via the new `tailWeapon` flag (`🦎 Schwanzwaffe`). Using it imposes **−2 on all rolls that round**. A mix of Krallenhand and Zweitwaffe. Flyway `V33`.
 - **Weapons assignable to an attack talent** — a weapon can be tied to an attack talent/skill (Nahkampfwaffen, Projektilwaffen, Wurfwaffen, Waffenloser Kampf) via `Equipment.attackTalentName`. In combat the weapon dropdown then only offers weapons matching the selected talent/skill; weapons left unassigned stay available for every attack (backward compatible). Flyway `V32`.

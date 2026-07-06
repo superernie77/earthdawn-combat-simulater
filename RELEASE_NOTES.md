@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.2.0 (in Entwicklung)
+
+_Noch keine Änderungen._
+
 ## v1.1.0
 
 ### 🆕 Neue Fähigkeiten & Talente
