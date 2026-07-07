@@ -197,10 +197,12 @@ public class CharacterController {
         return characterService.resetRecoveryTests(id);
     }
 
-    /** Arzt-Fertigkeit: Heiler behandelt den Verwundeten. Body: { healerCharacterId } */
+    /** Arzt-Fertigkeit: Heiler behandelt den Verwundeten. Body: { healerCharacterId, mode: VERLETZUNG|WUNDE } */
     @PostMapping("/{id}/arzt")
-    public ArztResult applyArzt(@PathVariable Long id, @RequestBody Map<String, Long> body) {
-        return characterService.applyArzt(id, body.get("healerCharacterId"));
+    public ArztResult applyArzt(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Long healerId = body.get("healerCharacterId") != null ? ((Number) body.get("healerCharacterId")).longValue() : null;
+        String mode = body.get("mode") != null ? body.get("mode").toString() : "VERLETZUNG";
+        return characterService.applyArzt(id, healerId, mode);
     }
 
     @DeleteMapping("/{id}")

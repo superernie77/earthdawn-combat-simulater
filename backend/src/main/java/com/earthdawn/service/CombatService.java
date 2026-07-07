@@ -829,6 +829,7 @@ public class CombatService {
             combatant.setZweitWaffeUsedThisRound(false);
             combatant.setNachtretenUsedThisRound(false);
             combatant.setSchwanzangriffUsedThisRound(false);
+            combatant.setFearResistUsedThisRound(false);
             combatant.setLufttanzActivatedThisRound(false);
             combatant.setLufttanzBonusUsedThisRound(false);
             combatant.setPendingLufttanzTargetId(-1L);
@@ -1595,6 +1596,142 @@ public class CombatService {
         TauntResult tauntResult = result.build();
         broadcastWithModal(session, "TAUNT", tauntResult);
         return tauntResult;
+    }
+
+    // --- Verängstigen ---
+
+    /**
+     * Verängstigen: WIL-Step + Rang + Bonus − Wunden vs. Mystische Verteidigung des Ziels.
+     * Erfolg: −2 auf alle Aktionsproben je Erfolg (1 + Übererfolge) für Rang Runden.
+     * Das Ziel darf in jeder seiner Runden eine Willenskraftprobe gegen die
+     * Verängstigen-Stufe (WIL-Step + Rang des Adepten) ablegen — Erfolg beendet den Effekt.
+     * Standardaktion, 0 Überanstrengung.
+     */
+    public FearResult performFear(Long sessionId, FearRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+
+        if (actor.isDefeated())  throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt und kann nicht handeln.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Aktionen sind nur in der Aktionsphase möglich.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.VERAENGSTIGEN.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Verängstigen' nicht gefunden."));
+
+        // Würfelstufe: WIL-Step + Rang + Bonus − Wunden (0 Überanstrengung)
+        int wilStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower()) - actor.getWounds());
+        int rollStep = Math.max(1, wilStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4); // W6
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int spellDef = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ON_SPELL_DEFENSE);
+        boolean success = total >= spellDef;
+        int successes = success ? 1 + (total - spellDef) / 5 : 0;
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+
+        // Widerstands-Mindestwurf: Verängstigen-Stufe = WIL-Step (ohne Wunden) + Rang
+        int resistTn = diceService.attributeToStep(actor.getCharacter().getWillpower()) + ct.getRank();
+
+        FearResult.FearResultBuilder result = FearResult.builder()
+                .actorName(actorName).targetName(targetName)
+                .rollStep(rollStep).roll(roll).karmaRoll(karmaRoll)
+                .spellDefense(spellDef).success(success).successes(successes)
+                .resistTargetNumber(resistTn);
+
+        if (!success) {
+            String desc = actorName + " versucht " + targetName + " zu verängstigen, scheitert aber. (" + total + " vs MV " + spellDef + ")";
+            result.penalty(0).duration(0).description(desc);
+            addLog(session, actorName, targetName, ActionType.FEAR, desc, false);
+            sessionRepo.save(session);
+            FearResult built = result.build();
+            broadcastWithModal(session, "FEAR", built);
+            return built;
+        }
+
+        int penalty = 2 * successes;
+        int duration = ct.getRank();
+
+        // Erneutes Verängstigen ersetzt den bestehenden Effekt
+        target.getActiveEffects().removeIf(e -> TalentNames.EFFECT_VERAENGSTIGT.equals(e.getName()));
+        target.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(target)
+                .name(TalentNames.EFFECT_VERAENGSTIGT)
+                .description("−" + penalty + " auf alle Aktionsproben (" + actorName + "). "
+                        + "Willenskraftprobe vs. " + resistTn + " am eigenen Zug beendet den Effekt.")
+                .sourceType(SourceType.CONDITION)
+                .remainingRounds(duration)
+                .negative(true)
+                .resistTargetNumber(resistTn)
+                .modifiers(List.of(
+                        ModifierEntry.builder().targetStat(StatType.ATTACK_STEP)
+                                .operation(ModifierOperation.ADD).value(-penalty)
+                                .triggerContext(TriggerContext.ALWAYS).build()))
+                .build());
+
+        String desc = actorName + " verängstigt " + targetName + " (" + total + " vs MV " + spellDef + "): "
+                + successes + " Erfolg(e) → −" + penalty + " auf Aktionsproben für " + duration
+                + " Runden. Widerstand: WIL-Probe vs. " + resistTn + ".";
+        result.penalty(penalty).duration(duration).description(desc);
+
+        addLog(session, actorName, targetName, ActionType.FEAR, desc, true);
+        sessionRepo.save(session);
+        FearResult built = result.build();
+        broadcastWithModal(session, "FEAR", built);
+        return built;
+    }
+
+    /**
+     * Widerstandsprobe gegen Verängstigen: WIL-Step − Wunden vs. gespeichertem Mindestwurf
+     * des Effekts. 1× pro Runde. Erfolg entfernt den Verängstigt-Effekt.
+     */
+    public FearResistResult resistFear(Long sessionId, Long combatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState target = findCombatant(session, combatantId);
+        String targetName = target.getCharacter().getName();
+
+        if (target.isDefeated()) throw new IllegalStateException(targetName + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        if (target.isFearResistUsedThisRound())
+            throw new IllegalStateException("Widerstandsprobe wurde in dieser Runde bereits abgelegt.");
+
+        ActiveEffect fear = target.getActiveEffects().stream()
+                .filter(e -> TalentNames.EFFECT_VERAENGSTIGT.equals(e.getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(targetName + " ist nicht verängstigt."));
+
+        int tn = fear.getResistTargetNumber() != null ? fear.getResistTargetNumber() : 0;
+        int resistStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower()) - target.getWounds());
+        RollResult roll = diceService.roll(resistStep);
+        boolean success = roll.getTotal() >= tn;
+        target.setFearResistUsedThisRound(true);
+
+        String desc;
+        if (success) {
+            target.getActiveEffects().remove(fear);
+            desc = targetName + " schüttelt die Furcht ab! (WIL " + roll.getTotal() + " vs. " + tn + ")";
+        } else {
+            desc = targetName + " bleibt verängstigt. (WIL " + roll.getTotal() + " vs. " + tn + ")";
+        }
+        addLog(session, targetName, null, ActionType.FEAR, desc, success);
+        sessionRepo.save(session);
+
+        FearResistResult result = FearResistResult.builder()
+                .targetName(targetName).resistStep(resistStep).roll(roll)
+                .targetNumber(tn).success(success).description(desc)
+                .build();
+        broadcastWithModal(session, "FEAR_RESIST", result);
+        return result;
     }
 
     // --- Akrobatische Verteidigung ---

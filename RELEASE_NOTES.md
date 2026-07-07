@@ -2,7 +2,18 @@
 
 ## v1.2.0 (in Entwicklung)
 
-_Noch keine Änderungen._
+**Neues Talent: Verängstigen**
+Der Adept jagt einem Gegner übernatürliche Furcht ein (WIL + Rang vs. Mystische Verteidigung, Standardaktion, 0 Überanstrengung). Bei Erfolg erleidet das Ziel **−2 auf alle Aktionsproben je Erfolg** für Rang Runden. Das Ziel darf in jeder seiner Runden eine Willenskraftprobe gegen die Verängstigen-Stufe ablegen („Furcht abschütteln") — Erfolg beendet den Effekt vorzeitig. Disziplintalent des Geisterbeschwörers (1. Kreis), Talentoption für Illusionisten (Kreis 5–8).
+
+**Bugfix: Schwimmen-Talent überlebt Neustarts**
+Das Talent Schwimmen wurde beim Backend-Start fälschlich als „nicht implementiert" gelöscht (inklusive Charakter-Zuweisungen) und neu angelegt — es bleibt jetzt erhalten.
+
+**Arzt-Umbau: zwei Behandlungsmodi**
+Die Arzt-Fertigkeit unterscheidet jetzt zwei Anwendungen:
+- **Verletzungen behandeln** (verlorene LP): nur 1× pro Erholungsprobe — Erfolg gibt +Rang auf den nächsten Erholungswurf.
+- **Wunde versorgen**: unterdrückt den −1-Wundmalus einer Wunde bei Erholungsproben — mehrfach anwendbar, bis alle Wunden versorgt sind (Verband bleibt bestehen).
+
+Beide Modi würfeln WAH-Stufe + Rang gegen MW 5 und verbrauchen je 1× Verbandszeug — auch bei Fehlschlag.
 
 ## v1.1.0
 

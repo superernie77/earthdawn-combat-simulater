@@ -7,6 +7,8 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ArztResult {
+    /** Behandlungsmodus: VERLETZUNG (verlorene LP) oder WUNDE (Wundversorgung). */
+    private String mode;
     private String healerName;
     private String woundedName;
     private int wounds;
@@ -16,10 +18,11 @@ public class ArztResult {
     private int rollStep;
     private RollResult roll;
     private boolean success;
+    /** VERLETZUNG: gewährter Bonus (= Rang) auf die nächste Erholungsprobe; sonst 0. */
     private int bonusGranted;
     private int newPendingBonus;
-    /** true = bei Erfolg wird der Wundabzug der nächsten Erholungsprobe aufgehoben. */
-    private boolean woundPenaltyNegated;
+    /** Anzahl aktuell versorgter Wunden (deren −1-Malus bei Erholungsproben unterdrückt ist). */
+    private int woundsTreated;
     /** Verbleibende Verbandszeug-Anwendungen des Heilers nach dieser Behandlung. */
     private int verbandszeugRemaining;
 }

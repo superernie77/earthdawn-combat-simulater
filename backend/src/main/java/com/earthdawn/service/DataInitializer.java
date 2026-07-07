@@ -294,6 +294,20 @@ public class DataInitializer {
             log.info("Talent 'Starrsinn' hinzugefügt.");
         }
 
+        if (talentRepo.findByName("Verängstigen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Verängstigen")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Jagt einem Gegner übernatürliche Furcht ein (WIL + Rang vs. Mystische Verteidigung des Ziels). " +
+                            "Standardaktion, 0 Überanstrengung. Erfolg: −2 auf alle Aktionsproben je Erfolg für Rang Runden. " +
+                            "Das Ziel darf in jeder seiner Runden eine Willenskraftprobe gegen die Verängstigen-Stufe (WIL + Rang) ablegen — " +
+                            "Erfolg beendet den Effekt vorzeitig. Disziplintalent des Geisterbeschwörers (1. Kreis), Talentoption für Illusionisten (Kreis 5–8).")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Verängstigen' hinzugefügt.");
+        }
+
         if (talentRepo.findByName("Akrobatische Verteidigung").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Akrobatische Verteidigung")
@@ -404,9 +418,11 @@ public class DataInitializer {
      * und bereinigt die Disziplin-Zugriffslisten entsprechend.
      */
     private void cleanupUnimplementedTalents() {
+        // Achtung: Nur wirklich NICHT implementierte Talente listen — Löschung entfernt auch
+        // Charakter-Zuweisungen! ("Schwimmen" ist seit 1.1.0 implementiert und darf nicht mehr rein.)
         java.util.List<String> toRemove = java.util.List.of(
             "Initiative", "Schlossknacken", "Schleichen",
-            "Schwimmen", "Zähigkeit", "Arkane Waffe", "Fadenmagie", "Erste Hilfe",
+            "Zähigkeit", "Arkane Waffe", "Fadenmagie", "Erste Hilfe",
             "Tiergespür", "Überzeugung", "Einschüchterung", "Meditation",
             "Standhalten", "Wissensmagie"
         );
@@ -446,10 +462,10 @@ public class DataInitializer {
         accessMap.put("Dieb",           java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Akrobatische Verteidigung", "Ablenken"));
         accessMap.put("Elementarist",   java.util.List.of("Spruchzauberei", "Elementarismus", "Eiserner Wille", "Standhaftigkeit"));
         accessMap.put("Magier",         java.util.List.of("Spruchzauberei", "Magie", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"));
-        accessMap.put("Illusionist",    java.util.List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken"));
+        accessMap.put("Illusionist",    java.util.List.of("Spruchzauberei", "Illusionismus", "Eiserner Wille", "Verspotten", "Ablenken", "Verängstigen"));
         accessMap.put("Schwertmeister", java.util.List.of("Nahkampfwaffen", "Ausweichen", "Kampfsinn", "Akrobatische Verteidigung", "Standhaftigkeit"));
         accessMap.put("Troubadour",     java.util.List.of("Verspotten", "Ablenken", "Ausweichen", "Magische Markierung"));
-        accessMap.put("Geisterbeschwörer", java.util.List.of("Spruchzauberei", "Geisterbeschwörung", "Eiserner Wille", "Standhaftigkeit", "Starrsinn"));
+        accessMap.put("Geisterbeschwörer", java.util.List.of("Spruchzauberei", "Geisterbeschwörung", "Eiserner Wille", "Standhaftigkeit", "Starrsinn", "Verängstigen"));
         accessMap.put("Bogenschütze",   java.util.List.of("Projektilwaffen", "Wurfwaffen", "Ausweichen", "Magische Markierung"));
         accessMap.put("Waffenmeister",  java.util.List.of("Nahkampfwaffen", "Waffenloser Kampf", "Ausweichen", "Standhaftigkeit", "Kampfsinn"));
 

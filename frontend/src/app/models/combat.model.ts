@@ -34,6 +34,8 @@ export interface ActiveEffect {
   negative: boolean;
   /** Wenn gesetzt: Effekt gilt nur, wenn der Träger gegen diesen Kombattanten agiert. */
   targetCombatantId?: number;
+  /** Wenn gesetzt: Mindestwurf der Widerstandsprobe, mit der der Effekt vorzeitig beendet werden kann. */
+  resistTargetNumber?: number;
 }
 
 export interface KnockdownResult {
@@ -87,6 +89,7 @@ export interface CombatantState {
   pendingLufttanzWeaponId: number;
   blattschussUsedThisRound: boolean;
   schwanzangriffUsedThisRound?: boolean;
+  fearResistUsedThisRound?: boolean;
   karmaInitiativeThisRound?: boolean;
   pendingBlattschussDefenderId: number;
   pendingBlattschussTotal: number;
@@ -585,4 +588,41 @@ export interface SchwanzangriffRequest {
   weaponId?: number;
   bonusSteps: number;
   spendKarma: boolean;
+}
+
+export interface FearRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  targetCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface FearResult {
+  actorName: string;
+  targetName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult | null;
+  /** Mystische Verteidigung des Ziels */
+  spellDefense: number;
+  success: boolean;
+  /** Erfolge gesamt (1 + Übererfolge) */
+  successes: number;
+  /** Malus je Probe (= Erfolge × −2) */
+  penalty: number;
+  /** Dauer in Runden (= Talentrang) */
+  duration: number;
+  /** Mindestwurf der Willenskraft-Widerstandsprobe */
+  resistTargetNumber: number;
+  description: string;
+}
+
+export interface FearResistResult {
+  targetName: string;
+  resistStep: number;
+  roll: RollResult;
+  targetNumber: number;
+  success: boolean;
+  description: string;
 }

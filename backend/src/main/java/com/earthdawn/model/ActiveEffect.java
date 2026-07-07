@@ -58,4 +58,11 @@ public class ActiveEffect {
      * dieses Ziel). null = unkonditional.
      */
     private Long targetCombatantId;
+
+    /**
+     * Wenn gesetzt: Mindestwurf einer Widerstandsprobe, mit der der Träger den Effekt
+     * vorzeitig beenden kann (z.B. Verängstigen: WIL-Probe vs. Verängstigen-Stufe).
+     * null = kein Widerstand möglich.
+     */
+    private Integer resistTargetNumber;
 }

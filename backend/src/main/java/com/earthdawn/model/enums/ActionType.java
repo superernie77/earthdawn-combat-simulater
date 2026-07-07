@@ -33,5 +33,6 @@ public enum ActionType {
     LUFTTANZ_ATTACK,
     BLATTSCHUSS_KARMA,
     NACHTRETEN,
-    SCHWANZANGRIFF
+    SCHWANZANGRIFF,
+    FEAR
 }

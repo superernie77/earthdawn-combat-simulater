@@ -824,7 +824,10 @@ import { ProbeResult } from '../../models/dice.model';
 
             <div class="recovery-info" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:14px">
               <span>ZÄH-Stufe: <strong>{{ attrToStep(character.toughness) }}</strong></span>
-              <span *ngIf="character.wounds > 0" style="color:#ef5350">Wunden-Abzug: −{{ character.wounds }}</span>
+              <span *ngIf="character.wounds > 0" style="color:#ef5350">
+                Wunden-Abzug: −{{ effectiveWoundPenalty() }}
+                <span *ngIf="(character.arztWoundsTreated ?? 0) > 0" style="color:#80cbc4">({{ character.arztWoundsTreated }} versorgt)</span>
+              </span>
               <span>Effektive Stufe: <strong>{{ getRecoveryRollStep() }}</strong></span>
             </div>
 
@@ -847,12 +850,13 @@ import { ProbeResult } from '../../models/dice.model';
               </span>
             </div>
 
-            <!-- Arzt-Wundpflege: nächste Probe ohne Wundabzug -->
-            <div *ngIf="character.arztWoundPenaltyNegated"
+            <!-- Arzt-Wundversorgung: versorgte Wunden zählen nicht in den Wundabzug -->
+            <div *ngIf="(character.arztWoundsTreated ?? 0) > 0"
               style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:#13302e;border-radius:6px;border:1px solid #2e6e66">
               <mat-icon style="color:#80cbc4">medical_services</mat-icon>
               <span style="color:#a7d8d2;font-size:13px">
-                Arzt-Wundpflege aktiv: nächste Erholungsprobe <strong>ohne Wundabzug</strong> (−{{ character.wounds }} entfällt)
+                Arzt-Wundversorgung: <strong>{{ character.arztWoundsTreated }} / {{ character.wounds }}</strong> Wunden versorgt
+                — Wundabzug nur noch −{{ effectiveWoundPenalty() }}
               </span>
             </div>
 
@@ -962,17 +966,18 @@ import { ProbeResult } from '../../models/dice.model';
 
             <div style="font-size:13px;color:#aaa;margin-bottom:16px">
               Ein Charakter mit der <strong style="color:#c9a84c">Arzt</strong>-Fertigkeit behandelt diesen Charakter.
-              <br>Wurf: WAH-Stufe + Rang vs. festem Mindestwurf <strong style="color:#ef9a9a">5</strong> (Verletzungen und Wunden).
-              Verbraucht <strong>1× Verbandszeug</strong> des Heilers. Erfolg: +Rang auf nächste Erholungsprobe
-              und der <strong>Wundabzug</strong> der nächsten Erholungsprobe entfällt.
+              Wurf: WAH-Stufe + Rang vs. festem Mindestwurf <strong style="color:#ef9a9a">5</strong>;
+              jede Behandlung verbraucht <strong>1× Verbandszeug</strong> des Heilers (auch bei Fehlschlag).
+              <br>• <strong style="color:#a5d6a7">Verletzungen behandeln</strong>: 1× pro Erholungsprobe — Erfolg gibt <strong>+Rang</strong> auf den nächsten Erholungswurf.
+              <br>• <strong style="color:#80cbc4">Wunde versorgen</strong>: unterdrückt den <strong>−1-Wundmalus</strong> einer Wunde bei Erholungsproben — mehrfach möglich, bis alle Wunden versorgt sind.
             </div>
 
-            <div *ngIf="(character?.wounds ?? 0) === 0"
+            <div *ngIf="(character?.wounds ?? 0) === 0 && (character?.currentDamage ?? 0) === 0"
               style="padding:12px;background:#1e1a16;border:1px solid #3a3028;border-radius:6px;color:#777;font-size:13px;margin-bottom:16px">
-              Kein Verwundeter — Arztbehandlung nur bei Wunden möglich.
+              Weder Verletzungen noch Wunden — keine Arztbehandlung nötig.
             </div>
 
-            <ng-container *ngIf="(character?.wounds ?? 0) > 0">
+            <ng-container *ngIf="(character?.wounds ?? 0) > 0 || (character?.currentDamage ?? 0) > 0">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
                 <mat-form-field appearance="fill" style="flex:1;min-width:200px">
                   <mat-label>Behandelnder Charakter</mat-label>
@@ -983,13 +988,28 @@ import { ProbeResult } from '../../models/dice.model';
                   </mat-select>
                 </mat-form-field>
                 <button mat-raised-button color="accent"
-                  [disabled]="!selectedHealerId || selectedHealerVerbandszeug() <= 0"
-                  (click)="doArzt()"
-                  [matTooltip]="selectedHealerVerbandszeug() > 0 ? 'WAH-Stufe + Rang vs. MW 5 — verbraucht 1 Verbandszeug' : 'Heiler hat kein Verbandszeug'">
-                  <mat-icon>medical_services</mat-icon> Arztprobe
+                  [disabled]="!canTreatInjury()"
+                  (click)="doArzt('VERLETZUNG')"
+                  [matTooltip]="injuryTooltip()">
+                  <mat-icon>healing</mat-icon> Verletzungen behandeln
+                </button>
+                <button mat-raised-button color="primary"
+                  [disabled]="!canTreatWound()"
+                  (click)="doArzt('WUNDE')"
+                  [matTooltip]="woundTooltip()">
+                  <mat-icon>personal_injury</mat-icon> Wunde versorgen
                 </button>
               </div>
 
+              <div *ngIf="character.arztInjuryTreated"
+                style="padding:10px;background:#13302e;border:1px solid #2e6e66;border-radius:6px;color:#a7d8d2;font-size:13px;margin-bottom:12px">
+                Verletzungen bereits behandelt — erst nach der nächsten Erholungsprobe wieder möglich.
+              </div>
+              <div *ngIf="(character.arztWoundsTreated ?? 0) > 0"
+                style="padding:10px;background:#1a2a1a;border:1px solid #2e5a2e;border-radius:6px;color:#a5d6a7;font-size:13px;margin-bottom:12px">
+                Versorgte Wunden: <strong>{{ character.arztWoundsTreated }} / {{ character.wounds }}</strong>
+                — je versorgter Wunde entfällt der −1-Malus bei Erholungsproben.
+              </div>
               <div *ngIf="selectedHealerId && selectedHealerVerbandszeug() <= 0"
                 style="padding:10px;background:#2a1a1a;border:1px solid #5a2a2a;border-radius:6px;color:#ef9a9a;font-size:13px;margin-bottom:16px">
                 Der gewählte Heiler hat kein Verbandszeug — Arztprobe nicht möglich.
@@ -1000,13 +1020,16 @@ import { ProbeResult } from '../../models/dice.model';
                   {{ lastArzt.success ? 'check_circle' : 'cancel' }}
                 </mat-icon>
                 <div>
-                  <div class="arzt-name">{{ lastArzt.healerName }} behandelt {{ lastArzt.woundedName }}</div>
+                  <div class="arzt-name">
+                    {{ lastArzt.healerName }} behandelt {{ lastArzt.woundedName }}
+                    <span style="color:#999;font-weight:normal">({{ lastArzt.mode === 'WUNDE' ? 'Wundversorgung' : 'Verletzungen' }})</span>
+                  </div>
                   <div class="arzt-detail">
                     Stufe {{ lastArzt.rollStep }} (WN {{ lastArzt.perStep }} + Rang {{ lastArzt.skillRank }})
                     vs. MW {{ lastArzt.targetNumber }}
                     → <strong [style.color]="lastArzt.success ? '#66bb6a' : '#ef5350'">{{ lastArzt.roll?.total }}</strong>
-                    <span *ngIf="lastArzt.success"> · <strong class="arzt-bonus">+{{ lastArzt.bonusGranted }} Bonus-Stufen</strong> auf nächste Erholungsprobe</span>
-                    <span *ngIf="lastArzt.woundPenaltyNegated"> · <strong style="color:#80cbc4">Wundabzug der nächsten Erholungsprobe entfällt</strong></span>
+                    <span *ngIf="lastArzt.success && lastArzt.mode === 'VERLETZUNG'"> · <strong class="arzt-bonus">+{{ lastArzt.bonusGranted }} Bonus-Stufen</strong> auf nächste Erholungsprobe</span>
+                    <span *ngIf="lastArzt.success && lastArzt.mode === 'WUNDE'"> · <strong style="color:#80cbc4">Wunde versorgt ({{ lastArzt.woundsTreated }}/{{ lastArzt.wounds }})</strong></span>
                     <span *ngIf="!lastArzt.success"> · Fehlschlag</span>
                     <div style="color:#999;font-size:12px;margin-top:2px">Verbandszeug übrig: {{ lastArzt.verbandszeugRemaining }}×</div>
                   </div>
@@ -1715,17 +1738,49 @@ export class CharacterSheetComponent implements OnInit {
     return this.verbandszeugCount(healer);
   }
 
-  doArzt(): void {
+  /** Verletzungsbehandlung möglich? Schaden vorhanden, noch nicht behandelt, Heiler mit Verbandszeug. */
+  canTreatInjury(): boolean {
+    return !!this.selectedHealerId && this.selectedHealerVerbandszeug() > 0
+      && (this.character?.currentDamage ?? 0) > 0
+      && !this.character?.arztInjuryTreated;
+  }
+
+  /** Wundversorgung möglich? Unversorgte Wunde vorhanden, Heiler mit Verbandszeug. */
+  canTreatWound(): boolean {
+    return !!this.selectedHealerId && this.selectedHealerVerbandszeug() > 0
+      && (this.character?.wounds ?? 0) > (this.character?.arztWoundsTreated ?? 0);
+  }
+
+  injuryTooltip(): string {
+    if (!this.selectedHealerId) return 'Zuerst Heiler wählen';
+    if (this.selectedHealerVerbandszeug() <= 0) return 'Heiler hat kein Verbandszeug';
+    if ((this.character?.currentDamage ?? 0) <= 0) return 'Keine Verletzungen (Schaden) vorhanden';
+    if (this.character?.arztInjuryTreated) return 'Bereits behandelt — erst nach der nächsten Erholungsprobe wieder';
+    return 'WAH-Stufe + Rang vs. MW 5 — Erfolg: +Rang auf nächste Erholungsprobe. Verbraucht 1 Verbandszeug.';
+  }
+
+  woundTooltip(): string {
+    if (!this.selectedHealerId) return 'Zuerst Heiler wählen';
+    if (this.selectedHealerVerbandszeug() <= 0) return 'Heiler hat kein Verbandszeug';
+    if ((this.character?.wounds ?? 0) <= 0) return 'Keine Wunden vorhanden';
+    if ((this.character?.wounds ?? 0) <= (this.character?.arztWoundsTreated ?? 0)) return 'Alle Wunden sind bereits versorgt';
+    return 'WAH-Stufe + Rang vs. MW 5 — Erfolg: −1-Wundmalus einer Wunde bei Erholungsproben unterdrückt. Verbraucht 1 Verbandszeug.';
+  }
+
+  doArzt(mode: 'VERLETZUNG' | 'WUNDE'): void {
     if (!this.character?.id || !this.selectedHealerId) return;
-    this.characterService.applyArzt(this.character.id, this.selectedHealerId).subscribe({
+    this.characterService.applyArzt(this.character.id, this.selectedHealerId, mode).subscribe({
       next: result => {
         this.lastArzt = result;
         // Verbandszeug wird bei jeder Anwendung verbraucht → Heilerliste auffrischen
         this.characterService.findAll().subscribe(all => this.allCharacters = all);
         if (result.success) {
           this.characterService.findById(this.character!.id!).subscribe(c => { this.character = c; });
+          const effectTxt = mode === 'VERLETZUNG'
+            ? `+${result.bonusGranted} Bonus-Stufen auf nächste Erholungsprobe`
+            : `Wunde versorgt (${result.woundsTreated}/${result.wounds})`;
           this.snack.open(
-            `${result.healerName}: Erfolg! +${result.bonusGranted} Bonus-Stufen + Wundabzug aufgehoben (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
+            `${result.healerName}: Erfolg! ${effectTxt} (MW ${result.targetNumber}, Wurf: ${result.roll?.total})`,
             'OK', { duration: 4000 }
           );
         } else {
@@ -2052,10 +2107,16 @@ export class CharacterSheetComponent implements OnInit {
     return r != null ? r : this.getRecoveryTestsMax();
   }
 
+  /** Effektiver Wundabzug: Wunden minus ärztlich versorgte Wunden (an Wundenzahl gekappt). */
+  effectiveWoundPenalty(): number {
+    if (!this.character) return 0;
+    const treated = Math.min(Math.max(0, this.character.arztWoundsTreated ?? 0), this.character.wounds);
+    return Math.max(0, this.character.wounds - treated);
+  }
+
   getRecoveryRollStep(): number {
     if (!this.character) return 1;
-    const woundPenalty = this.character.arztWoundPenaltyNegated ? 0 : this.character.wounds;
-    return Math.max(1, this.attrToStep(this.character.toughness) - woundPenalty);
+    return Math.max(1, this.attrToStep(this.character.toughness) - this.effectiveWoundPenalty());
   }
 
   recoverySlotArray(): number[] {

@@ -148,7 +148,11 @@ public class CharacterService {
             case "karma"         -> c.setKarmaCurrent(Math.max(0, Math.min(value, c.getKarmaMax())));
             case "karmaMax"      -> c.setKarmaMax(Math.max(0, value));
             case "damage"        -> c.setCurrentDamage(Math.max(0, value));
-            case "wounds"        -> c.setWounds(Math.max(0, value));
+            case "wounds"        -> {
+                c.setWounds(Math.max(0, value));
+                // Versorgte Wunden können nicht mehr sein als vorhandene Wunden
+                if (c.getArztWoundsTreated() > c.getWounds()) c.setArztWoundsTreated(c.getWounds());
+            }
             case "circle"        -> {
                 c.setCircle(Math.max(1, value));
                 // Alle rankFromCircle-Talente (z.B. Zaubermatritze) auf neuen Kreis synchronisieren
@@ -641,15 +645,16 @@ public class CharacterService {
         }
 
         int touStep = stepRollService.attributeToStep(c.getToughness());
-        // Nach erfolgreicher Arztbehandlung entfällt der Wundabzug für diese eine Erholungsprobe
-        int woundPenalty = c.isArztWoundPenaltyNegated() ? 0 : c.getWounds();
+        // Ärztlich versorgte Wunden zählen nicht in den Wundabzug (Zähler an Wundenzahl gekappt)
+        int treatedWounds = Math.min(Math.max(0, c.getArztWoundsTreated()), c.getWounds());
+        int woundPenalty = Math.max(0, c.getWounds() - treatedWounds);
         int rollStep = Math.max(1, touStep - woundPenalty);
         int bonusSteps = c.getPendingRecoveryBonus();
 
         remaining--;
         c.setRecoveryTestsRemaining(remaining);
         c.setPendingRecoveryBonus(0);
-        c.setArztWoundPenaltyNegated(false); // Wundpflege verbraucht
+        c.setArztInjuryTreated(false); // Verletzungsbehandlung: 1× pro Erholungsprobe — wieder frei
 
         RollResult roll = stepRollService.roll(rollStep + bonusSteps);
         int total = roll.getTotal();
@@ -756,18 +761,35 @@ public class CharacterService {
     private static final int ARZT_DN_WUNDEN = 5;
 
     /**
-     * Arzt-Fertigkeit: Heiler behandelt die Wunden eines verletzten Charakters.
-     * Wurf: WAH-Stufe + Rang vs. festem Mindestwurf 5 (Verletzungen und Wunden).
-     * Verbraucht 1× Verbandszeug des Heilers (pro Anwendung).
-     * Erfolg: +Rang Bonus auf die nächste Erholungsprobe UND der Wundabzug der nächsten
-     * Erholungsprobe wird aufgehoben (Wunde bleibt, aber ohne Recovery-Malus).
+     * Arzt-Fertigkeit: Heiler behandelt einen verletzten Charakter — in einem von zwei Modi:
+     *  - VERLETZUNG: behandelt verlorene LP. Nur 1× pro Erholungsprobe (arztInjuryTreated).
+     *    Erfolg → +Rang Bonus auf die nächste Erholungsprobe (pendingRecoveryBonus).
+     *  - WUNDE: versorgt eine Wunde. Erfolg → der −1-Wundmalus dieser Wunde ist bei
+     *    Erholungsproben unterdrückt (arztWoundsTreated++). Mehrfach möglich, bis alle
+     *    Wunden versorgt sind.
+     * Beide Modi: Wurf WAH-Stufe + Rang vs. festem Mindestwurf 5; verbraucht 1× Verbandszeug
+     * des Heilers — auch bei Fehlschlag.
      */
-    public ArztResult applyArzt(Long woundedCharId, Long healerCharId) {
+    public ArztResult applyArzt(Long woundedCharId, Long healerCharId, String mode) {
         GameCharacter wounded = findById(woundedCharId);
         GameCharacter healer = findById(healerCharId);
+        String m = mode == null ? "VERLETZUNG" : mode.trim().toUpperCase();
 
-        if (wounded.getWounds() <= 0) {
-            throw new IllegalStateException("Charakter hat keine Wunden — Arztbehandlung nicht möglich.");
+        // Modus-spezifische Vorbedingungen (vor Verbandszeug-Verbrauch prüfen)
+        switch (m) {
+            case "VERLETZUNG" -> {
+                if (wounded.getCurrentDamage() <= 0)
+                    throw new IllegalStateException("Charakter hat keine Verletzungen (Schaden) — Behandlung nicht möglich.");
+                if (wounded.isArztInjuryTreated())
+                    throw new IllegalStateException("Verletzungen wurden bereits behandelt — erst nach der nächsten Erholungsprobe wieder möglich.");
+            }
+            case "WUNDE" -> {
+                if (wounded.getWounds() <= 0)
+                    throw new IllegalStateException("Charakter hat keine Wunden — Wundversorgung nicht möglich.");
+                if (wounded.getArztWoundsTreated() >= wounded.getWounds())
+                    throw new IllegalStateException("Alle Wunden sind bereits versorgt.");
+            }
+            default -> throw new IllegalArgumentException("Unbekannter Arzt-Modus: " + mode);
         }
 
         CharacterSkill arztSkill = healer.getSkills().stream()
@@ -775,7 +797,7 @@ public class CharacterService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(healer.getName() + " hat keine Arzt-Fertigkeit."));
 
-        // Verbandszeug erforderlich — 1 Anwendung pro Arztprobe
+        // Verbandszeug erforderlich — 1 Anwendung pro Arztprobe (auch bei Fehlschlag verbraucht)
         Equipment verbandszeug = healer.getEquipment().stream()
                 .filter(e -> EquipmentType.VERBANDSZEUG.equals(e.getType()) && e.getQuantity() > 0)
                 .findFirst()
@@ -793,15 +815,19 @@ public class CharacterService {
 
         int bonusGranted = 0;
         if (success) {
-            bonusGranted = skillRank;
-            wounded.setPendingRecoveryBonus(wounded.getPendingRecoveryBonus() + bonusGranted);
-            // Wundbehandlung: nächste Erholungsprobe ohne Wundabzug
-            wounded.setArztWoundPenaltyNegated(true);
+            if ("VERLETZUNG".equals(m)) {
+                bonusGranted = skillRank;
+                wounded.setPendingRecoveryBonus(wounded.getPendingRecoveryBonus() + bonusGranted);
+                wounded.setArztInjuryTreated(true);
+            } else { // WUNDE
+                wounded.setArztWoundsTreated(wounded.getArztWoundsTreated() + 1);
+            }
             characterRepo.save(wounded);
         }
         characterRepo.save(healer); // Verbandszeug-Verbrauch persistieren
 
         return ArztResult.builder()
+                .mode(m)
                 .healerName(healer.getName())
                 .woundedName(wounded.getName())
                 .wounds(wounds)
@@ -813,7 +839,7 @@ public class CharacterService {
                 .success(success)
                 .bonusGranted(bonusGranted)
                 .newPendingBonus(wounded.getPendingRecoveryBonus())
-                .woundPenaltyNegated(success)
+                .woundsTreated(wounded.getArztWoundsTreated())
                 .verbandszeugRemaining(verbandszeug.getQuantity())
                 .build();
     }

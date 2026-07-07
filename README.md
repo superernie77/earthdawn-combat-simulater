@@ -871,7 +871,12 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 ### Changelog
 
 #### 1.2.0 (in development)
-- _No changes yet._
+- **New talent: Verängstigen** — WIL + rank vs. the target's mystic defense (standard action, 0 strain). On success the target is *verängstigt*: **−2 on all action tests per success** for **rank** rounds. Each round the target may attempt a willpower test against the adept's Verängstigen step (WIL step + rank) via a "Furcht abschütteln" button — success ends the effect early (once per round). Discipline talent of the Geisterbeschwörer (1st circle), talent option for Illusionists (circles 5–8). Flyway `V35`.
+- **Fix — Schwimmen talent no longer deleted on restart** — the startup cleanup of unimplemented talents still listed *Schwimmen* and stripped it (including character assignments) on every boot before re-seeding it; it is now kept.
+- **Arzt rework — two treatment modes** — the Arzt skill now distinguishes:
+  - **Verletzungen behandeln** (treat lost HP): only **once per recovery test**; on success grants **+rank** on the next recovery roll (`arztInjuryTreated`, reset by the recovery test).
+  - **Wunde versorgen** (dress a wound): on success suppresses the **−1 wound modifier of one wound** on recovery tests; repeatable until **all wounds are dressed** (`arztWoundsTreated` counter, persists until wounds heal).
+  - Both modes roll PER-step + rank vs. fixed DN 5 and consume **1× Verbandszeug each — even on failure**. Flyway `V34` (replaces the old all-or-nothing `arztWoundPenaltyNegated` flag).
 
 #### 1.1.0
 - **Schwanzangriff (T'skrang tail attack)** — racial ability for T'skrang: an extra unarmed tail attack (1×/round, doesn't consume the main action), resolved via Waffenloser Kampf vs. physical defense with STR-based damage. A melee weapon can be tail-mounted via the new `tailWeapon` flag (`🦎 Schwanzwaffe`). Using it imposes **−2 on all rolls that round**. A mix of Krallenhand and Zweitwaffe. Flyway `V33`.

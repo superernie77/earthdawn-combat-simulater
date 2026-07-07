@@ -21,6 +21,7 @@ import {
   CombatSession, CombatantState, AttackActionRequest,
   CombatActionResult, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
+  FearRequest, FearResult, FearResistResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
@@ -245,6 +246,23 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openTauntDialog(c)"
                   matTooltip="Verspotten (Freie Aktion · CHA + Rang vs. Soziale VK · kostet 1 Schaden)">
                   <mat-icon>sentiment_very_dissatisfied</mat-icon>
+                </button>
+                <!-- Verängstigen: WIL vs. MV, −2/Erfolg auf Aktionsproben -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasFearTalent(c) && !c.defeated"
+                  class="combat-option-btn fear-btn"
+                  [disabled]="!isActiveTurn(c)"
+                  (click)="openFearDialog(c)"
+                  matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
+                  <mat-icon>sentiment_extremely_dissatisfied</mat-icon>
+                </button>
+                <!-- Furcht abschütteln: Widerstandsprobe gegen Verängstigt (1×/Runde) -->
+                <button mat-raised-button color="accent"
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isFeared(c) && !c.defeated"
+                  class="combat-option-btn fear-resist-btn"
+                  [disabled]="c.fearResistUsedThisRound"
+                  (click)="resistFear(c)"
+                  matTooltip="Furcht abschütteln: Willenskraftprobe vs. {{ fearResistTn(c) }} — Erfolg beendet den Verängstigt-Effekt. 1×/Runde.">
+                  <mat-icon>psychology</mat-icon> Furcht abschütteln
                 </button>
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
                   class="combat-option-btn acrobatic-btn"
@@ -2407,6 +2425,134 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       </div>
     </div>
 
+    <!-- Verängstigen Dialog -->
+    <div class="attack-dialog" *ngIf="fearDialog.open">
+      <div class="dialog-backdrop" (click)="fearDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">sentiment_extremely_dissatisfied</mat-icon>Verängstigen: {{ fearDialog.actor?.character?.name }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WIL + Rang vs. Mystische VK · Standardaktion · 0 Überanstrengung ·
+          −2/Erfolg auf Aktionsproben für Rang Runden. Ziel darf jede Runde eine WIL-Probe zum Abschütteln ablegen.
+        </div>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Ziel</mat-label>
+          <mat-select [(ngModel)]="fearDialog.targetId">
+            <mat-option *ngFor="let c of fearTargets()" [value]="c.id">
+              {{ cn(c) }} (MV {{ sd(c) }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <label class="karma-toggle"
+            [class.active]="fearDialog.spendKarma"
+            [class.disabled]="(fearDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(fearDialog.actor?.currentKarma ?? 0) > 0 && (fearDialog.spendKarma = !fearDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon>
+            Karma
+            <span class="karma-count-badge" [class.empty]="(fearDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ fearDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="fearDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="warn" (click)="performFear()" [disabled]="!fearDialog.targetId">
+            <mat-icon>sentiment_extremely_dissatisfied</mat-icon> Verängstigen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verängstigen Result Modal -->
+    <div class="result-modal" *ngIf="fearModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="fearModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'sentiment_extremely_dissatisfied' : 'close' }}</mat-icon>
+          {{ r.success ? 'VERÄNGSTIGT!' : 'VERFEHLT' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Verängstigen · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">MV {{ r.spellDefense }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <ng-container *ngIf="r.success">
+            <div class="roll-divider"></div>
+            <div class="roll-row extra-success-row">
+              <span class="roll-label">Erfolge</span>
+              <span class="roll-expr">{{ r.successes }}× → −{{ r.penalty }} auf Aktionsproben</span>
+              <span class="roll-value extra-success">{{ r.successes }}</span>
+            </div>
+            <div class="taunt-effect-banner">
+              <mat-icon>sentiment_extremely_dissatisfied</mat-icon>
+              −{{ r.penalty }} auf Aktionsproben für {{ r.duration }} Runden · Abschütteln: WIL-Probe vs. {{ r.resistTargetNumber }}
+            </div>
+          </ng-container>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Furcht-abschütteln Result Modal -->
+    <div class="result-modal" *ngIf="fearResistModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="fearResistModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'psychology' : 'close' }}</mat-icon>
+          {{ r.success ? 'FURCHT ABGESCHÜTTELT!' : 'WEITER VERÄNGSTIGT' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Willenskraft · Step {{ r.resistStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total" [style.color]="r.success ? '#4caf50' : '#ef5350'">{{ r.roll.total }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">{{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
+          Schließen
+        </button>
+      </div>
+    </div>
+
     <!-- Spell Cast Result Modal -->
     <div class="result-modal" *ngIf="spellCastModal.open">
       <div class="dialog-backdrop" (click)="dismissAutofightModal(spellCastModal)"></div>
@@ -3159,6 +3305,17 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   tauntModal: { open: boolean; result?: TauntResult } = { open: false };
 
+  fearDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  fearModal: { open: boolean; result?: FearResult } = { open: false };
+
+  fearResistModal: { open: boolean; result?: FearResistResult } = { open: false };
+
   acrobaticDialog: {
     open: boolean;
     actor?: CombatantState;
@@ -3311,6 +3468,12 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'COMBAT_ENDED':
         this.combatEndedModal = { open: true, name: payload?.name, round: payload?.round };
         break;
+      case 'FEAR':
+        this.fearModal = { open: true, result: payload };
+        break;
+      case 'FEAR_RESIST':
+        this.fearResistModal = { open: true, result: payload };
+        break;
     }
   }
 
@@ -3329,6 +3492,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (this.dodgeModal) this.dodgeModal.open = false;
     if (this.riposteModal) this.riposteModal.open = false;
     if (this.combatEndedModal) this.combatEndedModal.open = false;
+    if (this.fearModal) this.fearModal.open = false;
+    if (this.fearResistModal) this.fearResistModal.open = false;
     if (this.standUpModal) this.standUpModal.open = false;
     if (this.threadweaveModal) this.threadweaveModal.open = false;
     if (this.spellCastModal) this.spellCastModal.open = false;
@@ -4442,6 +4607,60 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
         const msg = err?.error?.message ?? err?.message ?? JSON.stringify(err);
         this.snack.open('Fehler: ' + msg, 'OK', { duration: 5000 });
       }
+    });
+  }
+
+  // ── Verängstigen ───────────────────────────────────────────────────────────
+
+  hasFearTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Verängstigen');
+  }
+
+  /** True, wenn der Kombattant den Verängstigt-Effekt trägt. */
+  isFeared(c: CombatantState): boolean {
+    return (c.activeEffects ?? []).some(e => e.name === 'Verängstigt');
+  }
+
+  /** Mindestwurf der Widerstandsprobe aus dem Verängstigt-Effekt (0 wenn keiner). */
+  fearResistTn(c: CombatantState): number {
+    return (c.activeEffects ?? []).find(e => e.name === 'Verängstigt')?.resistTargetNumber ?? 0;
+  }
+
+  fearTargets(): CombatantState[] {
+    return (this.session?.combatants ?? []).filter(c => c.id !== this.fearDialog.actor?.id && !c.defeated);
+  }
+
+  openFearDialog(actor: CombatantState): void {
+    this.fearDialog = { open: true, actor, targetId: undefined, spendKarma: false };
+  }
+
+  performFear(): void {
+    if (!this.session || !this.fearDialog.actor || !this.fearDialog.targetId) return;
+    const req: FearRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.fearDialog.actor.id,
+      targetCombatantId: this.fearDialog.targetId,
+      bonusSteps: 0,
+      spendKarma: this.fearDialog.spendKarma
+    };
+    this.combatService.performFear(this.session.id, req).subscribe({
+      next: result => {
+        this.fearDialog.open = false;
+        this.fearModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  resistFear(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.resistFear(this.session.id, c.id).subscribe({
+      next: result => {
+        this.fearResistModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
     });
   }
 

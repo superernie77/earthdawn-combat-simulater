@@ -94,6 +94,11 @@ public class CombatantState {
     @Builder.Default
     private boolean schwanzangriffUsedThisRound = false;
 
+    /** Widerstandsprobe gegen Verängstigen bereits in dieser Runde abgelegt (1×/Runde). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean fearResistUsedThisRound = false;
+
     /** Lufttanz wurde in dieser Runde aktiviert (Initiative-Bonus, ermöglicht Bonusangriff). */
     @Column(columnDefinition = "boolean default false")
     @Builder.Default

@@ -207,26 +207,26 @@ class CharacterServiceRecoveryTest {
     // =========================================================================
 
     @Test
-    void arztWoundCare_negatesWoundPenalty_andConsumesFlag() {
-        // ZÄH=10 → step 5, Wunden=3, aber Wundpflege aktiv → woundPenalty 0 → rollStep 5
+    void arztWoundCare_treatedWoundsReduceWoundPenalty() {
+        // ZÄH=10 → step 5, Wunden=3, davon 2 versorgt → woundPenalty 1 → rollStep 4
         GameCharacter c = character(10, 3, 12, 2);
-        c.setArztWoundPenaltyNegated(true);
+        c.setArztWoundsTreated(2);
         stubFindById(c);
         stubAttrToStep(10, 5);
         stubRoll(8);
 
         RecoveryTestResult result = characterService.performRecoveryTest(1L);
 
-        assertThat(result.getWoundPenalty()).isZero();
-        assertThat(result.getRollStep()).isEqualTo(5);
-        assertThat(c.isArztWoundPenaltyNegated()).isFalse(); // verbraucht
+        assertThat(result.getWoundPenalty()).isEqualTo(1); // 3 − 2 versorgt
+        assertThat(result.getRollStep()).isEqualTo(4);
+        assertThat(c.getArztWoundsTreated()).isEqualTo(2); // Verband bleibt — nicht verbraucht
     }
 
     @Test
-    void arztWoundCare_appliesOnlyToNextTest() {
-        // Erste Probe ohne Abzug (Pflege aktiv), zweite wieder mit Abzug
+    void arztWoundCare_allWoundsTreated_noPenalty_persistsAcrossTests() {
+        // Alle 2 Wunden versorgt → kein Abzug, auch bei der zweiten Probe
         GameCharacter c = character(10, 2, 40, 2);
-        c.setArztWoundPenaltyNegated(true);
+        c.setArztWoundsTreated(2);
         stubFindById(c);
         stubAttrToStep(10, 5);
         stubRoll(6);
@@ -234,8 +234,37 @@ class CharacterServiceRecoveryTest {
         RecoveryTestResult first  = characterService.performRecoveryTest(1L);
         RecoveryTestResult second = characterService.performRecoveryTest(1L);
 
-        assertThat(first.getWoundPenalty()).isZero();      // Pflege greift
-        assertThat(second.getWoundPenalty()).isEqualTo(2); // danach wieder Abzug
+        assertThat(first.getWoundPenalty()).isZero();
+        assertThat(second.getWoundPenalty()).isZero(); // Versorgung bleibt bestehen
+    }
+
+    @Test
+    void arztWoundCare_counterClampedToWounds() {
+        // Zähler > Wunden (Wunde geheilt) → effektiv nur wounds angerechnet, kein negativer Malus
+        GameCharacter c = character(10, 1, 12, 2);
+        c.setArztWoundsTreated(3);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        stubRoll(6);
+
+        RecoveryTestResult result = characterService.performRecoveryTest(1L);
+
+        assertThat(result.getWoundPenalty()).isZero();
+        assertThat(result.getRollStep()).isEqualTo(5); // kein Bonus über 0 hinaus
+    }
+
+    @Test
+    void recoveryTest_resetsArztInjuryFlag() {
+        // Verletzungsbehandlung ist 1×/Erholungsprobe — Probe gibt sie wieder frei
+        GameCharacter c = character(10, 0, 12, 2);
+        c.setArztInjuryTreated(true);
+        stubFindById(c);
+        stubAttrToStep(10, 5);
+        stubRoll(6);
+
+        characterService.performRecoveryTest(1L);
+
+        assertThat(c.isArztInjuryTreated()).isFalse();
     }
 
     // =========================================================================

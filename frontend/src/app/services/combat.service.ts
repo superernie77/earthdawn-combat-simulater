@@ -5,6 +5,7 @@ import {
   CombatSession, DialogState, AttackActionRequest, CombatActionResult,
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
+  FearRequest, FearResult, FearResistResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
@@ -141,6 +142,16 @@ export class CombatService {
 
   performTaunt(sessionId: number, req: TauntRequest): Observable<TauntResult> {
     return this.http.post<TauntResult>(`${this.base}/sessions/${sessionId}/taunt`, req);
+  }
+
+  performFear(sessionId: number, req: FearRequest): Observable<FearResult> {
+    return this.http.post<FearResult>(`${this.base}/sessions/${sessionId}/fear`, req);
+  }
+
+  resistFear(sessionId: number, combatantId: number): Observable<FearResistResult> {
+    return this.http.post<FearResistResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/resist-fear`, {}
+    );
   }
 
   performAcrobaticDefense(sessionId: number, combatantId: number,

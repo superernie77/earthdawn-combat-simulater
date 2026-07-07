@@ -220,8 +220,10 @@ export interface Character {
   recoveryTestsRemaining?: number | null;
   // Ausstehender Bonus auf nächste reguläre Erholungsprobe (durch Erholungstrank)
   pendingRecoveryBonus?: number;
-  // Nach erfolgreicher Arztbehandlung: nächste Erholungsprobe ohne Wundabzug
-  arztWoundPenaltyNegated?: boolean;
+  // Ärztlich versorgte Wunden: jede unterdrückt ihren −1-Malus bei Erholungsproben (bleibt bestehen)
+  arztWoundsTreated?: number;
+  // Verletzungen seit letzter Erholungsprobe behandelt (1× pro Erholungsprobe)
+  arztInjuryTreated?: boolean;
 
   // Spielleiter
   gmCharacter?: boolean;
@@ -287,7 +289,11 @@ export interface DrinkPotionResult {
   recovery: RecoveryTestResult | null;
 }
 
+export type ArztMode = 'VERLETZUNG' | 'WUNDE';
+
 export interface ArztResult {
+  /** Behandlungsmodus: VERLETZUNG (verlorene LP) oder WUNDE (Wundversorgung). */
+  mode: ArztMode;
   healerName: string;
   woundedName: string;
   wounds: number;
@@ -297,10 +303,11 @@ export interface ArztResult {
   rollStep: number;
   roll: RollResult;
   success: boolean;
+  /** VERLETZUNG: gewährter Bonus (= Rang) auf die nächste Erholungsprobe; sonst 0. */
   bonusGranted: number;
   newPendingBonus: number;
-  /** true = Wundabzug der nächsten Erholungsprobe wird aufgehoben (bei Erfolg). */
-  woundPenaltyNegated: boolean;
+  /** Anzahl aktuell versorgter Wunden (deren −1-Malus bei Erholungsproben unterdrückt ist). */
+  woundsTreated: number;
   /** Verbleibende Verbandszeug-Anwendungen des Heilers nach dieser Behandlung. */
   verbandszeugRemaining: number;
 }

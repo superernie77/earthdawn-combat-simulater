@@ -154,18 +154,70 @@ describe('CharacterSheetComponent — Verbandszeug & Amulette', () => {
     expect(comp.getDefenseBonus('healthBonus')).toBe(0);
   });
 
-  // --- getRecoveryRollStep() mit Arzt-Wundpflege ---
+  // --- Arzt: Wundversorgung + Verletzungsbehandlung (zwei Modi) ---
 
-  it('getRecoveryRollStep() ignoriert den Wundabzug bei aktiver Wundpflege', () => {
-    (comp as any).character = { toughness: 10, wounds: 3, arztWoundPenaltyNegated: true };
-    // attrToStep(10) = 5, ohne Abzug → 5
+  it('effectiveWoundPenalty() zieht versorgte Wunden ab und kappt am Wundenstand', () => {
+    (comp as any).character = { wounds: 3, arztWoundsTreated: 2 };
+    expect(comp.effectiveWoundPenalty()).toBe(1);
+    (comp as any).character = { wounds: 1, arztWoundsTreated: 5 }; // Zähler > Wunden → gekappt
+    expect(comp.effectiveWoundPenalty()).toBe(0);
+    (comp as any).character = { wounds: 3 }; // keine Versorgung
+    expect(comp.effectiveWoundPenalty()).toBe(3);
+  });
+
+  it('getRecoveryRollStep() nutzt den effektiven Wundabzug (versorgte Wunden zählen nicht)', () => {
+    (comp as any).character = { toughness: 10, wounds: 3, arztWoundsTreated: 3 };
+    // attrToStep(10) = 5, alle Wunden versorgt → kein Abzug → 5
     expect(comp.getRecoveryRollStep()).toBe(5);
   });
 
-  it('getRecoveryRollStep() zieht Wunden ab ohne Wundpflege', () => {
-    (comp as any).character = { toughness: 10, wounds: 3, arztWoundPenaltyNegated: false };
-    // 5 − 3 = 2
-    expect(comp.getRecoveryRollStep()).toBe(2);
+  it('getRecoveryRollStep() zieht unversorgte Wunden ab', () => {
+    (comp as any).character = { toughness: 10, wounds: 3, arztWoundsTreated: 1 };
+    // 5 − (3−1) = 3
+    expect(comp.getRecoveryRollStep()).toBe(3);
+  });
+
+  it('canTreatInjury(): nur mit Heiler+Verbandszeug, Schaden > 0 und noch nicht behandelt', () => {
+    (comp as any).allCharacters = [{ id: 9, equipment: [{ type: 'VERBANDSZEUG', quantity: 2 }] }];
+    (comp as any).selectedHealerId = 9;
+    (comp as any).character = { currentDamage: 8, arztInjuryTreated: false };
+    expect(comp.canTreatInjury()).toBe(true);
+    (comp as any).character = { currentDamage: 8, arztInjuryTreated: true }; // schon behandelt
+    expect(comp.canTreatInjury()).toBe(false);
+    (comp as any).character = { currentDamage: 0, arztInjuryTreated: false }; // kein Schaden
+    expect(comp.canTreatInjury()).toBe(false);
+  });
+
+  it('canTreatWound(): nur solange unversorgte Wunden existieren', () => {
+    (comp as any).allCharacters = [{ id: 9, equipment: [{ type: 'VERBANDSZEUG', quantity: 1 }] }];
+    (comp as any).selectedHealerId = 9;
+    (comp as any).character = { wounds: 2, arztWoundsTreated: 1 };
+    expect(comp.canTreatWound()).toBe(true);
+    (comp as any).character = { wounds: 2, arztWoundsTreated: 2 }; // alle versorgt
+    expect(comp.canTreatWound()).toBe(false);
+    (comp as any).character = { wounds: 0 };
+    expect(comp.canTreatWound()).toBe(false);
+  });
+
+  it('canTreatInjury()/canTreatWound(): false ohne Verbandszeug', () => {
+    (comp as any).allCharacters = [{ id: 9, equipment: [] }];
+    (comp as any).selectedHealerId = 9;
+    (comp as any).character = { currentDamage: 8, wounds: 2, arztWoundsTreated: 0, arztInjuryTreated: false };
+    expect(comp.canTreatInjury()).toBe(false);
+    expect(comp.canTreatWound()).toBe(false);
+  });
+
+  it('doArzt() übergibt den Modus an den Service', () => {
+    (comp as any).character = { id: 1 };
+    (comp as any).selectedHealerId = 9;
+    const applyArzt = jest.fn().mockReturnValue({ subscribe: () => {} });
+    (comp as any).characterService = { applyArzt };
+
+    comp.doArzt('WUNDE');
+    expect(applyArzt).toHaveBeenCalledWith(1, 9, 'WUNDE');
+
+    comp.doArzt('VERLETZUNG');
+    expect(applyArzt).toHaveBeenCalledWith(1, 9, 'VERLETZUNG');
   });
 });
 

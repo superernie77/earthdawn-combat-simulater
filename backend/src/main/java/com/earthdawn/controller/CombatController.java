@@ -80,6 +80,17 @@ public class CombatController {
         return combatService.performTaunt(id, req);
     }
 
+    @PostMapping("/sessions/{id}/fear")
+    public FearResult performFear(@PathVariable Long id, @RequestBody FearRequest req) {
+        req.setSessionId(id);
+        return combatService.performFear(id, req);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/resist-fear")
+    public FearResistResult resistFear(@PathVariable Long id, @PathVariable Long combatantId) {
+        return combatService.resistFear(id, combatantId);
+    }
+
     @PostMapping("/sessions/{id}/dodge")
     public DodgeResult resolveDodge(@PathVariable Long id, @RequestBody DodgeRequest req) {
         return combatService.resolveDodge(id, req);

@@ -276,3 +276,42 @@ describe('CombatTrackerComponent — Waffen nach Angriffstalent gefiltert', () =
     expect(comp.attackWeaponsFor(c).map((w: any) => w.name)).toEqual(['Schwert', 'Bogen', 'Dolch']);
   });
 });
+
+describe('CombatTrackerComponent — Verängstigen', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  it('hasFearTalent() erkennt das Talent Verängstigen', () => {
+    const mit: any = { character: { talents: [{ talentDefinition: { name: 'Verängstigen' }, rank: 3 }] } };
+    const ohne: any = { character: { talents: [{ talentDefinition: { name: 'Verspotten' }, rank: 3 }] } };
+    expect(comp.hasFearTalent(mit)).toBe(true);
+    expect(comp.hasFearTalent(ohne)).toBe(false);
+  });
+
+  it('isFeared() und fearResistTn() lesen den Verängstigt-Effekt', () => {
+    const feared: any = { activeEffects: [{ name: 'Verängstigt', resistTargetNumber: 8, modifiers: [] }] };
+    const clean: any = { activeEffects: [{ name: 'Verspottet', modifiers: [] }] };
+    expect(comp.isFeared(feared)).toBe(true);
+    expect(comp.fearResistTn(feared)).toBe(8);
+    expect(comp.isFeared(clean)).toBe(false);
+    expect(comp.fearResistTn(clean)).toBe(0);
+  });
+
+  it('fearTargets() schließt Anwender und Besiegte aus', () => {
+    (comp as any).fearDialog = { actor: { id: 1 } };
+    (comp as any).session = { combatants: [
+      { id: 1, defeated: false }, // Anwender
+      { id: 2, defeated: false },
+      { id: 3, defeated: true },  // besiegt
+    ] };
+    expect(comp.fearTargets().map((c: any) => c.id)).toEqual([2]);
+  });
+
+  it('resistFear() ruft den Service mit Session- und Kombattanten-Id auf', () => {
+    (comp as any).session = { id: 7 };
+    const resistFear = jest.fn().mockReturnValue({ subscribe: () => {} });
+    (comp as any).combatService = { resistFear };
+    comp.resistFear({ id: 42 } as any);
+    expect(resistFear).toHaveBeenCalledWith(7, 42);
+  });
+});

@@ -93,6 +93,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 | Talent | Attribute | Roll vs. | Effect |
 |---|---|---|---|
 | **Verspotten** | CHA | Soziale VK (SV) | −1/Erfolg auf alle Proben+SV des Ziels für Rang Runden. Auto-Starrsinn-Gegenprobe. |
+| **Verängstigen** | WIL | Mystische VK (MV) | Standardaktion, **0 Überanstrengung**. −2 × Erfolge (1 + Übererfolge) auf `ATTACK_STEP` (Aktionsproben) für Rang Runden; erneutes Wirken ersetzt den Effekt. Effekt trägt `resistTargetNumber` = WIL-Step + Rang des Adepten: das Ziel darf **1×/Runde** (`fearResistUsedThisRound`, Reset in `nextRound()`) via `POST .../combatants/{cId}/resist-fear` eine WIL-Probe (− Wunden) dagegen ablegen — Erfolg entfernt den Effekt. Endpoints `POST /sessions/{id}/fear` (`FearRequest`→`FearResult`, Modal `FEAR`) + resist (`FearResistResult`, Modal `FEAR_RESIST`). Flyway **V35** (`active_effects.resist_target_number`, `combatant_states.fear_resist_used_this_round`). Disziplintalent Geisterbeschwörer (1. Kreis), Talentoption Illusionist (Kreis 5–8) — in beiden Access-Listen. |
 | **Ablenken** | CHA | Soziale VK (SV) | −successes KV auf Anwender UND Ziel (Toter Winkel für Verbündete). |
 | **Akrobatische Verteidigung** | DEX | Höchste KV aller Gegner | +2 KV/Erfolg für 1 Runde. Erlischt bei Niedergeschlagen. Nicht mit Kampfsinn. |
 | **Kampfsinn** | PER | MV des Ziels | +2 KV + +2 Angriff/Erfolg für 1 Runde. Nur vs. Ziele mit niedrigerer Initiative. Nicht mit Akrobatischer Verteidigung. |
@@ -210,7 +211,7 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 ### Erholungsproben (Recovery Tests)
 - **Roll**: ZÄH-Step − wounds (min 1). Result reduces `currentDamage`.
 - **Daily limit** from ZÄH: 1–6→1, 7–12→2, 13–18→3, 19–24→4, 25+→5. Stored as `recoveryTestsRemaining` (Integer, null = full) on `GameCharacter`.
-- **Wound penalty**: −1 step per wound, clamped to minimum 1. **Ausnahme**: ist `arztWoundPenaltyNegated=true` (nach erfolgreicher Arztbehandlung), entfällt der Wundabzug für **eine** Erholungsprobe; das Flag wird dabei verbraucht.
+- **Wound penalty**: −1 step per unversorgter Wunde, clamped to minimum 1. Effektiv: `wounds − min(arztWoundsTreated, wounds)` — ärztlich **versorgte Wunden** (siehe Arzt, Modus WUNDE) zählen nicht; die Versorgung bleibt bestehen (wird nicht pro Probe verbraucht). Jede Erholungsprobe setzt außerdem `arztInjuryTreated=false` (Verletzungsbehandlung wieder frei).
 - **Erholungstrank** (`extraRecovery=false`): +`healStep` bonus steps, consumes one daily slot.
 - **Heiltrank** (`extraRecovery=true`): +`healStep` bonus steps, grants an extra test (ignores daily limit).
 - **`healStep`** default 7 for both types (ED4 standard). Quantity decrements by 1 on use.
@@ -218,13 +219,13 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 - **Reset**: `POST /api/characters/{id}/recovery-test/reset` → sets `recoveryTestsRemaining = max` (new day).
 - **Frontend**: Tab "Erholung" shows slot dots, "Erholungsprobe würfeln" button, "Neuer Tag" reset, potion list with Trinken-button. `lastRecovery` (type `RecoveryTestResult`) displays last result.
 
-### Arzt (Physician) — Verletzungen und Wunden
-- **Wurf**: WAH-Step + Arzt-Rang vs. **festem Mindestwurf 5** (ED4-DN für „Verletzungen und Wunden"; **nicht** 6×Wunden). Nur möglich, wenn der Patient ≥1 Wunde hat.
-- **Verbandszeug**: Verbrauchsgegenstand des Heilers (`EquipmentType.VERBANDSZEUG`, `quantity` = Anwendungen). **1× pro Arztprobe verbraucht** (auch bei Fehlschlag). Ohne Verbandszeug wirft die Probe `IllegalStateException`.
-- **Erfolg**: (1) Patient erhält **+Rang** als `pendingRecoveryBonus` auf die nächste Erholungsprobe; (2) `arztWoundPenaltyNegated=true` → die nächste Erholungsprobe ignoriert den Wundabzug (Wunde bleibt, aber ohne Recovery-Malus).
-- **Endpoint**: `POST /api/characters/{id}/arzt` (Body `{ healerCharacterId }`), gibt `ArztResult` (inkl. `woundPenaltyNegated`, `verbandszeugRemaining`).
-- **Flyway V26**: `EquipmentType`-Constraint um `VERBANDSZEUG` erweitert + Spalte `arzt_wound_penalty_negated` auf `characters`.
-- **Frontend**: Verbandszeug-Sektion im „Ausrüstung"-Tab (Mengensteuerung). „Arzt"-Tab zeigt Verbandszeug-Bestand des Heilers, sperrt die Probe ohne Verbandszeug; „Erholung"-Tab zeigt aktive Wundpflege.
+### Arzt (Physician) — zwei Behandlungsmodi
+- **Wurf** (beide Modi): WAH-Step + Arzt-Rang vs. **festem Mindestwurf 5**. **Verbandszeug** des Heilers (`EquipmentType.VERBANDSZEUG`) wird **1× pro Probe verbraucht — auch bei Fehlschlag**. Ohne Verbandszeug/Arzt-Fertigkeit: `IllegalStateException`. Modus-Vorbedingungen werden **vor** dem Verbandszeug-Verbrauch geprüft.
+- **Modus `VERLETZUNG`** (verlorene LP behandeln): nur wenn `currentDamage > 0` und `arztInjuryTreated=false` (**1× pro Erholungsprobe**; Flag wird von `performRecoveryTest` zurückgesetzt — bei Fehlschlag der Arztprobe bleibt es false, erneuter Versuch erlaubt). Erfolg: `pendingRecoveryBonus += Rang`, `arztInjuryTreated=true`.
+- **Modus `WUNDE`** (Wundversorgung): nur wenn unversorgte Wunden existieren (`arztWoundsTreated < wounds`). Erfolg: `arztWoundsTreated++` — der **−1-Wundmalus dieser Wunde** ist bei Erholungsproben dauerhaft unterdrückt (Verband bleibt; Zähler wird beim Setzen der Wundenzahl via `applyFieldValue` und beim Lesen gekappt). Mehrfach anwendbar, bis alle Wunden versorgt sind.
+- **Endpoint**: `POST /api/characters/{id}/arzt` (Body `{ healerCharacterId, mode: VERLETZUNG|WUNDE }`, mode default VERLETZUNG), gibt `ArztResult` (inkl. `mode`, `woundsTreated`, `verbandszeugRemaining`).
+- **Flyway V26** (`VERBANDSZEUG`-Typ) + **V34** (`arzt_wounds_treated` int, `arzt_injury_treated` boolean; altes `arzt_wound_penalty_negated` entfernt).
+- **Frontend**: „Arzt"-Tab mit zwei Buttons („Verletzungen behandeln" / „Wunde versorgen", via `canTreatInjury()`/`canTreatWound()` gesperrt), Status-Banner (behandelt/versorgt x/y); „Erholung"-Tab zeigt effektiven Wundabzug (`effectiveWoundPenalty()`).
 
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
@@ -296,7 +297,7 @@ POST   /api/characters/{id}/holzhaut     → würfelt ZÄH-Step + Rang, speicher
 POST   /api/characters/{id}/holzhaut/end → reduziert currentDamage um Bonus, setzt Bonus auf 0
 POST   /api/characters/{id}/recovery-test         ?spendKarma=true|false → Erholungsprobe würfeln (optionaler Karmawürfel bei berechtigter Disziplin ab Kreis 3/5); gibt RecoveryTestResult
 POST   /api/characters/{id}/recovery-test/reset   → Neuer Tag: setzt recoveryTestsRemaining auf Max (aus ZÄH)
-POST   /api/characters/{id}/arzt                  { healerCharacterId } → Arztprobe (MW 5, verbraucht 1 Verbandszeug); gibt ArztResult
+POST   /api/characters/{id}/arzt                  { healerCharacterId, mode: VERLETZUNG|WUNDE } → Arztprobe (MW 5, verbraucht 1 Verbandszeug); gibt ArztResult
 
 GET    /api/reference/disciplines
 GET    /api/reference/talents
@@ -325,6 +326,8 @@ POST   /api/combat/sessions/{id}/attack              AttackActionRequest
 POST   /api/combat/sessions/{id}/dodge               DodgeRequest
 POST   /api/combat/sessions/{id}/free-action         FreeActionRequest
 POST   /api/combat/sessions/{id}/taunt               TauntRequest
+POST   /api/combat/sessions/{id}/fear                FearRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma } — Verängstigen (WIL vs. MV)
+POST   /api/combat/sessions/{id}/combatants/{cId}/resist-fear   → WIL-Widerstandsprobe gegen Verängstigt (1×/Runde)
 POST   /api/combat/sessions/{id}/distract            DistractRequest
 POST   /api/combat/sessions/{id}/spot-armor-flaw     SpotArmorFlawRequest
 POST   /api/combat/sessions/{id}/combat-sense        CombatSenseRequest

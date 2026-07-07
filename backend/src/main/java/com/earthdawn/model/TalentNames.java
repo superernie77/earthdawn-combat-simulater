@@ -38,4 +38,8 @@ public final class TalentNames {
 
     // T'skrang-Schwanzangriff: −2 auf alle Proben in dieser Runde
     public static final String EFFECT_SCHWANZANGRIFF      = "Schwanzangriff";
+
+    // Verängstigen (WIL vs. MV): −2/Erfolg auf Aktionsproben, per Willenskraftprobe abschüttelbar
+    public static final String VERAENGSTIGEN              = "Verängstigen";
+    public static final String EFFECT_VERAENGSTIGT        = "Verängstigt";
 }

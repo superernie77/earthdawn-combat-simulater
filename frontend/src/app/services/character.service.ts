@@ -173,8 +173,8 @@ export class CharacterService {
     return this.http.post<Character>(`${this.base}/${characterId}/recovery-test/reset`, {});
   }
 
-  applyArzt(woundedCharacterId: number, healerCharacterId: number): Observable<ArztResult> {
-    return this.http.post<ArztResult>(`${this.base}/${woundedCharacterId}/arzt`, { healerCharacterId });
+  applyArzt(woundedCharacterId: number, healerCharacterId: number, mode: 'VERLETZUNG' | 'WUNDE'): Observable<ArztResult> {
+    return this.http.post<ArztResult>(`${this.base}/${woundedCharacterId}/arzt`, { healerCharacterId, mode });
   }
 
   delete(id: number): Observable<void> {

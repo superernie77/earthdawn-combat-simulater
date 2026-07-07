@@ -105,12 +105,18 @@ public class GameCharacter {
     @Builder.Default private int pendingRecoveryBonus = 0;
 
     /**
-     * Nach erfolgreicher Arztbehandlung gesetzt: die nächste Erholungsprobe ignoriert den
-     * Wundabzug (Spec: Arzt eliminiert den Malus, den Wunden auf Erholungsproben verursachen).
-     * Wird bei der nächsten Erholungsprobe verbraucht.
+     * Anzahl der ärztlich versorgten Wunden: jede versorgte Wunde unterdrückt ihren −1-Malus
+     * auf Erholungsproben. Bleibt bestehen (Verband), wird beim Sinken der Wundenzahl gekappt.
+     */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default private int arztWoundsTreated = 0;
+
+    /**
+     * Verletzungen (verlorene LP) wurden seit der letzten Erholungsprobe ärztlich behandelt —
+     * nur 1× pro Erholungsprobe möglich. Wird bei der nächsten Erholungsprobe zurückgesetzt.
      */
     @Column(columnDefinition = "boolean default false")
-    @Builder.Default private boolean arztWoundPenaltyNegated = false;
+    @Builder.Default private boolean arztInjuryTreated = false;
 
     // --- Spielleiter ---
     /** true = nur für den Spielleiter sichtbar */
