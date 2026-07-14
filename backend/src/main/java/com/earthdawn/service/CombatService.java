@@ -1734,6 +1734,103 @@ public class CombatService {
         return result;
     }
 
+    // --- Magie neutralisieren ---
+
+    /** Prüft die Vorbedingungen für Magie neutralisieren und liefert das Talent. */
+    private CharacterTalent requireNeutralizeMagic(CombatSession session, CombatantState actor) {
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (session.getPhase() != CombatPhase.ACTION) throw new IllegalStateException("Nur in der Aktionsphase möglich.");
+        return actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.MAGIE_NEUTRALISIEREN.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Magie neutralisieren' nicht gefunden."));
+    }
+
+    /**
+     * Öffnet den (für alle Clients synchronisierten) Auswahldialog für Magie neutralisieren.
+     * Die Effektliste bauen die Clients aus ihrer Session-Kopie — hier wird nur das Modal
+     * mit dem Anwender gebroadcastet. Kein State-Change.
+     */
+    public CombatSession openNeutralizeMagicDialog(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor = findCombatant(session, actorCombatantId);
+        CharacterTalent ct = requireNeutralizeMagic(session, actor);
+        if (actor.isHasActedThisRound())
+            throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt!");
+
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("actorCombatantId", actorCombatantId);
+        payload.put("actorName", actor.getCharacter().getName());
+        payload.put("rank", ct.getRank());
+        broadcastWithModal(session, "NEUTRALIZE_MAGIC_SELECT", payload);
+        return session;
+    }
+
+    /**
+     * Magie neutralisieren: WIL-Step + Rang + Bonus − Wunden vs. (gewählte Effektstufe + 10).
+     * Verbraucht die Aktion der Runde und 1 Überanstrengung. Erfolg entfernt den gewählten Effekt.
+     * Welche Effekte neutralisierbar sind, entscheidet der GM — daher stehen alle zur Auswahl.
+     */
+    public NeutralizeMagicResult performNeutralizeMagic(Long sessionId, NeutralizeMagicRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, req.getActorCombatantId());
+        CombatantState target = findCombatant(session, req.getTargetCombatantId());
+        CharacterTalent ct = requireNeutralizeMagic(session, actor);
+        if (actor.isHasActedThisRound())
+            throw new IllegalStateException(actor.getCharacter().getName() + " hat diese Runde bereits gehandelt!");
+
+        ActiveEffect effect = target.getActiveEffects().stream()
+                .filter(e -> e.getId() != null && e.getId().equals(req.getEffectId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Effekt nicht gefunden: " + req.getEffectId()));
+
+        // Verbraucht die Aktion der Runde + 1 Überanstrengung
+        actor.setHasActedThisRound(true);
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        int wilStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower()) - actor.getWounds());
+        int rollStep = Math.max(1, wilStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4);
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        int effectLevel = Math.max(0, req.getEffectLevel());
+        int targetNumber = effectLevel + 10;
+        boolean success = total >= targetNumber;
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+        String effectName = effect.getName();
+
+        if (success) target.getActiveEffects().remove(effect);
+
+        String desc = success
+                ? actorName + " neutralisiert „" + effectName + "“ auf " + targetName
+                  + "! (" + total + " vs MW " + targetNumber + " = Stufe " + effectLevel + " + 10)"
+                : actorName + " scheitert daran, „" + effectName + "“ auf " + targetName
+                  + " zu neutralisieren. (" + total + " vs MW " + targetNumber + ")";
+
+        addLog(session, actorName, targetName, ActionType.NEUTRALIZE_MAGIC, desc, success);
+        sessionRepo.save(session);
+
+        NeutralizeMagicResult result = NeutralizeMagicResult.builder()
+                .actorName(actorName).targetName(targetName)
+                .effectName(effectName).effectLevel(effectLevel)
+                .targetNumber(targetNumber).rollStep(rollStep)
+                .roll(roll).karmaRoll(karmaRoll)
+                .success(success).effectRemoved(success)
+                .description(desc)
+                .build();
+        broadcastWithModal(session, "NEUTRALIZE_MAGIC", result);
+        return result;
+    }
+
     // --- Akrobatische Verteidigung ---
 
     public AcrobaticDefenseResult performAcrobaticDefense(Long sessionId, Long actorCombatantId,

@@ -80,6 +80,16 @@ docker compose -f docker-compose.prod.yml logs -f --tail 100 earthdawn-backend
 - Discipline-to-weaving-talent map: Elementarist→Elementarismus, Illusionist→Illusionismus, Magier→Magie, Geisterbeschwörer→Geisterbeschwörung.
 - **Nur Matrix-Zauber im Kampf**: Die Zauberauswahl im Kampf (Faden-weben- und Wirken-Dialog) bietet ausschließlich Zauber an, die in einer **Matrize** (Zaubermatritze **oder** Erweiterte Matrize) einliegen. Frontend `CombatTrackerComponent.matrixSpellIds()` filtert `spellsOf()` und `readySpellsOf()` auf `talent.assignedSpell`-IDs dieser Matrix-Talente.
 
+#### Zusatzfäden (Stufe 1)
+Sind **alle Pflichtfäden gewoben**, kauft jeder weitere Faden genau **eine Option** des Zaubers (`SpellDefinition.threadOptions`, `@ElementCollection` mit `@OrderColumn` — die Reihenfolge ist bindend, da Auswahlen als **Index** gespeichert werden).
+
+- **Nur `EFFECT_STEP` wird verrechnet** (+`value` auf `effectStep`, wirkt in `applySpellDamage`/`applySpellHeal`). Alle anderen Optionen sind `DISPLAY`: sie werden gespeichert und im Log/Modal angezeigt, aber **nicht** gerechnet — die Engine kennt weder Reichweiten (kein Distanzsystem) noch Mehrfachziele (`SpellCastRequest.targetCombatantId` ist einzelzielig) noch Boni auf Nicht-Kampf-Proben (Heimlichkeit/Wahrnehmung sind keine `StatType`s). **Wirkungsdauer** ist bewusst `DISPLAY`: `SpellDefinition.duration` zählt **Runden**, die Regel nennt **Minuten**.
+- **Obergrenze = Fadenweben-Rang.** Dieselbe Option darf mehrfach gewählt werden (Werte addieren sich).
+- **Auch Sofortzauber (`threads == 0`) können Zusatzfäden haben** (z.B. Blitz, Katastrophe) — der `weaveThread`-Guard wirft nur noch, wenn `threads == 0` **und** `threadOptions` leer ist. Der Mindestwurf ist `weavingDifficulty` (auch bei 0-Faden-Zaubern gesetzt).
+- **Zusatzfäden erhöhen `threadsWoven` nicht** — sie zählen separat über `CombatantState.extraThreadChoices` (CSV der Indizes, z.B. `"0,0,3"`). Dadurch bleibt die Anzeige `2/2 +1` statt `3/2`.
+- `ThreadweaveRequest.extraThreadOptionIndex` ist **nur** bei einem Zusatzfaden erforderlich (und wird bei Pflichtfäden ignoriert). `castSpell` löst die Auswahl nur auf, wenn `preparingSpellId` zum Zauber passt; `resetPreparation()` räumt bei Wirken/Abbrechen/Zauberwechsel auf.
+- Frontend spiegelt die Regel in `threadweaveIsExtra()` (inkl. Erweiterte-Matrize-Rabatt) und `weavingRankOf()`. Flyway `V36`.
+
 ### Free Actions (Freie Aktionen)
 - Do **not** consume `hasActedThisRound` — unlimited per round.
 - Roll: AttributStep + TalentRank + bonusSteps vs target's defense stat.
@@ -93,6 +103,7 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 | Talent | Attribute | Roll vs. | Effect |
 |---|---|---|---|
 | **Verspotten** | CHA | Soziale VK (SV) | −1/Erfolg auf alle Proben+SV des Ziels für Rang Runden. Auto-Starrsinn-Gegenprobe. |
+| **Magie neutralisieren** | WIL | Effektstufe + 10 | Beendet einen **beliebigen aktiven Effekt** auf einem beliebigen Kombattanten. **Verbraucht die Aktion** (`hasActedThisRound=true`) + **1 Überanstrengung**. Wurf: WIL-Step + Rang + Bonus − Wunden vs. **gewählter Effektstufe + 10** (Effekte haben keine eigene Stufe → Stufe wird im Dialog eingegeben). Erfolg entfernt den `ActiveEffect`. **Zwei-Stufen-Flow, beide via WebSocket an alle Clients**: `POST .../combatants/{cId}/neutralize-magic/open` broadcastet das Modal `NEUTRALIZE_MAGIC_SELECT` (Payload `actorCombatantId`/`actorName`/`rank`; **kein** State-Change — die Effektliste bauen die Clients via `allActiveEffects()` aus ihrer Session-Kopie); `POST /sessions/{id}/neutralize-magic` (`NeutralizeMagicRequest`) führt aus und broadcastet `NEUTRALIZE_MAGIC` (`NeutralizeMagicResult`). Es wird **nicht gefiltert**, welche Effekte neutralisierbar sind — das entscheidet der GM. Keine Migration nötig. |
 | **Verängstigen** | WIL | Mystische VK (MV) | Standardaktion, **0 Überanstrengung**. −2 × Erfolge (1 + Übererfolge) auf `ATTACK_STEP` (Aktionsproben) für Rang Runden; erneutes Wirken ersetzt den Effekt. Effekt trägt `resistTargetNumber` = WIL-Step + Rang des Adepten: das Ziel darf **1×/Runde** (`fearResistUsedThisRound`, Reset in `nextRound()`) via `POST .../combatants/{cId}/resist-fear` eine WIL-Probe (− Wunden) dagegen ablegen — Erfolg entfernt den Effekt. Endpoints `POST /sessions/{id}/fear` (`FearRequest`→`FearResult`, Modal `FEAR`) + resist (`FearResistResult`, Modal `FEAR_RESIST`). Flyway **V35** (`active_effects.resist_target_number`, `combatant_states.fear_resist_used_this_round`). Disziplintalent Geisterbeschwörer (1. Kreis), Talentoption Illusionist (Kreis 5–8) — in beiden Access-Listen. |
 | **Ablenken** | CHA | Soziale VK (SV) | −successes KV auf Anwender UND Ziel (Toter Winkel für Verbündete). |
 | **Akrobatische Verteidigung** | DEX | Höchste KV aller Gegner | +2 KV/Erfolg für 1 Runde. Erlischt bei Niedergeschlagen. Nicht mit Kampfsinn. |
@@ -328,6 +339,8 @@ POST   /api/combat/sessions/{id}/free-action         FreeActionRequest
 POST   /api/combat/sessions/{id}/taunt               TauntRequest
 POST   /api/combat/sessions/{id}/fear                FearRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma } — Verängstigen (WIL vs. MV)
 POST   /api/combat/sessions/{id}/combatants/{cId}/resist-fear   → WIL-Widerstandsprobe gegen Verängstigt (1×/Runde)
+POST   /api/combat/sessions/{id}/combatants/{cId}/neutralize-magic/open → broadcastet den Auswahldialog (NEUTRALIZE_MAGIC_SELECT) an alle Clients
+POST   /api/combat/sessions/{id}/neutralize-magic    NeutralizeMagicRequest { actorCombatantId, targetCombatantId, effectId, effectLevel, bonusSteps, spendKarma }
 POST   /api/combat/sessions/{id}/distract            DistractRequest
 POST   /api/combat/sessions/{id}/spot-armor-flaw     SpotArmorFlawRequest
 POST   /api/combat/sessions/{id}/combat-sense        CombatSenseRequest
@@ -364,7 +377,7 @@ POST   /api/combat/sessions/{id}/end
 - Topic: `/topic/combat/{sessionId}` — broadcasts full `CombatSession` on every state change
 - Frontend subscribes in `CombatTrackerComponent` via `WebSocketService`
 - **Kampfprotokoll**: `logEntries` werden im Frontend **absteigend** (neueste oben) angezeigt (`toLogEntries`). Angriffe schreiben strukturierte Wurf-/Modifikator-Details nach `CombatLog.rollDetailsJson` (`attackLogJson`): Angriffs- und Schadenswurf (Einzelwürfel, Karmawürfel, Total), Strain (Überanstrengung) und Modifikatoren (`attackBonusNotes`/`damageBonusNotes`). Das Frontend parst `rollDetailsJson` und rendert eine Detailzeile pro Eintrag.
-- **Synchronisierte Modale** (`broadcastWithModal` → `liveModal` → Frontend `openLocalModalForType`): u.a. `ATTACK_RESULT`, `INITIATIVE`, `DODGE`, `RIPOSTE`, `TAUNT`, `MANOEUVER`, … sowie **`COMBAT_ENDED`** — `endCombat()` broadcastet ein „Kampf beendet"-Modal an alle Clients (Payload `name`/`round`). Im Tracker zusätzlich ein persistentes „🏁 Kampf beendet"-Badge bei `status === 'FINISHED'`.
+- **Synchronisierte Modale** (`broadcastWithModal` → `liveModal` → Frontend `openLocalModalForType`): u.a. `ATTACK_RESULT`, `INITIATIVE`, `DODGE`, `RIPOSTE`, `TAUNT`, `MANOEUVER`, `FEAR`, `FEAR_RESIST`, `NEUTRALIZE_MAGIC` sowie **`NEUTRALIZE_MAGIC_SELECT`** — bislang das einzige *interaktive* Broadcast-Modal (Auswahldialog statt Ergebnis; jeder Client rendert die Effektliste lokal, wer bestätigt, löst aus) — sowie **`COMBAT_ENDED`** — `endCombat()` broadcastet ein „Kampf beendet"-Modal an alle Clients (Payload `name`/`round`). Im Tracker zusätzlich ein persistentes „🏁 Kampf beendet"-Badge bei `status === 'FINISHED'`.
 
 ## Reference Data (DataInitializer)
 Seeded automatically (idempotent) on first start via migration methods in `migrateDodgeTalent()` and `migrateFreeActionTalents()`:

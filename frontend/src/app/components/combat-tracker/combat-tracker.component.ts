@@ -22,6 +22,7 @@ import {
   CombatActionResult, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
   FearRequest, FearResult, FearResistResult,
+  NeutralizeMagicRequest, NeutralizeMagicResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
@@ -38,7 +39,18 @@ import {
   LufttanzActivationResult, LufttanzAttackRequest,
   InitiativeRollDetail, DialogState
 } from '../../models/combat.model';
-import { Character, SpellDefinition, CharacterSpell } from '../../models/character.model';
+import { Character, SpellDefinition, CharacterSpell, SpellThreadOption } from '../../models/character.model';
+
+/** Ein auswählbarer Effekt im "Magie neutralisieren"-Dialog. */
+export interface EffectChoice {
+  /** 'combatantId:effectId' */
+  key: string;
+  combatantId: number;
+  combatantName: string;
+  effectId: number;
+  name: string;
+  remainingRounds: number;
+}
 
 @Component({
   selector: 'app-combat-tracker',
@@ -168,8 +180,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                 <mat-icon *ngIf="c.defeated" style="color:#f44336;font-size:16px">skull</mat-icon>
                 <span *ngIf="c.knockedDown && !c.defeated" class="knocked-badge" matTooltip="Niedergeschlagen: −3 auf alle Proben, −3 KV/MV/SV">↓ Nieder</span>
                 <span *ngIf="c.preparingSpellId && !c.defeated" class="spell-prep-badge"
-                  matTooltip="Zauber vorbereitet: {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }} Fäden)">
-                  ⟡ {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }})
+                  matTooltip="Zauber vorbereitet: {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }} Fäden){{ extraThreadCountOf(c) ? ', ' + extraThreadCountOf(c) + ' Zusatzfäden' : '' }}">
+                  ⟡ {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }})<span
+                    *ngIf="extraThreadCountOf(c)"> +{{ extraThreadCountOf(c) }}</span>
                 </span>
                 <span *ngIf="dialogStateBadge(c) as badge" class="dialog-state-badge"
                   [matTooltip]="'Plant: ' + badge">{{ badge }}</span>
@@ -254,6 +267,14 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
                   (click)="openFearDialog(c)"
                   matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
                   <mat-icon>sentiment_extremely_dissatisfied</mat-icon>
+                </button>
+                <!-- Magie neutralisieren: beendet einen aktiven Effekt (Aktion + 1 Überanstrengung) -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNeutralizeMagicTalent(c) && !c.defeated"
+                  class="combat-option-btn neutralize-btn"
+                  [disabled]="c.hasActedThisRound"
+                  (click)="openNeutralizeMagicDialog(c)"
+                  matTooltip="Magie neutralisieren: beendet einen aktiven Effekt (WIL + Rang vs. Effektstufe + 10). Verbraucht die Aktion, kostet 1 Überanstrengung.">
+                  <mat-icon>auto_fix_off</mat-icon> Magie neutralisieren
                 </button>
                 <!-- Furcht abschütteln: Widerstandsprobe gegen Verängstigt (1×/Runde) -->
                 <button mat-raised-button color="accent"
@@ -1220,7 +1241,7 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     <!-- Schwanzangriff Dialog (T'skrang) -->
     <div class="attack-dialog" *ngIf="schwanzangriffDialog.open">
       <div class="dialog-backdrop" (click)="schwanzangriffDialog.open = false"></div>
-      <div class="dialog-box">
+      <div class="dialog-box" style="max-width:440px">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#a5d6a7">pets</mat-icon>Schwanzangriff: {{ schwanzangriffDialog.actor?.character?.name }}</h3>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
@@ -1669,6 +1690,38 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
             </mat-option>
           </mat-select>
         </mat-form-field>
+
+        <!-- Zusatzfaden: alle Pflichtfäden sind gewoben, jeder weitere Faden kauft eine Option -->
+        <div class="extra-thread-box" *ngIf="threadweaveIsExtra()">
+          <div class="extra-thread-head">
+            <mat-icon>add_circle_outline</mat-icon> Zusatzfaden
+            <span class="extra-thread-count">
+              {{ extraThreadCountOf(threadweaveDialog.caster) }}/{{ weavingRankOf(threadweaveDialog.caster) }}
+            </span>
+          </div>
+
+          <div class="extra-thread-hint" *ngIf="threadweaveOptions().length === 0">
+            {{ threadweaveSpell()?.name }} bietet keine Zusatzfäden — alle Fäden sind bereits gewoben.
+          </div>
+          <div class="extra-thread-hint" *ngIf="threadweaveOptions().length > 0 && threadweaveExtraExhausted()">
+            Maximum erreicht: {{ weavingRankOf(threadweaveDialog.caster) }} Zusatzfäden (Fadenweben-Rang).
+          </div>
+
+          <mat-form-field appearance="fill" style="width:100%"
+            *ngIf="threadweaveOptions().length > 0 && !threadweaveExtraExhausted()">
+            <mat-label>Option</mat-label>
+            <mat-select [(ngModel)]="threadweaveDialog.extraOptionIndex">
+              <mat-option *ngFor="let o of threadweaveOptions(); let i = index; trackBy: trackByOptionIndex" [value]="i">
+                {{ o.label }}<span *ngIf="o.type === 'DISPLAY'"> — Spielleiter</span>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="extra-thread-note" *ngIf="threadweaveOptions().length > 0 && !threadweaveExtraExhausted()">
+            Nur „Wirkungsstufe" wird automatisch verrechnet. Alle übrigen Optionen werden nur
+            protokolliert — Reichweite, Ziele, Dauer und Nicht-Kampf-Boni kennt die Engine nicht.
+          </div>
+        </div>
+
         <div style="display:flex;gap:8px;align-items:center">
           <label class="karma-toggle"
             [class.active]="threadweaveDialog.spendKarma"
@@ -1683,8 +1736,8 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
           <button mat-stroked-button (click)="closeThreadweaveDialog()">Abbrechen</button>
-          <button mat-raised-button color="primary" (click)="performThreadweave()" [disabled]="!threadweaveDialog.spellId">
-            <mat-icon>all_inclusive</mat-icon> Faden weben
+          <button mat-raised-button color="primary" (click)="performThreadweave()" [disabled]="threadweaveBlocked()">
+            <mat-icon>all_inclusive</mat-icon> {{ threadweaveIsExtra() ? 'Zusatzfaden weben' : 'Faden weben' }}
           </button>
         </div>
       </div>
@@ -1731,6 +1784,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               <span *ngFor="let woven of threadDots(r)" [class]="'thread-dot ' + (woven ? 'woven' : 'empty')"></span>
             </div>
             <span class="thread-count">{{ r.threadsWoven }}/{{ r.threadsRequired }}</span>
+          </div>
+          <div class="extra-thread-result" *ngIf="r.extraThread && r.extraThreadLabel">
+            <mat-icon>add_circle_outline</mat-icon>
+            <span>{{ r.extraThreadLabel }}</span>
+            <span class="extra-thread-count">{{ r.extraThreadCount }}/{{ r.extraThreadMax }}</span>
           </div>
           <div class="spell-ready-banner" *ngIf="r.readyToCast">
             <mat-icon>auto_fix_high</mat-icon> Bereit zum Wirken!
@@ -2428,11 +2486,11 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     <!-- Verängstigen Dialog -->
     <div class="attack-dialog" *ngIf="fearDialog.open">
       <div class="dialog-backdrop" (click)="fearDialog.open = false"></div>
-      <div class="dialog-box">
+      <div class="dialog-box" style="max-width:440px">
         <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">sentiment_extremely_dissatisfied</mat-icon>Verängstigen: {{ fearDialog.actor?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
-          WIL + Rang vs. Mystische VK · Standardaktion · 0 Überanstrengung ·
-          −2/Erfolg auf Aktionsproben für Rang Runden. Ziel darf jede Runde eine WIL-Probe zum Abschütteln ablegen.
+          WIL + Rang vs. Mystische VK · Standardaktion · 0 Überanstrengung
+          <br>−2/Erfolg auf Aktionsproben für Rang Runden. Das Ziel darf jede Runde eine WIL-Probe zum Abschütteln ablegen.
         </div>
         <mat-form-field appearance="fill" style="width:100%">
           <mat-label>Ziel</mat-label>
@@ -2510,6 +2568,122 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               −{{ r.penalty }} auf Aktionsproben für {{ r.duration }} Runden · Abschütteln: WIL-Probe vs. {{ r.resistTargetNumber }}
             </div>
           </ng-container>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Magie neutralisieren: Auswahldialog (bei allen Clients synchron geöffnet) -->
+    <div class="result-modal" *ngIf="neutralizeSelectModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box" style="max-width:560px">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#80deea">auto_fix_off</mat-icon>Magie neutralisieren: {{ neutralizeSelectModal.actorName }}</h3>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          WIL + Rang {{ neutralizeSelectModal.rank }} vs. <strong>Effektstufe + 10</strong> ·
+          Verbraucht die Aktion der Runde · kostet 1 Überanstrengung.
+          <br>Welche Effekte neutralisierbar sind, entscheidet der Spielleiter — es stehen alle zur Auswahl.
+        </div>
+
+        <div *ngIf="!neutralizeSelectModal.effects.length"
+          style="padding:12px;background:#1e1a16;border:1px solid #3a3028;border-radius:6px;color:#777;font-size:13px">
+          Aktuell liegen keine Effekte auf Kombattanten.
+        </div>
+
+        <ng-container *ngIf="neutralizeSelectModal.effects.length">
+          <mat-form-field appearance="fill" style="width:100%">
+            <mat-label>Zu neutralisierender Effekt</mat-label>
+            <mat-select [(ngModel)]="neutralizeSelectModal.selection">
+              <mat-option *ngFor="let e of neutralizeSelectModal.effects; trackBy: trackByEffectKey" [value]="e.key">
+                {{ e.combatantName }} — {{ e.name }}
+                <span style="color:#888">({{ e.remainingRounds < 0 ? 'permanent' : e.remainingRounds + ' Rd' }})</span>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <mat-form-field appearance="fill" style="width:170px"
+              matTooltip="Effekte haben keine eigene Stufe — hier die Stufe des auslösenden Zaubers/Talents eintragen.">
+              <mat-label>Stufe des Effekts</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="neutralizeSelectModal.effectLevel">
+            </mat-form-field>
+            <div style="font-size:0.9rem;color:#c9a84c">
+              Mindestwurf: <strong>{{ (neutralizeSelectModal.effectLevel || 0) + 10 }}</strong>
+              <span style="color:#888;font-size:0.8rem"> (Stufe + 10)</span>
+            </div>
+            <label class="karma-toggle"
+              [class.active]="neutralizeSelectModal.spendKarma"
+              [class.disabled]="(neutralizeActor()?.currentKarma ?? 0) <= 0"
+              (click)="(neutralizeActor()?.currentKarma ?? 0) > 0 && (neutralizeSelectModal.spendKarma = !neutralizeSelectModal.spendKarma)">
+              <mat-icon>auto_awesome</mat-icon> Karma
+              <span class="karma-count-badge" [class.empty]="(neutralizeActor()?.currentKarma ?? 0) <= 0">
+                {{ neutralizeActor()?.currentKarma ?? 0 }}
+              </span>
+            </label>
+          </div>
+        </ng-container>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button mat-stroked-button (click)="dismissModal()">Abbrechen</button>
+          <button mat-raised-button color="primary"
+            [disabled]="!neutralizeSelectModal.selection"
+            (click)="performNeutralizeMagic()">
+            <mat-icon>auto_fix_off</mat-icon> Neutralisieren
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Magie neutralisieren: Ergebnis -->
+    <div class="result-modal" *ngIf="neutralizeModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="neutralizeModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'auto_fix_off' : 'close' }}</mat-icon>
+          {{ r.success ? 'NEUTRALISIERT!' : 'FEHLGESCHLAGEN' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+          <mat-icon style="color:#555;font-size:18px">arrow_forward</mat-icon>
+          <span class="result-target" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Magie neutralisieren · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">MW {{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}<span *ngIf="r.karmaRoll.exploded"> 💥</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="roll-row">
+            <span class="roll-label">Effekt</span>
+            <span class="roll-expr">{{ r.effectName }} · Stufe {{ r.effectLevel }} + 10</span>
+            <span class="roll-value">{{ r.targetNumber }}</span>
+          </div>
+          <div class="taunt-effect-banner" *ngIf="r.effectRemoved">
+            <mat-icon>auto_fix_off</mat-icon>
+            „{{ r.effectName }}" auf {{ r.targetName }} beendet
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08);margin-top:4px">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Aktion der Runde + Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−1</span>
+          </div>
         </div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">
           Schließen
@@ -2660,6 +2834,20 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
               {{ r.effectApplied }} ({{ r.effectDuration }} Runden)
             </div>
           </ng-container>
+
+          <!-- Zusatzfäden: verrechnet wird nur die Wirkungsstufe, der Rest ist GM-Sache -->
+          <ng-container *ngIf="r.extraThreadLabels?.length">
+            <div class="roll-divider"></div>
+            <div class="extra-thread-head">
+              <mat-icon>add_circle_outline</mat-icon> Zusatzfäden
+              <span class="extra-thread-count" *ngIf="r.extraThreadEffectStep">
+                Wirkungsstufe +{{ r.extraThreadEffectStep }}
+              </span>
+            </div>
+            <div class="extra-thread-result" *ngFor="let l of r.extraThreadLabels; trackBy: trackByOptionIndex">
+              <span>{{ l }}</span>
+            </div>
+          </ng-container>
         </div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissAutofightModal(spellCastModal)">
           Schließen
@@ -2755,7 +2943,9 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
       font-weight: bold; font-size: 0.85rem; flex-shrink: 0;
     }
-    .comb-actions { display: flex; align-items: center; gap: 4px; }
+    /* wrap: sonst quetscht eine lange Button-Reihe (viele Talente) die Buttons zusammen —
+       Beschriftungen werden abgeschnitten und Icons auf 0 Breite geschrumpft. */
+    .comb-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     .attack-btn {
       height: 36px; padding: 0 12px; font-size: 13px; font-weight: 600;
       border-color: #c9a84c; color: #c9a84c;
@@ -2766,7 +2956,10 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn {
       height: 32px; min-width: 0; padding: 0 8px; font-size: 12px;
       border-color: #3a3028; color: #888; display: flex; align-items: center; gap: 4px;
-      mat-icon { font-size: 16px; height: 16px; width: 16px; }
+      /* Buttons behalten ihre natürliche Breite und brechen um (siehe .comb-actions),
+         statt Beschriftung abzuschneiden und das Icon auf 0 Breite zu quetschen. */
+      white-space: nowrap; flex-shrink: 0;
+      mat-icon { font-size: 16px; height: 16px; width: 16px; flex-shrink: 0; }
       &.aggressive.active { border-color: #ff7043; color: #ff7043; background: rgba(255,112,67,0.1); }
       &.defensive.active { border-color: #42a5f5; color: #42a5f5; background: rgba(66,165,245,0.1); }
       &.magische-markierung-btn { border-color: #3a1a40; color: #ce93d8; }
@@ -3042,6 +3235,17 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
     .combat-option-btn.zweitwaffe-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
     .combat-option-btn.nachtreten-btn { color: #ffb74d; border-color: #4a3413; }
     .combat-option-btn.nachtreten-btn:not([disabled]):hover { border-color: #ffb74d; background: rgba(255,183,77,0.1); }
+    .combat-option-btn.schwanzangriff-btn { color: #a5d6a7; border-color: #2e5a2e; }
+    .combat-option-btn.schwanzangriff-btn:not([disabled]):hover { border-color: #a5d6a7; background: rgba(165,214,167,0.1); }
+    .combat-option-btn.karma-init-btn { color: #d4b85a; border-color: #6b5a1e; }
+    .combat-option-btn.karma-init-btn:not([disabled]):hover { border-color: #d4b85a; background: rgba(212,184,90,0.1); }
+    .combat-option-btn.karma-init-btn.active { border-color: #d4b85a; color: #d4b85a; background: rgba(212,184,90,0.15); }
+    .combat-option-btn.fear-btn { color: #b39ddb; border-color: #3a2c55; }
+    .combat-option-btn.fear-btn:not([disabled]):hover { border-color: #b39ddb; background: rgba(179,157,219,0.1); }
+    .combat-option-btn.fear-resist-btn { color: #80cbc4; border-color: #2e6e66; }
+    .combat-option-btn.fear-resist-btn:not([disabled]):hover { border-color: #80cbc4; background: rgba(128,203,196,0.1); }
+    .combat-option-btn.neutralize-btn { color: #80deea; border-color: #1e4c52; }
+    .combat-option-btn.neutralize-btn:not([disabled]):hover { border-color: #80deea; background: rgba(128,222,234,0.1); }
     .distract-effect-row { display: flex; gap: 8px; }
     .distract-effect-badge {
       flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
@@ -3079,6 +3283,32 @@ import { Character, SpellDefinition, CharacterSpell } from '../../models/charact
       font-size: 10px; font-weight: 700; color: #b39ddb; background: rgba(179,157,219,0.15);
       border: 1px solid #b39ddb; border-radius: 8px; padding: 2px 7px;
       letter-spacing: 0.03em;
+    }
+    .extra-thread-box {
+      border: 1px solid #4a3070;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: rgba(179,157,219,0.06);
+    }
+    .extra-thread-head {
+      display: flex; align-items: center; gap: 6px;
+      color: #b39ddb; font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; flex-shrink: 0; }
+    }
+    .extra-thread-count {
+      margin-left: auto;
+      background: rgba(179,157,219,0.18);
+      border-radius: 10px; padding: 1px 8px; font-size: 0.78rem;
+    }
+    .extra-thread-hint { color: #ffb74d; font-size: 0.8rem; line-height: 1.4; }
+    .extra-thread-note { color: #999; font-size: 0.75rem; line-height: 1.4; margin-top: 2px; }
+    .extra-thread-result {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 10px; padding: 6px 10px;
+      border: 1px solid #4a3070; border-radius: 6px;
+      background: rgba(179,157,219,0.1); color: #b39ddb; font-size: 0.85rem;
+      mat-icon { font-size: 18px; height: 18px; width: 18px; flex-shrink: 0; }
     }
     .combat-option-btn.threadweave-btn { color: #b39ddb; border-color: #4a3070; }
     .combat-option-btn.threadweave-btn:not([disabled]):hover { border-color: #b39ddb; background: rgba(179,157,219,0.1); }
@@ -3279,6 +3509,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     caster?: CombatantState;
     spellId?: number;
     spendKarma: boolean;
+    /** Bei einem Zusatzfaden: Index der gewählten Option. */
+    extraOptionIndex?: number;
   } = { open: false, spendKarma: false };
 
   threadweaveModal: { open: boolean; result?: ThreadweaveResult } = { open: false };
@@ -3315,6 +3547,25 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   fearModal: { open: boolean; result?: FearResult } = { open: false };
 
   fearResistModal: { open: boolean; result?: FearResistResult } = { open: false };
+
+  /** Auswahldialog für Magie neutralisieren — via WebSocket bei allen Clients geöffnet. */
+  neutralizeSelectModal: {
+    open: boolean;
+    actorCombatantId?: number;
+    actorName?: string;
+    rank?: number;
+    /**
+     * Snapshot der Effektliste beim Öffnen. WICHTIG: nicht im Template berechnen —
+     * allActiveEffects() erzeugt neue Objekte, was im *ngFor eine Change-Detection-Endlosschleife auslöst.
+     */
+    effects: EffectChoice[];
+    /** Auswahl: 'combatantId:effectId' */
+    selection?: string;
+    effectLevel: number;
+    spendKarma: boolean;
+  } = { open: false, effects: [], effectLevel: 5, spendKarma: false };
+
+  neutralizeModal: { open: boolean; result?: NeutralizeMagicResult } = { open: false };
 
   acrobaticDialog: {
     open: boolean;
@@ -3474,6 +3725,21 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'FEAR_RESIST':
         this.fearResistModal = { open: true, result: payload };
         break;
+      case 'NEUTRALIZE_MAGIC_SELECT':
+        this.neutralizeSelectModal = {
+          open: true,
+          actorCombatantId: payload?.actorCombatantId,
+          actorName: payload?.actorName,
+          rank: payload?.rank,
+          effects: this.allActiveEffects(), // einmaliger Snapshot — nicht im Template berechnen!
+          selection: undefined,
+          effectLevel: 5,
+          spendKarma: false
+        };
+        break;
+      case 'NEUTRALIZE_MAGIC':
+        this.neutralizeModal = { open: true, result: payload };
+        break;
     }
   }
 
@@ -3494,6 +3760,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (this.combatEndedModal) this.combatEndedModal.open = false;
     if (this.fearModal) this.fearModal.open = false;
     if (this.fearResistModal) this.fearResistModal.open = false;
+    if (this.neutralizeSelectModal) this.neutralizeSelectModal.open = false;
+    if (this.neutralizeModal) this.neutralizeModal.open = false;
     if (this.standUpModal) this.standUpModal.open = false;
     if (this.threadweaveModal) this.threadweaveModal.open = false;
     if (this.spellCastModal) this.spellCastModal.open = false;
@@ -4234,6 +4502,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   /** Talente, die als Zaubermatrize zählen (normal oder erweitert). */
   private static readonly MATRIX_TALENTS = ['Zaubermatritze', 'Erweiterte Matrize'];
 
+  /** Fadenweben-Talent je Disziplin — spiegelt SpellService.WEAVING_TALENT_MAP. */
+  private static readonly WEAVING_TALENT_BY_DISCIPLINE: Record<string, string> = {
+    'Elementarist': 'Elementarismus',
+    'Illusionist': 'Illusionismus',
+    'Magier': 'Magie',
+    'Geisterbeschwörer': 'Geisterbeschwörung'
+  };
+
   /** IDs aller Zauber, die in einer (normalen oder erweiterten) Matrize des Charakters liegen. */
   matrixSpellIds(c?: CombatantState): Set<number> {
     const ids = new Set<number>();
@@ -4279,8 +4555,76 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       open: true,
       caster: c,
       spellId: c.preparingSpellId ?? (this.spellsOf(c).length > 0 ? this.spellsOf(c)[0].spellDefinition.id : undefined),
-      spendKarma: false
+      spendKarma: false,
+      extraOptionIndex: undefined
     };
+  }
+
+  // --- Zusatzfäden ---
+
+  /** Zauber, der im Fadenweben-Dialog gerade gewählt ist. */
+  threadweaveSpell(): SpellDefinition | undefined {
+    const c = this.threadweaveDialog.caster;
+    const id = this.threadweaveDialog.spellId;
+    if (!c || !id) return undefined;
+    return (c.character.spells ?? []).find(s => s.spellDefinition.id === id)?.spellDefinition;
+  }
+
+  threadweaveOptions(): SpellThreadOption[] {
+    return this.threadweaveSpell()?.threadOptions ?? [];
+  }
+
+  /** Fadenweben-Rang = Obergrenze für Zusatzfäden. 0 = Talent fehlt. */
+  weavingRankOf(c?: CombatantState): number {
+    const talentName = CombatTrackerComponent.WEAVING_TALENT_BY_DISCIPLINE[c?.character.discipline?.name ?? ''];
+    if (!talentName) return 0;
+    return (c?.character.talents ?? []).find(t => t.talentDefinition.name === talentName)?.rank ?? 0;
+  }
+
+  /** Anzahl bereits gewobener Zusatzfäden (CSV-Länge). */
+  extraThreadCountOf(c?: CombatantState): number {
+    const csv = c?.extraThreadChoices;
+    if (!csv) return 0;
+    return csv.split(',').filter(t => t.trim() !== '').length;
+  }
+
+  /** Pflichtfäden für diesen Zauber — erweiterte Matrize hat bereits einen Faden vorgewoben. */
+  private requiredThreadsFor(c: CombatantState, spell: SpellDefinition): number {
+    const enhanced = (c.character.talents ?? []).some(
+      t => t.talentDefinition.name === 'Erweiterte Matrize' && t.assignedSpell?.id === spell.id);
+    return Math.max(0, spell.threads - (enhanced ? 1 : 0));
+  }
+
+  /**
+   * Ist der nächste Faden ein Zusatzfaden? Spiegelt die Backend-Regel: alle Pflichtfäden gewoben.
+   * Vor Beginn der Vorbereitung zählt der Bedarf laut Zauber (0 → sofort Zusatzfaden, z.B. Blitz).
+   */
+  threadweaveIsExtra(): boolean {
+    const c = this.threadweaveDialog.caster;
+    const spell = this.threadweaveSpell();
+    if (!c || !spell) return false;
+    if (c.preparingSpellId === spell.id) return c.threadsWoven >= c.threadsRequired;
+    return this.requiredThreadsFor(c, spell) === 0;
+  }
+
+  /** Sind bereits alle erlaubten Zusatzfäden (= Fadenweben-Rang) gewoben? */
+  threadweaveExtraExhausted(): boolean {
+    const c = this.threadweaveDialog.caster;
+    if (!c || !this.threadweaveIsExtra()) return false;
+    return this.extraThreadCountOf(c) >= this.weavingRankOf(c);
+  }
+
+  /** Weben blockiert: kein Zauber, oder Zusatzfaden ohne (mögliche) Option. */
+  threadweaveBlocked(): boolean {
+    if (!this.threadweaveDialog.spellId) return true;
+    if (!this.threadweaveIsExtra()) return false;
+    if (this.threadweaveOptions().length === 0) return true;
+    if (this.threadweaveExtraExhausted()) return true;
+    return this.threadweaveDialog.extraOptionIndex === undefined;
+  }
+
+  trackByOptionIndex(index: number): number {
+    return index;
   }
 
   performThreadweave(): void {
@@ -4289,7 +4633,8 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       sessionId: this.session.id,
       casterCombatantId: this.threadweaveDialog.caster.id,
       spellId: this.threadweaveDialog.spellId,
-      spendKarma: this.threadweaveDialog.spendKarma
+      spendKarma: this.threadweaveDialog.spendKarma,
+      extraThreadOptionIndex: this.threadweaveIsExtra() ? this.threadweaveDialog.extraOptionIndex : undefined
     };
     this.combatService.weaveThread(this.session.id, req).subscribe({
       next: result => {
@@ -4658,6 +5003,75 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.combatService.resistFear(this.session.id, c.id).subscribe({
       next: result => {
         this.fearResistModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // ── Magie neutralisieren ───────────────────────────────────────────────────
+
+  hasNeutralizeMagicTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Magie neutralisieren');
+  }
+
+  trackByEffectKey(_i: number, e: EffectChoice): string { return e.key; }
+
+  /**
+   * Alle aktiven Effekte aller Kombattanten — Auswahlliste für Magie neutralisieren.
+   * Der GM entscheidet, was neutralisierbar ist, daher wird nicht gefiltert.
+   * NUR beim Öffnen des Dialogs aufrufen (Snapshot) — erzeugt neue Objekte und würde
+   * im Template eine Change-Detection-Endlosschleife auslösen.
+   */
+  allActiveEffects(): EffectChoice[] {
+    const out: EffectChoice[] = [];
+    for (const c of this.session?.combatants ?? []) {
+      for (const e of c.activeEffects ?? []) {
+        if (e.id == null) continue;
+        out.push({
+          key: `${c.id}:${e.id}`,
+          combatantId: c.id,
+          combatantName: this.cn(c),
+          effectId: e.id,
+          name: e.name,
+          remainingRounds: e.remainingRounds
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Der Kombattant, der Magie neutralisieren anwendet (aus dem synchronisierten Dialog). */
+  neutralizeActor(): CombatantState | undefined {
+    const id = this.neutralizeSelectModal.actorCombatantId;
+    return id == null ? undefined : this.session?.combatants.find(c => c.id === id);
+  }
+
+  openNeutralizeMagicDialog(c: CombatantState): void {
+    if (!this.session) return;
+    // Öffnet das Modal via Backend-Broadcast bei allen Clients
+    this.combatService.openNeutralizeMagicDialog(this.session.id, c.id).subscribe({
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  performNeutralizeMagic(): void {
+    const m = this.neutralizeSelectModal;
+    if (!this.session || !m.selection || m.actorCombatantId == null) return;
+    const [combatantId, effectId] = m.selection.split(':').map(Number);
+    const req: NeutralizeMagicRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: m.actorCombatantId,
+      targetCombatantId: combatantId,
+      effectId,
+      effectLevel: m.effectLevel || 0,
+      bonusSteps: 0,
+      spendKarma: m.spendKarma
+    };
+    this.combatService.performNeutralizeMagic(this.session.id, req).subscribe({
+      next: result => {
+        this.neutralizeSelectModal.open = false;
+        this.neutralizeModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })

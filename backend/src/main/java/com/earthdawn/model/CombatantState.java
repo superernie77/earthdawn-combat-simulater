@@ -214,6 +214,14 @@ public class CombatantState {
     @Builder.Default
     private int threadsRequired = 0;
 
+    /**
+     * Gewählte Zusatzfaden-Optionen als CSV der Indizes in {@code SpellDefinition.threadOptions},
+     * z.B. "1,1,3" = Option 1 zweimal, Option 3 einmal. Null/leer = keine Zusatzfäden.
+     * Die Anzahl der Einträge ist die Anzahl der zusätzlich gewobenen Fäden (max. Fadenweben-Rang).
+     */
+    @Column(length = 200)
+    private String extraThreadChoices;
+
     // --- Deklarationsphase (Ansage zu Rundenbeginn) ---
 
     /** Hat dieser Kombattant für die aktuelle Runde bereits deklariert? */

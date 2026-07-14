@@ -6,6 +6,7 @@ import {
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
   FearRequest, FearResult, FearResistResult,
+  NeutralizeMagicRequest, NeutralizeMagicResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
   DodgeRequest, DodgeResult, StandUpResult,
@@ -152,6 +153,17 @@ export class CombatService {
     return this.http.post<FearResistResult>(
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/resist-fear`, {}
     );
+  }
+
+  /** Öffnet den für alle Clients sichtbaren Auswahldialog (Magie neutralisieren). */
+  openNeutralizeMagicDialog(sessionId: number, combatantId: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/neutralize-magic/open`, {}
+    );
+  }
+
+  performNeutralizeMagic(sessionId: number, req: NeutralizeMagicRequest): Observable<NeutralizeMagicResult> {
+    return this.http.post<NeutralizeMagicResult>(`${this.base}/sessions/${sessionId}/neutralize-magic`, req);
   }
 
   performAcrobaticDefense(sessionId: number, combatantId: number,

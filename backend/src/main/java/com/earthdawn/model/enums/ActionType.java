@@ -34,5 +34,6 @@ public enum ActionType {
     BLATTSCHUSS_KARMA,
     NACHTRETEN,
     SCHWANZANGRIFF,
-    FEAR
+    FEAR,
+    NEUTRALIZE_MAGIC
 }

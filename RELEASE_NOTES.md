@@ -2,6 +2,16 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Zusätzliche Fäden bei Zaubern**
+Sind alle Pflichtfäden eines Zaubers gewoben, kann jeder weitere Faden eine der Zusatz-Optionen des Zaubers kaufen — auswählbar im Fadenweben-Dialog. Die Obergrenze ist der **Fadenweben-Rang**; dieselbe Option darf mehrfach gewählt werden. Auch **Sofortzauber ohne Pflichtfäden** (z.B. Blitz) können Zusatzfäden aufnehmen.
+
+Automatisch verrechnet wird nur **„Wirkung Verstärken (Wirkungsstufe +2)"**. Alle übrigen Optionen — Reichweite, zusätzliche Ziele, Wirkungsdauer und Boni auf Heimlichkeit/Wahrnehmung — werden gewählt, gespeichert und im Kampfprotokoll sowie im Ergebnisfenster angezeigt, aber bewusst **nicht** gerechnet: dafür fehlen dem Kampfsystem die Grundlagen (kein Distanzsystem, einzelzielige Zauber, Dauer in Runden statt Minuten, keine Nicht-Kampf-Proben). Der Spielleiter entscheidet.
+
+Hinterlegt für 10 Illusionisten-Zauber: Katastrophe, Umhang, Vertrauen, Blitz, Illusionärer Blitz, Blindheit, Gedankennebel, Sehen von Verborgenem, Niemand Da, Phantomkrieger.
+
+**Neues Talent: Magie neutralisieren**
+Beendet einen beliebigen aktiven Effekt auf einem beliebigen Kombattanten (WIL + Rang vs. **Effektstufe + 10**). Verbraucht die Aktion der Runde und kostet 1 Überanstrengung. Beim Anwenden öffnet sich **bei allen Mitspielern** ein Auswahldialog mit allen aktuell aktiven Effekten; dort wird der Effekt gewählt und seine Stufe eingetragen (Effekte haben keine eigene Stufe — maßgeblich ist der auslösende Zauber bzw. das Talent). Das Ergebnis erscheint ebenfalls bei allen. Welche Effekte sich neutralisieren lassen, entscheidet der Spielleiter — es stehen alle zur Auswahl.
+
 **Neues Talent: Verängstigen**
 Der Adept jagt einem Gegner übernatürliche Furcht ein (WIL + Rang vs. Mystische Verteidigung, Standardaktion, 0 Überanstrengung). Bei Erfolg erleidet das Ziel **−2 auf alle Aktionsproben je Erfolg** für Rang Runden. Das Ziel darf in jeder seiner Runden eine Willenskraftprobe gegen die Verängstigen-Stufe ablegen („Furcht abschütteln") — Erfolg beendet den Effekt vorzeitig. Disziplintalent des Geisterbeschwörers (1. Kreis), Talentoption für Illusionisten (Kreis 5–8).
 

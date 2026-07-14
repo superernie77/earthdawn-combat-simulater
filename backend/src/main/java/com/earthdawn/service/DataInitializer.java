@@ -294,6 +294,21 @@ public class DataInitializer {
             log.info("Talent 'Starrsinn' hinzugefügt.");
         }
 
+        if (talentRepo.findByName("Magie neutralisieren").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Magie neutralisieren")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Beendet einen aktiven magischen Effekt auf einem beliebigen Kombattanten " +
+                            "(WIL + Rang vs. Effektstufe + 10). Verbraucht die Aktion der Runde, kostet 1 Überanstrengung. " +
+                            "Die Stufe des Effekts wird beim Anwenden gewählt (Effekte tragen keine eigene Stufe — " +
+                            "maßgeblich ist der auslösende Zauber bzw. das Talent). Welche Effekte neutralisierbar sind, " +
+                            "entscheidet der Spielleiter — es stehen alle zur Auswahl.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Magie neutralisieren' hinzugefügt.");
+        }
+
         if (talentRepo.findByName("Verängstigen").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Verängstigen")
@@ -452,6 +467,70 @@ public class DataInitializer {
 
         // Disziplin-Zugriffslisten auf implementierte Talente setzen
         migrateDisciplineAccessLists();
+
+        // Zusatzfaden-Optionen an bestehende Zauber hängen
+        migrateSpellThreadOptions();
+    }
+
+    /**
+     * Zusatzfaden-Optionen der Zauber (idempotent — nur wenn noch keine gesetzt sind).
+     * Nur WIRKUNGSSTUFE wird von der Engine verrechnet; alle übrigen Optionen sind Anzeige
+     * für den Spielleiter, weil die Engine weder Reichweiten noch Mehrfachziele noch Boni
+     * auf Nicht-Kampf-Proben (Heimlichkeit/Wahrnehmung) kennt.
+     */
+    private void migrateSpellThreadOptions() {
+        String REICHWEITE_10 = "Reichweite Erhöhen (+10 Schritt)";
+        String DAUER_2MIN    = "Wirkungsdauer Verlängern (+2 Minuten)";
+        String ZIEL_1        = "Zusätzliches Ziel (+1)";
+        String ZIEL_RANG     = "Zusätzliches Ziel (+Rang)";
+
+        setThreadOptions("Katastrophe",
+                display(REICHWEITE_10));
+        setThreadOptions("Umhang",
+                display(REICHWEITE_10), display("Wirkung Verstärken (Bonus +2)"),
+                display(DAUER_2MIN), display(ZIEL_RANG));
+        setThreadOptions("Vertrauen",
+                display(REICHWEITE_10), display(DAUER_2MIN));
+        setThreadOptions("Blitz",
+                effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
+                display("Malus Erhöhen (−2)"),
+                display("Malus gilt auch für die zusätzliche Durchschauen-Probe"),
+                display(ZIEL_1));
+        setThreadOptions("Illusionärer Blitz",
+                display(REICHWEITE_10), effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
+                display(ZIEL_1));
+        setThreadOptions("Blindheit",
+                display(DAUER_2MIN));
+        setThreadOptions("Gedankennebel",
+                display(REICHWEITE_10), effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
+                display(ZIEL_1));
+        setThreadOptions("Sehen von Verborgenem",
+                display("Wirkung Verstärken (Bonus +1)"), display(DAUER_2MIN), display(ZIEL_RANG));
+        setThreadOptions("Niemand Da",
+                display("Reichweite Erhöhen (+2 Schritt)"), display(DAUER_2MIN));
+        setThreadOptions("Phantomkrieger",
+                display(REICHWEITE_10), display("Wirkung Verstärken (+1 Bild)"), display(ZIEL_RANG));
+    }
+
+    private SpellThreadOption display(String label) {
+        return SpellThreadOption.builder()
+                .label(label).type(SpellThreadOptionType.DISPLAY).value(0).build();
+    }
+
+    private SpellThreadOption effectStep(String label, int value) {
+        return SpellThreadOption.builder()
+                .label(label).type(SpellThreadOptionType.EFFECT_STEP).value(value).build();
+    }
+
+    /** Setzt die Optionen für alle Zauber dieses Namens, sofern dort noch keine hinterlegt sind. */
+    private void setThreadOptions(String spellName, SpellThreadOption... options) {
+        spellRepo.findAll().stream()
+                .filter(s -> spellName.equals(s.getName()))
+                .filter(s -> s.getThreadOptions() == null || s.getThreadOptions().isEmpty())
+                .forEach(s -> {
+                    s.setThreadOptions(new java.util.ArrayList<>(java.util.List.of(options)));
+                    spellRepo.save(s);
+                });
     }
 
     private void migrateDisciplineAccessLists() {

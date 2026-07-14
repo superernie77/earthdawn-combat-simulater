@@ -315,3 +315,262 @@ describe('CombatTrackerComponent — Verängstigen', () => {
     expect(resistFear).toHaveBeenCalledWith(7, 42);
   });
 });
+
+describe('CombatTrackerComponent — Magie neutralisieren', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => {
+    comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent;
+    (comp as any).cn = (c: any) => c.character?.name ?? '?';
+  });
+
+  it('hasNeutralizeMagicTalent() erkennt das Talent', () => {
+    const mit: any = { character: { talents: [{ talentDefinition: { name: 'Magie neutralisieren' }, rank: 4 }] } };
+    const ohne: any = { character: { talents: [{ talentDefinition: { name: 'Verängstigen' }, rank: 4 }] } };
+    expect(comp.hasNeutralizeMagicTalent(mit)).toBe(true);
+    expect(comp.hasNeutralizeMagicTalent(ohne)).toBe(false);
+  });
+
+  it('allActiveEffects() sammelt Effekte aller Kombattanten mit key combatantId:effectId', () => {
+    (comp as any).session = { combatants: [
+      { id: 1, character: { name: 'Kaelen' }, activeEffects: [
+        { id: 500, name: 'Verängstigt', remainingRounds: 3 },
+        { id: 501, name: 'Segen', remainingRounds: -1 },
+      ] },
+      { id: 2, character: { name: 'Ork' }, activeEffects: [{ id: 502, name: 'Bedrängt', remainingRounds: 1 }] },
+      { id: 3, character: { name: 'Leer' }, activeEffects: [] },
+    ] };
+    const all = comp.allActiveEffects();
+    expect(all.map(e => e.key)).toEqual(['1:500', '1:501', '2:502']);
+    expect(all[0].combatantName).toBe('Kaelen');
+    expect(all[2].name).toBe('Bedrängt');
+  });
+
+  it('allActiveEffects() überspringt Effekte ohne id und ist leer ohne Session', () => {
+    (comp as any).session = { combatants: [
+      { id: 1, character: { name: 'X' }, activeEffects: [{ name: 'Ohne Id', remainingRounds: 1 }] },
+    ] };
+    expect(comp.allActiveEffects()).toEqual([]);
+    (comp as any).session = undefined;
+    expect(comp.allActiveEffects()).toEqual([]);
+  });
+
+  it('neutralizeActor() findet den Anwender aus dem synchronisierten Dialog', () => {
+    (comp as any).session = { combatants: [{ id: 1, character: { name: 'A' } }, { id: 2, character: { name: 'B' } }] };
+    (comp as any).neutralizeSelectModal = { open: true, actorCombatantId: 2 };
+    expect(comp.neutralizeActor()?.id).toBe(2);
+    (comp as any).neutralizeSelectModal = { open: true, actorCombatantId: undefined };
+    expect(comp.neutralizeActor()).toBeUndefined();
+  });
+
+  it('performNeutralizeMagic() zerlegt die Auswahl und schickt Ziel, Effekt und Stufe', () => {
+    (comp as any).session = { id: 7, combatants: [] };
+    (comp as any).neutralizeSelectModal = {
+      open: true, actorCombatantId: 1, selection: '2:502', effectLevel: 8, spendKarma: true
+    };
+    const performNeutralizeMagic = jest.fn().mockReturnValue({ subscribe: () => {} });
+    (comp as any).combatService = { performNeutralizeMagic };
+
+    comp.performNeutralizeMagic();
+
+    expect(performNeutralizeMagic).toHaveBeenCalledWith(7, {
+      sessionId: 7, actorCombatantId: 1, targetCombatantId: 2,
+      effectId: 502, effectLevel: 8, bonusSteps: 0, spendKarma: true
+    });
+  });
+
+  it('performNeutralizeMagic() tut nichts ohne Auswahl', () => {
+    (comp as any).session = { id: 7 };
+    (comp as any).neutralizeSelectModal = { open: true, actorCombatantId: 1, selection: undefined, effectLevel: 5 };
+    const performNeutralizeMagic = jest.fn();
+    (comp as any).combatService = { performNeutralizeMagic };
+    comp.performNeutralizeMagic();
+    expect(performNeutralizeMagic).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Regression: allActiveEffects() erzeugt neue Objekte. Wird es im Template (*ngFor) aufgerufen,
+   * baut mat-select die Optionen in jedem Change-Detection-Zyklus neu auf → Endlosschleife,
+   * die den Browser einfriert. Die Liste muss daher beim Öffnen einmalig gesnapshottet werden.
+   */
+  it('NEUTRALIZE_MAGIC_SELECT snapshottet die Effektliste beim Öffnen', () => {
+    (comp as any).session = { combatants: [
+      { id: 1, character: { name: 'Kaelen' }, activeEffects: [{ id: 500, name: 'Verängstigt', remainingRounds: 3 }] },
+      { id: 2, character: { name: 'Ork' }, activeEffects: [{ id: 502, name: 'Bedrängt', remainingRounds: 1 }] },
+    ] };
+    // Modale, die closeAllResultModals() ungeschützt anfasst
+    for (const m of ['resultModal', 'initiativeModal', 'tigersprungModal', 'lufttanzModal']) {
+      (comp as any)[m] = { open: false };
+    }
+    (comp as any).neutralizeSelectModal = { open: false, effects: [], effectLevel: 5, spendKarma: false };
+
+    (comp as any).openLocalModalForType('NEUTRALIZE_MAGIC_SELECT', { actorCombatantId: 1, actorName: 'Kaelen', rank: 4 });
+
+    const m = (comp as any).neutralizeSelectModal;
+    expect(m.open).toBe(true);
+    expect(m.actorName).toBe('Kaelen');
+    expect(m.rank).toBe(4);
+    expect(m.effects.map((e: any) => e.key)).toEqual(['1:500', '2:502']); // Snapshot vorhanden
+    expect(m.selection).toBeUndefined();
+  });
+
+  it('trackByEffectKey() liefert den stabilen key', () => {
+    expect(comp.trackByEffectKey(0, { key: '1:500' } as any)).toBe('1:500');
+  });
+});
+
+describe('CombatTrackerComponent — Zusatzfäden', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  const OPT_STEP = { label: 'Wirkung Verstärken (Wirkungsstufe +2)', type: 'EFFECT_STEP', value: 2 };
+  const OPT_DISPLAY = { label: 'Reichweite Erhöhen (+10 Schritt)', type: 'DISPLAY', value: 0 };
+
+  /** Illusionist mit Illusionismus-Rang und einem Zauber in der Matrize. */
+  function caster(opts: {
+    threads: number;
+    threadOptions?: any[];
+    weavingRank?: number;
+    enhancedMatrix?: boolean;
+    preparingSpellId?: number;
+    threadsWoven?: number;
+    threadsRequired?: number;
+    extraThreadChoices?: string;
+  }): any {
+    const spellDef = {
+      id: 50, name: 'Blitz', threads: opts.threads,
+      weavingDifficulty: 5, threadOptions: opts.threadOptions
+    };
+    const talents: any[] = [
+      { talentDefinition: { name: 'Illusionismus' }, rank: opts.weavingRank ?? 4 },
+      { talentDefinition: { name: 'Zaubermatritze' }, assignedSpell: spellDef, rank: 1 }
+    ];
+    if (opts.enhancedMatrix) {
+      talents.push({ talentDefinition: { name: 'Erweiterte Matrize' }, assignedSpell: spellDef, rank: 1 });
+    }
+    return {
+      id: 10,
+      preparingSpellId: opts.preparingSpellId,
+      threadsWoven: opts.threadsWoven ?? 0,
+      threadsRequired: opts.threadsRequired ?? 0,
+      extraThreadChoices: opts.extraThreadChoices,
+      character: { discipline: { name: 'Illusionist' }, talents, spells: [{ spellDefinition: spellDef }] }
+    };
+  }
+
+  function openWith(c: any, extraOptionIndex?: number) {
+    (comp as any).threadweaveDialog = { open: true, caster: c, spellId: 50, spendKarma: false, extraOptionIndex };
+  }
+
+  // --- Erkennung: Pflicht- vs. Zusatzfaden ---
+
+  it('threadweaveIsExtra() ist false, solange Pflichtfäden offen sind', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP], preparingSpellId: 50, threadsWoven: 1, threadsRequired: 2 }));
+    expect(comp.threadweaveIsExtra()).toBe(false);
+  });
+
+  it('threadweaveIsExtra() ist true, sobald alle Pflichtfäden gewoben sind', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP], preparingSpellId: 50, threadsWoven: 2, threadsRequired: 2 }));
+    expect(comp.threadweaveIsExtra()).toBe(true);
+  });
+
+  it('threadweaveIsExtra() ist true bei einem Sofortzauber (0 Fäden) vor der Vorbereitung', () => {
+    openWith(caster({ threads: 0, threadOptions: [OPT_STEP] }));
+    expect(comp.threadweaveIsExtra()).toBe(true);
+  });
+
+  it('threadweaveIsExtra() ist false bei einem 2-Faden-Zauber vor der Vorbereitung', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP] }));
+    expect(comp.threadweaveIsExtra()).toBe(false);
+  });
+
+  it('threadweaveIsExtra() beachtet die erweiterte Matrize (1 Faden vorgewoben)', () => {
+    // 1-Faden-Zauber in erweiterter Matrize → 0 Pflichtfäden → erster Faden ist bereits Zusatzfaden
+    openWith(caster({ threads: 1, threadOptions: [OPT_STEP], enhancedMatrix: true }));
+    expect(comp.threadweaveIsExtra()).toBe(true);
+  });
+
+  // --- Obergrenze ---
+
+  it('weavingRankOf() liest den Rang des Fadenweben-Talents der Disziplin', () => {
+    expect(comp.weavingRankOf(caster({ threads: 2, weavingRank: 6 }))).toBe(6);
+  });
+
+  it('weavingRankOf() ist 0 ohne passende Disziplin', () => {
+    const c = caster({ threads: 2 });
+    c.character.discipline = { name: 'Krieger' };
+    expect(comp.weavingRankOf(c)).toBe(0);
+  });
+
+  it('extraThreadCountOf() zählt die CSV-Einträge', () => {
+    expect(comp.extraThreadCountOf(caster({ threads: 2 }))).toBe(0);
+    expect(comp.extraThreadCountOf(caster({ threads: 2, extraThreadChoices: '0' }))).toBe(1);
+    expect(comp.extraThreadCountOf(caster({ threads: 2, extraThreadChoices: '0,1,0' }))).toBe(3);
+  });
+
+  it('threadweaveExtraExhausted() greift bei erreichtem Fadenweben-Rang', () => {
+    openWith(caster({
+      threads: 0, threadOptions: [OPT_STEP], weavingRank: 2,
+      preparingSpellId: 50, extraThreadChoices: '0,0'
+    }));
+    expect(comp.threadweaveExtraExhausted()).toBe(true);
+  });
+
+  it('threadweaveExtraExhausted() ist false unterhalb des Rangs', () => {
+    openWith(caster({
+      threads: 0, threadOptions: [OPT_STEP], weavingRank: 3,
+      preparingSpellId: 50, extraThreadChoices: '0,0'
+    }));
+    expect(comp.threadweaveExtraExhausted()).toBe(false);
+  });
+
+  // --- Button-Sperre ---
+
+  it('threadweaveBlocked() ist false für einen Pflichtfaden ohne Option', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP], preparingSpellId: 50, threadsWoven: 0, threadsRequired: 2 }));
+    expect(comp.threadweaveBlocked()).toBe(false);
+  });
+
+  it('threadweaveBlocked() sperrt einen Zusatzfaden ohne gewählte Option', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP], preparingSpellId: 50, threadsWoven: 2, threadsRequired: 2 }));
+    expect(comp.threadweaveBlocked()).toBe(true);
+  });
+
+  it('threadweaveBlocked() gibt einen Zusatzfaden mit Option frei', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP], preparingSpellId: 50, threadsWoven: 2, threadsRequired: 2 }), 0);
+    expect(comp.threadweaveBlocked()).toBe(false);
+  });
+
+  it('threadweaveBlocked() lässt Option-Index 0 zu (kein Falsy-Bug)', () => {
+    openWith(caster({ threads: 0, threadOptions: [OPT_STEP] }), 0);
+    expect(comp.threadweaveBlocked()).toBe(false);
+  });
+
+  it('threadweaveBlocked() sperrt Zusatzfäden bei einem Zauber ohne Optionen', () => {
+    openWith(caster({ threads: 2, threadOptions: [], preparingSpellId: 50, threadsWoven: 2, threadsRequired: 2 }), 0);
+    expect(comp.threadweaveBlocked()).toBe(true);
+  });
+
+  it('threadweaveBlocked() sperrt bei erschöpftem Fadenweben-Rang', () => {
+    openWith(caster({
+      threads: 0, threadOptions: [OPT_STEP], weavingRank: 1,
+      preparingSpellId: 50, extraThreadChoices: '0'
+    }), 0);
+    expect(comp.threadweaveBlocked()).toBe(true);
+  });
+
+  // --- Optionen ---
+
+  it('threadweaveOptions() liefert die Optionen des gewählten Zaubers', () => {
+    openWith(caster({ threads: 2, threadOptions: [OPT_STEP, OPT_DISPLAY] }));
+    expect(comp.threadweaveOptions()).toEqual([OPT_STEP, OPT_DISPLAY]);
+  });
+
+  it('threadweaveOptions() ist leer, wenn der Zauber keine kennt', () => {
+    openWith(caster({ threads: 2 }));
+    expect(comp.threadweaveOptions()).toEqual([]);
+  });
+
+  it('trackByOptionIndex() liefert den Index', () => {
+    expect(comp.trackByOptionIndex(3)).toBe(3);
+  });
+});

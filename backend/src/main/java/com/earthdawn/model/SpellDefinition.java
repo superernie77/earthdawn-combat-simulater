@@ -94,4 +94,15 @@ public class SpellDefinition {
     @Builder.Default
     @Column(length = 20)
     private String extraSuccessEffect = "NONE";
+
+    /**
+     * Wählbare Zusatzfaden-Optionen. Je zusätzlich gewobenem Faden wird genau eine Option gewählt
+     * (Mehrfachwahl derselben Option erlaubt). Leere Liste = Zauber kennt keine Zusatzfäden.
+     * Die Reihenfolge ist stabil (option_order), da Auswahlen als Index gespeichert werden.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "spell_thread_options", joinColumns = @JoinColumn(name = "spell_id"))
+    @OrderColumn(name = "option_order")
+    @Builder.Default
+    private java.util.List<SpellThreadOption> threadOptions = new java.util.ArrayList<>();
 }

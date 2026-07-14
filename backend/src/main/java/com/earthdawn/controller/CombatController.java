@@ -91,6 +91,18 @@ public class CombatController {
         return combatService.resistFear(id, combatantId);
     }
 
+    /** Öffnet den für alle Clients synchronisierten Auswahldialog für Magie neutralisieren. */
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/neutralize-magic/open")
+    public CombatSession openNeutralizeMagicDialog(@PathVariable Long id, @PathVariable Long combatantId) {
+        return combatService.openNeutralizeMagicDialog(id, combatantId);
+    }
+
+    @PostMapping("/sessions/{id}/neutralize-magic")
+    public NeutralizeMagicResult performNeutralizeMagic(@PathVariable Long id, @RequestBody NeutralizeMagicRequest req) {
+        req.setSessionId(id);
+        return combatService.performNeutralizeMagic(id, req);
+    }
+
     @PostMapping("/sessions/{id}/dodge")
     public DodgeResult resolveDodge(@PathVariable Long id, @RequestBody DodgeRequest req) {
         return combatService.resolveDodge(id, req);

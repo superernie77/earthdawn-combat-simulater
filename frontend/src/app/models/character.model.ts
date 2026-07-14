@@ -149,6 +149,15 @@ export interface SpellDefinition {
   effectDescription: string;
   /** Wenn true: im Zauberdialog wird ein Ziel ausgewählt; Schwierigkeit = MV des Ziels. */
   requiresTarget?: boolean;
+  /** Wählbare Zusatzfaden-Optionen (leer/undefined = Zauber kennt keine Zusatzfäden). */
+  threadOptions?: SpellThreadOption[];
+}
+
+export interface SpellThreadOption {
+  label: string;
+  /** EFFECT_STEP wird automatisch verrechnet, DISPLAY ist reine Anzeige für den Spielleiter. */
+  type: 'EFFECT_STEP' | 'DISPLAY';
+  value: number;
 }
 
 export interface CharacterSpell {

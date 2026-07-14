@@ -37,6 +37,13 @@ public class SpellCastResult {
     private int effectDuration;
     private int healedAmount;
 
+    // Zusatzfäden
+    /** Texte der beim Vorbereiten gewählten Zusatzfaden-Optionen (in Wahlreihenfolge). */
+    private java.util.List<String> extraThreadLabels;
+
+    /** Automatisch verrechnete Erhöhung der Wirkungsstufe aus Zusatzfäden. */
+    private int extraThreadEffectStep;
+
     private String description;
 
     /** Angewandte Verzweiflungsschlag-Amulette (Zauber-/Schadensbonus) zur Anzeige. */

@@ -100,6 +100,8 @@ export interface CombatantState {
   preparingSpellId?: number;
   threadsWoven: number;
   threadsRequired: number;
+  /** Gewählte Zusatzfaden-Optionen als CSV der Indizes, z.B. "0,0,3". */
+  extraThreadChoices?: string;
   activeEffects: ActiveEffect[];
 }
 
@@ -276,6 +278,8 @@ export interface ThreadweaveRequest {
   casterCombatantId: number;
   spellId: number;
   spendKarma: boolean;
+  /** Nur bei Zusatzfäden: Index der gewählten Option in SpellDefinition.threadOptions. */
+  extraThreadOptionIndex?: number;
 }
 
 export interface ThreadweaveResult {
@@ -289,6 +293,13 @@ export interface ThreadweaveResult {
   threadsWoven: number;
   threadsRequired: number;
   readyToCast: boolean;
+  /** War dieser Faden ein Zusatzfaden statt eines Pflichtfadens? */
+  extraThread?: boolean;
+  /** Bei Erfolg eines Zusatzfadens: Text der gewählten Option. */
+  extraThreadLabel?: string;
+  extraThreadCount?: number;
+  /** Obergrenze = Fadenweben-Rang. */
+  extraThreadMax?: number;
   description: string;
 }
 
@@ -329,6 +340,10 @@ export interface SpellCastResult {
   effectApplied?: string;
   effectDuration?: number;
   healedAmount?: number;
+  /** Beim Vorbereiten gewählte Zusatzfaden-Optionen (Anzeige). */
+  extraThreadLabels?: string[];
+  /** Automatisch verrechnete Erhöhung der Wirkungsstufe aus Zusatzfäden. */
+  extraThreadEffectStep?: number;
   description: string;
   /** Angewandte Verzweiflungsschlag-Amulette (Zauber-/Schadensbonus) zur Anzeige. */
   amuletNotes?: string[];
@@ -624,5 +639,32 @@ export interface FearResistResult {
   roll: RollResult;
   targetNumber: number;
   success: boolean;
+  description: string;
+}
+
+export interface NeutralizeMagicRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  /** Kombattant, der den Effekt trägt. */
+  targetCombatantId: number;
+  effectId: number;
+  /** Gewählte Stufe des Effekts (Mindestwurf = Stufe + 10). */
+  effectLevel: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface NeutralizeMagicResult {
+  actorName: string;
+  targetName: string;
+  effectName: string;
+  effectLevel: number;
+  /** Mindestwurf = Effektstufe + 10. */
+  targetNumber: number;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult | null;
+  success: boolean;
+  effectRemoved: boolean;
   description: string;
 }

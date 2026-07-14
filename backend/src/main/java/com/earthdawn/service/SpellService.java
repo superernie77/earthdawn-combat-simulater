@@ -46,14 +46,14 @@ public class SpellService {
         SpellDefinition spell = spellRepo.findById(req.getSpellId())
                 .orElseThrow(() -> new EntityNotFoundException("Zauber nicht gefunden: " + req.getSpellId()));
 
-        if (spell.getThreads() == 0) throw new IllegalStateException("Dieser Zauber benötigt keine Fäden.");
+        // Auch Sofortzauber (threads == 0) können Zusatzfäden anbieten (z.B. Blitz, Katastrophe).
+        if (spell.getThreads() == 0 && spell.getThreadOptions().isEmpty()) {
+            throw new IllegalStateException("Dieser Zauber benötigt keine Fäden.");
+        }
 
-        // Bereits einen anderen Zauber in Vorbereitung?
+        // Bereits einen anderen Zauber in Vorbereitung? Vorbereitung abbrechen und neuen starten.
         if (caster.getPreparingSpellId() != null && !caster.getPreparingSpellId().equals(req.getSpellId())) {
-            // Vorbereitung abbrechen und neuen Zauber starten
-            caster.setPreparingSpellId(null);
-            caster.setThreadsWoven(0);
-            caster.setThreadsRequired(0);
+            resetPreparation(caster);
         }
 
         // Vorbereitung starten? Erweiterte Matrize: ein Faden ist bereits gewoben → −1 Aufwand.
@@ -62,6 +62,7 @@ public class SpellService {
             caster.setPreparingSpellId(spell.getId());
             caster.setThreadsWoven(0);
             caster.setThreadsRequired(Math.max(0, spell.getThreads() - discount));
+            caster.setExtraThreadChoices(null);
         }
 
         // Fadenweben-Talent finden
@@ -70,6 +71,26 @@ public class SpellService {
                 .filter(t -> t.getTalentDefinition().getName().equals(weavingTalentName))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Fadenweben-Talent '" + weavingTalentName + "' nicht gefunden."));
+
+        // Sind alle Pflichtfäden gewoben, ist dies ein Zusatzfaden — dafür muss eine Option
+        // gewählt werden, und es sind höchstens `Fadenweben-Rang` viele erlaubt.
+        boolean isExtra = caster.getThreadsWoven() >= caster.getThreadsRequired();
+        java.util.List<Integer> choices = parseChoices(caster.getExtraThreadChoices());
+        int extraMax = weavingTalent.getRank();
+        SpellThreadOption chosenOption = null;
+        if (isExtra) {
+            if (spell.getThreadOptions().isEmpty()) {
+                throw new IllegalStateException("'" + spell.getName() + "' bietet keine Zusatzfäden — alle Fäden sind bereits gewoben.");
+            }
+            if (choices.size() >= extraMax) {
+                throw new IllegalStateException("Maximal " + extraMax + " Zusatzfäden (Fadenweben-Rang " + extraMax + ").");
+            }
+            Integer idx = req.getExtraThreadOptionIndex();
+            if (idx == null || idx < 0 || idx >= spell.getThreadOptions().size()) {
+                throw new IllegalStateException("Für einen Zusatzfaden muss eine gültige Option gewählt werden.");
+            }
+            chosenOption = spell.getThreadOptions().get(idx);
+        }
 
         // Würfelstufe: PER-Stufe + Rang - Wunden
         int perStep = Math.max(1, diceService.attributeToStep(caster.getCharacter().getPerception()) - caster.getWounds());
@@ -88,17 +109,30 @@ public class SpellService {
         boolean success = total >= targetNumber;
 
         if (success) {
-            caster.setThreadsWoven(caster.getThreadsWoven() + 1);
+            if (isExtra) {
+                choices.add(req.getExtraThreadOptionIndex());
+                caster.setExtraThreadChoices(formatChoices(choices));
+            } else {
+                caster.setThreadsWoven(caster.getThreadsWoven() + 1);
+            }
         }
 
         boolean readyToCast = caster.getThreadsWoven() >= caster.getThreadsRequired();
         caster.setHasActedThisRound(true);
 
         String casterName = caster.getCharacter().getName();
-        String desc = success
-                ? casterName + " webt einen Faden für " + spell.getName() + " (" + caster.getThreadsWoven() + "/" + caster.getThreadsRequired() + "). Wurf " + total + " vs " + targetNumber + "."
-                : casterName + " scheitert beim Fadenweben für " + spell.getName() + ". Wurf " + total + " vs " + targetNumber + ".";
-        if (readyToCast && success) desc += " Zauber ist bereit!";
+        String desc;
+        if (isExtra) {
+            desc = success
+                    ? casterName + " webt einen Zusatzfaden für " + spell.getName() + ": " + chosenOption.getLabel()
+                      + " (" + choices.size() + "/" + extraMax + "). Wurf " + total + " vs " + targetNumber + "."
+                    : casterName + " scheitert beim Zusatzfaden für " + spell.getName() + " (" + chosenOption.getLabel() + "). Wurf " + total + " vs " + targetNumber + ".";
+        } else {
+            desc = success
+                    ? casterName + " webt einen Faden für " + spell.getName() + " (" + caster.getThreadsWoven() + "/" + caster.getThreadsRequired() + "). Wurf " + total + " vs " + targetNumber + "."
+                    : casterName + " scheitert beim Fadenweben für " + spell.getName() + ". Wurf " + total + " vs " + targetNumber + ".";
+            if (readyToCast && success) desc += " Zauber ist bereit!";
+        }
 
         combatService.addLog(session, casterName, null, ActionType.THREADWEAVE, desc, success);
         sessionRepo.save(session);
@@ -115,8 +149,49 @@ public class SpellService {
                 .threadsWoven(caster.getThreadsWoven())
                 .threadsRequired(caster.getThreadsRequired())
                 .readyToCast(readyToCast)
+                .extraThread(isExtra)
+                .extraThreadLabel(success && chosenOption != null ? chosenOption.getLabel() : null)
+                .extraThreadCount(choices.size())
+                .extraThreadMax(extraMax)
                 .description(desc)
                 .build();
+    }
+
+    // --- Zusatzfäden: Hilfsfunktionen ---
+
+    /** Setzt die komplette Zaubervorbereitung inkl. gewählter Zusatzfäden zurück. */
+    private void resetPreparation(CombatantState caster) {
+        caster.setPreparingSpellId(null);
+        caster.setThreadsWoven(0);
+        caster.setThreadsRequired(0);
+        caster.setExtraThreadChoices(null);
+    }
+
+    /** "1,1,3" → [1, 1, 3]. Null/leer → leere Liste. */
+    static java.util.List<Integer> parseChoices(String csv) {
+        java.util.List<Integer> out = new java.util.ArrayList<>();
+        if (csv == null || csv.isBlank()) return out;
+        for (String part : csv.split(",")) {
+            String t = part.trim();
+            if (t.isEmpty()) continue;
+            try {
+                out.add(Integer.parseInt(t));
+            } catch (NumberFormatException ignored) {
+                // defekte Altdaten überspringen
+            }
+        }
+        return out;
+    }
+
+    /** [1, 1, 3] → "1,1,3". Leere Liste → null. */
+    static String formatChoices(java.util.List<Integer> choices) {
+        if (choices == null || choices.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < choices.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(choices.get(i));
+        }
+        return sb.toString();
     }
 
     // --- Zauber wirken ---
@@ -142,6 +217,21 @@ public class SpellService {
             }
             if (caster.getThreadsWoven() < caster.getThreadsRequired()) {
                 throw new IllegalStateException("Noch nicht genug Fäden gewirkt (" + caster.getThreadsWoven() + "/" + caster.getThreadsRequired() + ").");
+            }
+        }
+
+        // Zusatzfäden auflösen — nur wenn genau dieser Zauber vorbereitet wurde.
+        // Verrechnet wird ausschließlich EFFECT_STEP; alles andere ist Anzeige für den Spielleiter.
+        java.util.List<String> extraThreadLabels = new java.util.ArrayList<>();
+        int extraThreadEffectStep = 0;
+        if (caster.getPreparingSpellId() != null && caster.getPreparingSpellId().equals(spell.getId())) {
+            for (int idx : parseChoices(caster.getExtraThreadChoices())) {
+                if (idx < 0 || idx >= spell.getThreadOptions().size()) continue;
+                SpellThreadOption opt = spell.getThreadOptions().get(idx);
+                extraThreadLabels.add(opt.getLabel());
+                if (opt.getType() == SpellThreadOptionType.EFFECT_STEP) {
+                    extraThreadEffectStep += opt.getValue();
+                }
             }
         }
 
@@ -202,26 +292,27 @@ public class SpellService {
                 .karmaRoll(karmaRoll)
                 .defenseValue(defenseValue)
                 .success(success)
-                .extraSuccesses(extraSuccesses);
+                .extraSuccesses(extraSuccesses)
+                .extraThreadLabels(extraThreadLabels)
+                .extraThreadEffectStep(extraThreadEffectStep);
 
         if (success) {
             switch (spell.getEffectType()) {
                 case DAMAGE -> {
                     // Schadens-Amulette (Zauber) hier entladen und +6 je Amulett auf den Schadenswurf
                     int amuletDmg = combatService.applyAmulets(caster, req.getAmuletDamageIds(), true, "Schaden", amuletNotes);
-                    applySpellDamage(session, caster, target, spell, extraSuccesses, amuletDmg, result);
+                    applySpellDamage(session, caster, target, spell, extraSuccesses,
+                            amuletDmg + extraThreadEffectStep, result);
                 }
                 case BUFF   -> applySpellBuff(session, caster, target, spell, result);
                 case DEBUFF -> applySpellDebuff(session, target, spell, result);
-                case HEAL   -> applySpellHeal(target != null ? target : caster, spell, result);
+                case HEAL   -> applySpellHeal(target != null ? target : caster, spell, extraThreadEffectStep, result);
             }
         }
         result.amuletNotes(amuletNotes);
 
         // Vorbereitung zurücksetzen
-        caster.setPreparingSpellId(null);
-        caster.setThreadsWoven(0);
-        caster.setThreadsRequired(0);
+        resetPreparation(caster);
         caster.setHasActedThisRound(true);
 
         SpellCastResult castResult = result.build();
@@ -242,9 +333,7 @@ public class SpellService {
         var session = combatService.findById(sessionId);
         var caster = combatService.findCombatant(session, combatantId);
 
-        caster.setPreparingSpellId(null);
-        caster.setThreadsWoven(0);
-        caster.setThreadsRequired(0);
+        resetPreparation(caster);
 
         combatService.addLog(session, caster.getCharacter().getName(), null,
                 ActionType.SPELL_CAST, caster.getCharacter().getName() + " bricht die Zaubervorbereitung ab.", false);
@@ -331,9 +420,9 @@ public class SpellService {
               .effectDuration(spell.getDuration());
     }
 
-    private void applySpellHeal(CombatantState target, SpellDefinition spell,
+    private void applySpellHeal(CombatantState target, SpellDefinition spell, int extraThreadEffectStep,
                                  SpellCastResult.SpellCastResultBuilder result) {
-        RollResult healRoll = diceService.roll(spell.getEffectStep());
+        RollResult healRoll = diceService.roll(Math.max(1, spell.getEffectStep() + extraThreadEffectStep));
         int healAmount = healRoll.getTotal();
         target.setCurrentDamage(Math.max(0, target.getCurrentDamage() - healAmount));
 
@@ -391,6 +480,7 @@ public class SpellService {
 
         if (!r.isSuccess()) {
             sb.append("Fehlschlag!");
+            appendExtraThreads(sb, r);
             return sb.toString();
         }
 
@@ -409,6 +499,12 @@ public class SpellService {
                 sb.append("Heilt ").append(r.getHealedAmount()).append(" Schaden.");
             }
         }
+        appendExtraThreads(sb, r);
         return sb.toString();
+    }
+
+    private void appendExtraThreads(StringBuilder sb, SpellCastResult r) {
+        if (r.getExtraThreadLabels() == null || r.getExtraThreadLabels().isEmpty()) return;
+        sb.append(" Zusatzfäden: ").append(String.join(", ", r.getExtraThreadLabels())).append(".");
     }
 }

@@ -16,5 +16,18 @@ public class ThreadweaveResult {
     private int threadsWoven;
     private int threadsRequired;
     private boolean readyToCast;
+
+    /** War dieser Faden ein Zusatzfaden (statt eines Pflichtfadens)? */
+    private boolean extraThread;
+
+    /** Bei Erfolg eines Zusatzfadens: Text der gewählten Option. */
+    private String extraThreadLabel;
+
+    /** Anzahl bisher gewobener Zusatzfäden. */
+    private int extraThreadCount;
+
+    /** Maximal erlaubte Zusatzfäden (= Fadenweben-Rang). */
+    private int extraThreadMax;
+
     private String description;
 }
