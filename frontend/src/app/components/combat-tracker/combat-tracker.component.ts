@@ -187,7 +187,7 @@ export interface EffectChoice {
                 <span *ngIf="dialogStateBadge(c) as badge" class="dialog-state-badge"
                   [matTooltip]="'Plant: ' + badge">{{ badge }}</span>
               </div>
-              <div class="comb-actions">
+              <div class="comb-meta">
                 <mat-checkbox
                   [checked]="isAutofight(c)"
                   (change)="toggleAutofight(c, $event.checked)"
@@ -198,208 +198,6 @@ export interface EffectChoice {
                       class="stance-badge aggressive" matTooltip="Aggressive Haltung: +3 Angriff, -3 Verteidigung">⚔ Aggressiv</span>
                 <span *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.declaredStance === 'DEFENSIVE' && !c.defeated"
                       class="stance-badge defensive" matTooltip="Defensive Haltung: -3 Angriff, +3 Verteidigung">🛡 Defensiv</span>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
-                  class="attack-btn"
-                  [disabled]="c.hasActedThisRound || c.defeated || !isActiveTurn(c)"
-                  (click)="openAttackDialog(c)" matTooltip="Angreifen">
-                  <mat-icon>sports_martial_arts</mat-icon> Angriff
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
-                  class="combat-option-btn standup-btn"
-                  [disabled]="c.hasActedThisRound"
-                  (click)="performStandUp(c)"
-                  matTooltip="Aufstehen (Hauptaktion)">
-                  <mat-icon>accessibility_new</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
-                  class="combat-option-btn aufspringen-btn"
-                  (click)="openAufspringenDialog(c)"
-                  matTooltip="Aufspringen (GE-Probe vs 6, 2 Schaden — kann danach noch angreifen)">
-                  <mat-icon>directions_run</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && !c.preparingSpellId"
-                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
-                  (click)="openThreadweaveDialog(c)"
-                  matTooltip="Faden weben (Hauptaktion)">
-                  <mat-icon>all_inclusive</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && c.preparingSpellId"
-                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
-                  (click)="openThreadweaveDialog(c)"
-                  matTooltip="Weiteren Faden weben ({{ c.threadsWoven }}/{{ c.threadsRequired }})">
-                  <mat-icon>all_inclusive</mat-icon> {{ c.threadsWoven }}/{{ c.threadsRequired }}
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && canCastSpell(c)"
-                  class="combat-option-btn spellcast-btn" [disabled]="c.hasActedThisRound || c.defeated"
-                  (click)="openSpellCastDialog(c)"
-                  matTooltip="Zauber wirken">
-                  <mat-icon>auto_fix_high</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.preparingSpellId && !c.defeated"
-                  class="combat-option-btn cancel-spell-btn"
-                  (click)="cancelSpell(c)"
-                  matTooltip="Zaubervorbereitung abbrechen">
-                  <mat-icon>cancel</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
-                  class="combat-option-btn use-action" [disabled]="c.hasActedThisRound || c.defeated"
-                  (click)="useAction(c)"
-                  matTooltip="Aktion benutzen (Sonstiges)">
-                  <mat-icon>auto_awesome</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasMagischeMarkierungTalent(c) && !c.defeated"
-                  class="combat-option-btn magische-markierung-btn"
-                  (click)="openMagischeMarkierungDialog(c)"
-                  matTooltip="Magische Markierung · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 Angriff/Übererfolg für Fernkampf, kostet 1 Schaden)">
-                  <mat-icon>gps_fixed</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTauntTalent(c) && !c.defeated"
-                  class="combat-option-btn taunt-btn"
-                  [disabled]="!isActiveTurn(c)"
-                  (click)="openTauntDialog(c)"
-                  matTooltip="Verspotten (Freie Aktion · CHA + Rang vs. Soziale VK · kostet 1 Schaden)">
-                  <mat-icon>sentiment_very_dissatisfied</mat-icon>
-                </button>
-                <!-- Verängstigen: WIL vs. MV, −2/Erfolg auf Aktionsproben -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasFearTalent(c) && !c.defeated"
-                  class="combat-option-btn fear-btn"
-                  [disabled]="!isActiveTurn(c)"
-                  (click)="openFearDialog(c)"
-                  matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
-                  <mat-icon>sentiment_extremely_dissatisfied</mat-icon>
-                </button>
-                <!-- Magie neutralisieren: beendet einen aktiven Effekt (Aktion + 1 Überanstrengung) -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNeutralizeMagicTalent(c) && !c.defeated"
-                  class="combat-option-btn neutralize-btn"
-                  [disabled]="c.hasActedThisRound"
-                  (click)="openNeutralizeMagicDialog(c)"
-                  matTooltip="Magie neutralisieren: beendet einen aktiven Effekt (WIL + Rang vs. Effektstufe + 10). Verbraucht die Aktion, kostet 1 Überanstrengung.">
-                  <mat-icon>auto_fix_off</mat-icon> Magie neutralisieren
-                </button>
-                <!-- Furcht abschütteln: Widerstandsprobe gegen Verängstigt (1×/Runde) -->
-                <button mat-raised-button color="accent"
-                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isFeared(c) && !c.defeated"
-                  class="combat-option-btn fear-resist-btn"
-                  [disabled]="c.fearResistUsedThisRound"
-                  (click)="resistFear(c)"
-                  matTooltip="Furcht abschütteln: Willenskraftprobe vs. {{ fearResistTn(c) }} — Erfolg beendet den Verängstigt-Effekt. 1×/Runde.">
-                  <mat-icon>psychology</mat-icon> Furcht abschütteln
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
-                  class="combat-option-btn acrobatic-btn"
-                  (click)="openAcrobaticDefenseDialog(c)"
-                  matTooltip="Akrobatische Verteidigung · Freie Aktion (GES + Rang vs. höchste KV, +2 KV/Erfolg, kostet 1 Schaden)">
-                  <mat-icon>self_improvement</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasCombatSenseTalent(c) && !c.defeated"
-                  class="combat-option-btn combat-sense-btn"
-                  (click)="openCombatSenseDialog(c)"
-                  matTooltip="Kampfsinn · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Schaden)">
-                  <mat-icon>visibility</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasDistractTalent(c) && !c.defeated"
-                  class="combat-option-btn distract-btn"
-                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
-                  (click)="openDistractDialog(c)"
-                  matTooltip="Ablenken (CHA + Rang vs. Soziale VK, −1 KV/Erfolg für beide, kostet 1 Schaden)">
-                  <mat-icon>record_voice_over</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasIronWillTalent(c) && !c.defeated"
-                  class="combat-option-btn iron-will-btn"
-                  (click)="openIronWillDialog(c)"
-                  matTooltip="Eiserner Wille (WIL + Rang vs. Zauberwurf, freie Aktion, kostet 1 Schaden)">
-                  <mat-icon>psychology</mat-icon>
-                </button>
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasSpotArmorFlawTalent(c) && !c.defeated"
-                  class="combat-option-btn spot-flaw-btn"
-                  (click)="openSpotArmorFlawDialog(c)"
-                  matTooltip="Schwachstelle erkennen (WAH + Rang vs. max(MV, Rüstung) — +2 Schaden/Erfolg gegen das Ziel für Rang Runden, kostet 1 Schaden, keine Hauptaktion)">
-                  <mat-icon>biotech</mat-icon>
-                </button>
-                <!-- Riposte: nur sichtbar wenn ein Angriff aussteht -->
-                <button mat-raised-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasRiposteTalent(c) && c.pendingRiposteAttackTotal >= 0 && !c.defeated"
-                  class="combat-option-btn riposte-btn"
-                  (click)="openRiposteDialog(c)"
-                  matTooltip="Riposte! Nahkampfangriff parieren und kontern (GES + Rang vs. Angriffswurf, kostet 2 Überanstrengung)">
-                  <mat-icon>sports_martial_arts</mat-icon>
-                </button>
-                <!-- Manövrieren: freie Aktion -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasManoeuverTalent(c) && !c.defeated"
-                  class="combat-option-btn manoeuver-btn"
-                  (click)="openManoeuverDialog(c)"
-                  matTooltip="Manövrieren (GES + Rang vs. KV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Überanstrengung) — freie Aktion">
-                  <mat-icon>swap_horiz</mat-icon>
-                </button>
-                <!-- Tigersprung: freie Aktion, kein Würfelwurf -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasTigersprungTalent(c) && !c.defeated"
-                  class="combat-option-btn tigersprung-btn"
-                  [disabled]="c.tigersprungUsedThisRound"
-                  (click)="performTigersprung(c)"
-                  matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
-                  <mat-icon>bolt</mat-icon> Tigersprung
-                </button>
-                <!-- Lufttanz: freie Aktion in der Ansagephase, ermöglicht Bonusangriff -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasLufttanzTalent(c) && !c.defeated"
-                  class="combat-option-btn lufttanz-btn"
-                  [disabled]="c.lufttanzActivatedThisRound"
-                  (click)="performLufttanz(c)"
-                  matTooltip="Lufttanz: +Rang auf Initiative; bei Initiative-Vorsprung ≥10 ein Bonus-Nahkampfangriff. Ansagephase, 1×/Runde, kostet 2 Überanstrengung.">
-                  <mat-icon>air</mat-icon> Lufttanz
-                </button>
-                <!-- Karma auf Initiative: Disziplin-Fähigkeit ab Kreis 3 -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && canUseKarmaInitiative(c) && !c.defeated"
-                  class="combat-option-btn karma-init-btn"
-                  [class.active]="c.karmaInitiativeThisRound"
-                  [disabled]="!c.karmaInitiativeThisRound && c.currentKarma <= 0"
-                  (click)="toggleKarmaInitiative(c)"
-                  matTooltip="Karma auf Initiative: 1 Karma → +W6 (Stufe 4) auf den Initiativewurf dieser Runde. Disziplin-Fähigkeit ab dem 3. Kreis.">
-                  <mat-icon>auto_awesome</mat-icon> {{ c.karmaInitiativeThisRound ? 'Karma-Init ✓' : 'Karma-Init' }}
-                </button>
-                <!-- Lufttanz-Bonusangriff: nur wenn pending -->
-                <button mat-raised-button color="warn"
-                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingLufttanzTargetId >= 0 && !c.defeated"
-                  class="combat-option-btn lufttanz-attack-btn"
-                  (click)="openLufttanzAttackDialog(c)"
-                  matTooltip="Lufttanz-Zusatzangriff verfügbar! Gleiche Waffe wie der auslösende Angriff.">
-                  <mat-icon>air</mat-icon> Zusatzangriff
-                </button>
-                <!-- Blattschuss: pending Karma-Nachschuss -->
-                <button mat-raised-button color="primary"
-                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingBlattschussDefenderId >= 0 && !c.defeated"
-                  class="combat-option-btn blattschuss-pending-btn"
-                  [disabled]="c.currentKarma <= 0"
-                  (click)="resumeBlattschuss(c)"
-                  matTooltip="Blattschuss: Karma nachschießen. {{ c.pendingBlattschussKarmaUsed }}/{{ c.pendingBlattschussRank }} eingesetzt, Wurf-Total {{ c.pendingBlattschussTotal }} vs VK {{ c.pendingBlattschussDefense }}.">
-                  <mat-icon>track_changes</mat-icon> +Karma ({{ c.pendingBlattschussRank - c.pendingBlattschussKarmaUsed }} übrig)
-                </button>
-                <!-- Zweitwaffe: zweiter Angriff -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
-                  class="combat-option-btn zweitwaffe-btn"
-                  [disabled]="c.zweitWaffeUsedThisRound"
-                  (click)="openZweitwaffeDialog(c)"
-                  matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung) — freie Aktion, 1×/Runde">
-                  <mat-icon>join_full</mat-icon>
-                </button>
-                <!-- Nachtreten: zusätzlicher waffenloser Angriff -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNachtretenTalent(c) && !c.defeated"
-                  class="combat-option-btn nachtreten-btn"
-                  [disabled]="c.nachtretenUsedThisRound"
-                  (click)="openNachtretenDialog(c)"
-                  matTooltip="Nachtreten: zusätzlicher waffenloser Angriff (GES + Rang vs. KV, waffenloser STR-Schaden). Einfache Aktion, 1×/Runde, kostet 1 Überanstrengung. Nur gegen Ziele mit niedrigerer Initiative.">
-                  <mat-icon>sports_martial_arts</mat-icon> Nachtreten
-                </button>
-                <!-- Schwanzangriff: T'skrang-Rassenfähigkeit -->
-                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isTskrang(c) && !c.defeated"
-                  class="combat-option-btn schwanzangriff-btn"
-                  [disabled]="c.schwanzangriffUsedThisRound"
-                  (click)="openSchwanzangriffDialog(c)"
-                  matTooltip="Schwanzangriff (T'skrang): zusätzlicher waffenloser Angriff mit dem Schwanz (Waffenloser Kampf vs. KV, STR-Schaden, optional Schwanzwaffe). 1×/Runde. −2 auf alle Proben in dieser Runde.">
-                  <mat-icon>pets</mat-icon> Schwanzangriff
-                </button>
-                <button mat-icon-button *ngIf="session!.status === 'SETUP'"
-                  color="warn" (click)="removeCombatant(c.id)" matTooltip="Entfernen">
-                  <mat-icon>close</mat-icon>
-                </button>
               </div>
             </div>
             <!-- Declaration Phase UI -->
@@ -440,73 +238,255 @@ export interface EffectChoice {
                 <button mat-stroked-button (click)="undeclare(c)" style="margin-left:6px">Ändern</button>
               </span>
             </div>
-            <!-- Damage Track -->
-            <div class="comb-damage-row">
-              <span class="dmg-label">Schaden</span>
-              <div class="damage-track" style="flex:1;margin:0 8px">
-                <div class="damage-track__fill" [style.width.%]="damagePercent(c)"></div>
-              </div>
-              <span class="dmg-val">{{ c.currentDamage }}/{{ ur(c) }}</span>
-              <div class="mini-ctrl">
-                <button mat-icon-button (click)="updateValue(c, 'damage', -1)" matTooltip="Heilen">
-                  <mat-icon style="font-size:16px">healing</mat-icon>
-                </button>
-                <button mat-icon-button color="warn" (click)="updateValue(c, 'damage', 1)" matTooltip="Schaden">
-                  <mat-icon style="font-size:16px">bolt</mat-icon>
-                </button>
-              </div>
-            </div>
-            <!-- Wounds + Karma row -->
-            <div class="comb-status-row">
-              <div class="comb-stat">
-                <span class="comb-stat-label">Wunden</span>
+            <!-- Zwei Spalten: links die Werte, rechts die Aktionen -->
+            <div class="comb-columns">
+              <div class="comb-col-stats">
+              <!-- Damage Track -->
+              <div class="comb-damage-row">
+                <span class="dmg-label">Schaden</span>
+                <div class="damage-track" style="flex:1;margin:0 8px">
+                  <div class="damage-track__fill" [style.width.%]="damagePercent(c)"></div>
+                </div>
+                <span class="dmg-val">{{ c.currentDamage }}/{{ ur(c) }}</span>
                 <div class="mini-ctrl">
-                  <button mat-icon-button (click)="updateValue(c, 'wounds', -1)"><mat-icon style="font-size:14px">remove</mat-icon></button>
-                  <span class="stat-value wounds">{{ c.wounds }}</span>
-                  <button mat-icon-button color="warn" (click)="updateValue(c, 'wounds', 1)"><mat-icon style="font-size:14px">add</mat-icon></button>
+                  <button mat-icon-button (click)="updateValue(c, 'damage', -1)" matTooltip="Heilen">
+                    <mat-icon style="font-size:16px">healing</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="updateValue(c, 'damage', 1)" matTooltip="Schaden">
+                    <mat-icon style="font-size:16px">bolt</mat-icon>
+                  </button>
                 </div>
               </div>
-              <div class="comb-stat" *ngIf="!isNoKarma(c)">
-                <span class="comb-stat-label">Karma</span>
-                <div class="mini-ctrl">
-                  <button mat-icon-button (click)="updateValue(c, 'karma', -1)"><mat-icon style="font-size:14px">remove</mat-icon></button>
-                  <span class="stat-value karma">{{ c.currentKarma }}</span>
-                  <button mat-icon-button (click)="updateValue(c, 'karma', 1)"><mat-icon style="font-size:14px">add</mat-icon></button>
+              <!-- Wounds + Karma row -->
+              <div class="comb-status-row">
+                <div class="comb-stat">
+                  <span class="comb-stat-label">Wunden</span>
+                  <div class="mini-ctrl">
+                    <button mat-icon-button (click)="updateValue(c, 'wounds', -1)"><mat-icon style="font-size:14px">remove</mat-icon></button>
+                    <span class="stat-value wounds">{{ c.wounds }}</span>
+                    <button mat-icon-button color="warn" (click)="updateValue(c, 'wounds', 1)"><mat-icon style="font-size:14px">add</mat-icon></button>
+                  </div>
+                </div>
+                <div class="comb-stat" *ngIf="!isNoKarma(c)">
+                  <span class="comb-stat-label">Karma</span>
+                  <div class="mini-ctrl">
+                    <button mat-icon-button (click)="updateValue(c, 'karma', -1)"><mat-icon style="font-size:14px">remove</mat-icon></button>
+                    <span class="stat-value karma">{{ c.currentKarma }}</span>
+                    <button mat-icon-button (click)="updateValue(c, 'karma', 1)"><mat-icon style="font-size:14px">add</mat-icon></button>
+                  </div>
                 </div>
               </div>
-            </div>
-            <!-- Defense Values -->
-            <div class="comb-defense-row">
-              <span class="def-chip phys" [matTooltip]="defenseTooltip(c, 'PHYSICAL_DEFENSE')" matTooltipClass="multiline-tooltip">
-                <mat-icon>shield</mat-icon> KV {{ pd(c) }}<span *ngIf="effectivePd(c) !== pd(c)" class="def-modified"> ({{ effectivePd(c) }})</span>
-              </span>
-              <span class="def-chip myst" [matTooltip]="defenseTooltip(c, 'SPELL_DEFENSE')" matTooltipClass="multiline-tooltip">
-                <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}<span *ngIf="effectiveSd(c) !== sd(c)" class="def-modified"> ({{ effectiveSd(c) }})</span>
-              </span>
-              <span class="def-chip social" [matTooltip]="defenseTooltip(c, 'SOCIAL_DEFENSE')" matTooltipClass="multiline-tooltip">
-                <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
-              </span>
-            </div>
-            <!-- Rüstungs-Chips (gleiche Darstellung wie auf den Charakter-Karten) -->
-            <div class="comb-armor-row" *ngIf="pa(c) > 0 || ma(c) > 0">
-              <span class="armor-chip phys" matTooltip="Physische Rüstung" *ngIf="pa(c) > 0">
-                🛡 {{ pa(c) }} phys.
-              </span>
-              <span class="armor-chip myst" matTooltip="Mystische Rüstung" *ngIf="ma(c) > 0">
-                ✨ {{ ma(c) }} myst.
-              </span>
-            </div>
-            <!-- Active Effects -->
-            <div class="effects-row" *ngIf="c.activeEffects.length > 0">
-              <span
-                *ngFor="let e of c.activeEffects"
-                [class]="'effect-chip ' + (e.negative ? 'negative' : 'positive')"
-                (click)="removeEffect(c, e)"
-                matTooltip="Klicken zum Entfernen. {{ e.description }} {{ e.remainingRounds > 0 ? '(' + e.remainingRounds + ' Runden)' : '(permanent)' }}"
-                style="cursor:pointer">
-                {{ e.name }}
-                <span *ngIf="e.remainingRounds > 0"> ({{ e.remainingRounds }})</span>
-              </span>
+              <!-- Defense Values -->
+              <div class="comb-defense-row">
+                <span class="def-chip phys" [matTooltip]="defenseTooltip(c, 'PHYSICAL_DEFENSE')" matTooltipClass="multiline-tooltip">
+                  <mat-icon>shield</mat-icon> KV {{ pd(c) }}<span *ngIf="effectivePd(c) !== pd(c)" class="def-modified"> ({{ effectivePd(c) }})</span>
+                </span>
+                <span class="def-chip myst" [matTooltip]="defenseTooltip(c, 'SPELL_DEFENSE')" matTooltipClass="multiline-tooltip">
+                  <mat-icon>auto_awesome</mat-icon> MV {{ sd(c) }}<span *ngIf="effectiveSd(c) !== sd(c)" class="def-modified"> ({{ effectiveSd(c) }})</span>
+                </span>
+                <span class="def-chip social" [matTooltip]="defenseTooltip(c, 'SOCIAL_DEFENSE')" matTooltipClass="multiline-tooltip">
+                  <mat-icon>people</mat-icon> SV {{ socD(c) }}<span *ngIf="effectiveSocD(c) !== socD(c)" class="def-modified"> ({{ effectiveSocD(c) }})</span>
+                </span>
+              </div>
+              <!-- Rüstungs-Chips (gleiche Darstellung wie auf den Charakter-Karten) -->
+              <div class="comb-armor-row" *ngIf="pa(c) > 0 || ma(c) > 0">
+                <span class="armor-chip phys" matTooltip="Physische Rüstung" *ngIf="pa(c) > 0">
+                  🛡 {{ pa(c) }} phys.
+                </span>
+                <span class="armor-chip myst" matTooltip="Mystische Rüstung" *ngIf="ma(c) > 0">
+                  ✨ {{ ma(c) }} myst.
+                </span>
+              </div>
+              <!-- Active Effects -->
+              <div class="effects-row" *ngIf="c.activeEffects.length > 0">
+                <span
+                  *ngFor="let e of c.activeEffects"
+                  [class]="'effect-chip ' + (e.negative ? 'negative' : 'positive')"
+                  (click)="removeEffect(c, e)"
+                  matTooltip="Klicken zum Entfernen. {{ e.description }} {{ e.remainingRounds > 0 ? '(' + e.remainingRounds + ' Runden)' : '(permanent)' }}"
+                  style="cursor:pointer">
+                  {{ e.name }}
+                  <span *ngIf="e.remainingRounds > 0"> ({{ e.remainingRounds }})</span>
+                </span>
+              </div>
+              </div>
+              <div class="comb-actions">
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
+                  class="attack-btn"
+                  [disabled]="c.hasActedThisRound || c.defeated || !isActiveTurn(c)"
+                  (click)="openAttackDialog(c)" matTooltip="Angreifen">
+                  <mat-icon>sports_martial_arts</mat-icon><span class="btn-label">Angriff</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
+                  class="combat-option-btn standup-btn"
+                  [disabled]="c.hasActedThisRound"
+                  (click)="performStandUp(c)"
+                  matTooltip="Aufstehen (Hauptaktion)">
+                  <mat-icon>accessibility_new</mat-icon><span class="btn-label">Aufstehen</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.knockedDown && !c.defeated"
+                  class="combat-option-btn aufspringen-btn"
+                  (click)="openAufspringenDialog(c)"
+                  matTooltip="Aufspringen (GE-Probe vs 6, 2 Schaden — kann danach noch angreifen)">
+                  <mat-icon>directions_run</mat-icon><span class="btn-label">Aufspringen</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && !c.preparingSpellId"
+                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openThreadweaveDialog(c)"
+                  matTooltip="Faden weben (Hauptaktion)">
+                  <mat-icon>all_inclusive</mat-icon><span class="btn-label">Faden weben</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isMagicCombatant(c) && c.preparingSpellId"
+                  class="combat-option-btn threadweave-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openThreadweaveDialog(c)"
+                  matTooltip="Weiteren Faden weben ({{ c.threadsWoven }}/{{ c.threadsRequired }})">
+                  <mat-icon>all_inclusive</mat-icon><span class="btn-label">Faden {{ c.threadsWoven }}/{{ c.threadsRequired }}</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && canCastSpell(c)"
+                  class="combat-option-btn spellcast-btn" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="openSpellCastDialog(c)"
+                  matTooltip="Zauber wirken">
+                  <mat-icon>auto_fix_high</mat-icon><span class="btn-label">Zaubern</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.preparingSpellId && !c.defeated"
+                  class="combat-option-btn cancel-spell-btn"
+                  (click)="cancelSpell(c)"
+                  matTooltip="Zaubervorbereitung abbrechen">
+                  <mat-icon>cancel</mat-icon><span class="btn-label">Zauber abbrechen</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION'"
+                  class="combat-option-btn use-action" [disabled]="c.hasActedThisRound || c.defeated"
+                  (click)="useAction(c)"
+                  matTooltip="Aktion benutzen (Sonstiges)">
+                  <mat-icon>auto_awesome</mat-icon><span class="btn-label">Aktion nutzen</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasMagischeMarkierungTalent(c) && !c.defeated"
+                  class="combat-option-btn magische-markierung-btn"
+                  (click)="openMagischeMarkierungDialog(c)"
+                  matTooltip="Magische Markierung · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 Angriff/Übererfolg für Fernkampf, kostet 1 Schaden)">
+                  <mat-icon>gps_fixed</mat-icon><span class="btn-label">Magische Markierung</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasTauntTalent(c) && !c.defeated"
+                  class="combat-option-btn taunt-btn"
+                  [disabled]="!isActiveTurn(c)"
+                  (click)="openTauntDialog(c)"
+                  matTooltip="Verspotten (Freie Aktion · CHA + Rang vs. Soziale VK · kostet 1 Schaden)">
+                  <mat-icon>sentiment_very_dissatisfied</mat-icon><span class="btn-label">Verspotten</span></button>
+                <!-- Verängstigen: WIL vs. MV, −2/Erfolg auf Aktionsproben -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasFearTalent(c) && !c.defeated"
+                  class="combat-option-btn fear-btn"
+                  [disabled]="!isActiveTurn(c)"
+                  (click)="openFearDialog(c)"
+                  matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
+                  <mat-icon>sentiment_extremely_dissatisfied</mat-icon><span class="btn-label">Verängstigen</span></button>
+                <!-- Magie neutralisieren: beendet einen aktiven Effekt (Aktion + 1 Überanstrengung) -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNeutralizeMagicTalent(c) && !c.defeated"
+                  class="combat-option-btn neutralize-btn"
+                  [disabled]="c.hasActedThisRound"
+                  (click)="openNeutralizeMagicDialog(c)"
+                  matTooltip="Magie neutralisieren: beendet einen aktiven Effekt (WIL + Rang vs. Effektstufe + 10). Verbraucht die Aktion, kostet 1 Überanstrengung.">
+                  <mat-icon>auto_fix_off</mat-icon><span class="btn-label">Magie neutralisieren</span></button>
+                <!-- Furcht abschütteln: Widerstandsprobe gegen Verängstigt (1×/Runde) -->
+                <button mat-stroked-button
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isFeared(c) && !c.defeated"
+                  class="combat-option-btn fear-resist-btn"
+                  [disabled]="c.fearResistUsedThisRound"
+                  (click)="resistFear(c)"
+                  matTooltip="Furcht abschütteln: Willenskraftprobe vs. {{ fearResistTn(c) }} — Erfolg beendet den Verängstigt-Effekt. 1×/Runde.">
+                  <mat-icon>psychology</mat-icon><span class="btn-label">Furcht abschütteln</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasAcrobaticDefenseTalent(c) && !c.defeated"
+                  class="combat-option-btn acrobatic-btn"
+                  (click)="openAcrobaticDefenseDialog(c)"
+                  matTooltip="Akrobatische Verteidigung · Freie Aktion (GES + Rang vs. höchste KV, +2 KV/Erfolg, kostet 1 Schaden)">
+                  <mat-icon>self_improvement</mat-icon><span class="btn-label">Akrob. Verteidigung</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasCombatSenseTalent(c) && !c.defeated"
+                  class="combat-option-btn combat-sense-btn"
+                  (click)="openCombatSenseDialog(c)"
+                  matTooltip="Kampfsinn · Freie Aktion (WAH + Rang vs. MV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Schaden)">
+                  <mat-icon>visibility</mat-icon><span class="btn-label">Kampfsinn</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasDistractTalent(c) && !c.defeated"
+                  class="combat-option-btn distract-btn"
+                  [disabled]="c.hasActedThisRound || !isActiveTurn(c)"
+                  (click)="openDistractDialog(c)"
+                  matTooltip="Ablenken (CHA + Rang vs. Soziale VK, −1 KV/Erfolg für beide, kostet 1 Schaden)">
+                  <mat-icon>record_voice_over</mat-icon><span class="btn-label">Ablenken</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasIronWillTalent(c) && !c.defeated"
+                  class="combat-option-btn iron-will-btn"
+                  (click)="openIronWillDialog(c)"
+                  matTooltip="Eiserner Wille (WIL + Rang vs. Zauberwurf, freie Aktion, kostet 1 Schaden)">
+                  <mat-icon>psychology</mat-icon><span class="btn-label">Eiserner Wille</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasSpotArmorFlawTalent(c) && !c.defeated"
+                  class="combat-option-btn spot-flaw-btn"
+                  (click)="openSpotArmorFlawDialog(c)"
+                  matTooltip="Schwachstelle erkennen (WAH + Rang vs. max(MV, Rüstung) — +2 Schaden/Erfolg gegen das Ziel für Rang Runden, kostet 1 Schaden, keine Hauptaktion)">
+                  <mat-icon>biotech</mat-icon><span class="btn-label">Schwachstelle</span></button>
+                <!-- Riposte: nur sichtbar wenn ein Angriff aussteht -->
+                <button mat-raised-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasRiposteTalent(c) && c.pendingRiposteAttackTotal >= 0 && !c.defeated"
+                  class="combat-option-btn riposte-btn"
+                  (click)="openRiposteDialog(c)"
+                  matTooltip="Riposte! Nahkampfangriff parieren und kontern (GES + Rang vs. Angriffswurf, kostet 2 Überanstrengung)">
+                  <mat-icon>sports_martial_arts</mat-icon><span class="btn-label">Riposte</span></button>
+                <!-- Manövrieren: freie Aktion -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasManoeuverTalent(c) && !c.defeated"
+                  class="combat-option-btn manoeuver-btn"
+                  (click)="openManoeuverDialog(c)"
+                  matTooltip="Manövrieren (GES + Rang vs. KV des Ziels, +2 KV &amp; +2 Angriff/Erfolg, kostet 1 Überanstrengung) — freie Aktion">
+                  <mat-icon>swap_horiz</mat-icon><span class="btn-label">Manövrieren</span></button>
+                <!-- Tigersprung: freie Aktion, kein Würfelwurf -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasTigersprungTalent(c) && !c.defeated"
+                  class="combat-option-btn tigersprung-btn"
+                  [disabled]="c.tigersprungUsedThisRound"
+                  (click)="performTigersprung(c)"
+                  matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
+                  <mat-icon>bolt</mat-icon><span class="btn-label">Tigersprung</span></button>
+                <!-- Lufttanz: freie Aktion in der Ansagephase, ermöglicht Bonusangriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasLufttanzTalent(c) && !c.defeated"
+                  class="combat-option-btn lufttanz-btn"
+                  [disabled]="c.lufttanzActivatedThisRound"
+                  (click)="performLufttanz(c)"
+                  matTooltip="Lufttanz: +Rang auf Initiative; bei Initiative-Vorsprung ≥10 ein Bonus-Nahkampfangriff. Ansagephase, 1×/Runde, kostet 2 Überanstrengung.">
+                  <mat-icon>air</mat-icon><span class="btn-label">Lufttanz</span></button>
+                <!-- Karma auf Initiative: Disziplin-Fähigkeit ab Kreis 3 -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && canUseKarmaInitiative(c) && !c.defeated"
+                  class="combat-option-btn karma-init-btn"
+                  [class.active]="c.karmaInitiativeThisRound"
+                  [disabled]="!c.karmaInitiativeThisRound && c.currentKarma <= 0"
+                  (click)="toggleKarmaInitiative(c)"
+                  matTooltip="Karma auf Initiative: 1 Karma → +W6 (Stufe 4) auf den Initiativewurf dieser Runde. Disziplin-Fähigkeit ab dem 3. Kreis.">
+                  <mat-icon>auto_awesome</mat-icon><span class="btn-label">{{ c.karmaInitiativeThisRound ? 'Karma-Init ✓' : 'Karma-Init' }}</span></button>
+                <!-- Lufttanz-Bonusangriff: nur wenn pending -->
+                <button mat-raised-button color="warn"
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingLufttanzTargetId >= 0 && !c.defeated"
+                  class="combat-option-btn lufttanz-attack-btn"
+                  (click)="openLufttanzAttackDialog(c)"
+                  matTooltip="Lufttanz-Zusatzangriff verfügbar! Gleiche Waffe wie der auslösende Angriff.">
+                  <mat-icon>air</mat-icon><span class="btn-label">Lufttanz-Angriff</span></button>
+                <!-- Blattschuss: pending Karma-Nachschuss -->
+                <button mat-raised-button color="primary"
+                  *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && c.pendingBlattschussDefenderId >= 0 && !c.defeated"
+                  class="combat-option-btn blattschuss-pending-btn"
+                  [disabled]="c.currentKarma <= 0"
+                  (click)="resumeBlattschuss(c)"
+                  matTooltip="Blattschuss: Karma nachschießen. {{ c.pendingBlattschussKarmaUsed }}/{{ c.pendingBlattschussRank }} eingesetzt, Wurf-Total {{ c.pendingBlattschussTotal }} vs VK {{ c.pendingBlattschussDefense }}.">
+                  <mat-icon>track_changes</mat-icon><span class="btn-label">Blattschuss</span></button>
+                <!-- Zweitwaffe: zweiter Angriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasZweitwaffeTalent(c) && !c.defeated"
+                  class="combat-option-btn zweitwaffe-btn"
+                  [disabled]="c.zweitWaffeUsedThisRound"
+                  (click)="openZweitwaffeDialog(c)"
+                  matTooltip="Zweitwaffe: zweiter Nahkampfangriff (GES + Rang vs. KV, kostet 1 Überanstrengung) — freie Aktion, 1×/Runde">
+                  <mat-icon>join_full</mat-icon><span class="btn-label">Zweitwaffe</span></button>
+                <!-- Nachtreten: zusätzlicher waffenloser Angriff -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNachtretenTalent(c) && !c.defeated"
+                  class="combat-option-btn nachtreten-btn"
+                  [disabled]="c.nachtretenUsedThisRound"
+                  (click)="openNachtretenDialog(c)"
+                  matTooltip="Nachtreten: zusätzlicher waffenloser Angriff (GES + Rang vs. KV, waffenloser STR-Schaden). Einfache Aktion, 1×/Runde, kostet 1 Überanstrengung. Nur gegen Ziele mit niedrigerer Initiative.">
+                  <mat-icon>sports_martial_arts</mat-icon><span class="btn-label">Nachtreten</span></button>
+                <!-- Schwanzangriff: T'skrang-Rassenfähigkeit -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && isTskrang(c) && !c.defeated"
+                  class="combat-option-btn schwanzangriff-btn"
+                  [disabled]="c.schwanzangriffUsedThisRound"
+                  (click)="openSchwanzangriffDialog(c)"
+                  matTooltip="Schwanzangriff (T'skrang): zusätzlicher waffenloser Angriff mit dem Schwanz (Waffenloser Kampf vs. KV, STR-Schaden, optional Schwanzwaffe). 1×/Runde. −2 auf alle Proben in dieser Runde.">
+                  <mat-icon>pets</mat-icon><span class="btn-label">Schwanzangriff</span></button>
+                <button mat-stroked-button *ngIf="session!.status === 'SETUP'"
+                  class="combat-option-btn remove-btn"
+                  (click)="removeCombatant(c.id)" matTooltip="Kombattant entfernen">
+                  <mat-icon>close</mat-icon><span class="btn-label">Entfernen</span>
+                </button>
+              </div>
             </div>
         </ng-template>
 
@@ -2938,16 +2918,37 @@ export interface EffectChoice {
     .decl-confirm { margin-left: auto; }
     .decl-confirmed { display: inline-flex; align-items: center; gap: 4px; color: #4caf50; font-size: 0.82rem; margin-left: auto; }
 
-    .comb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .comb-title { display: flex; align-items: center; gap: 8px; }
+    .comb-header {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .comb-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    /* Auto-Checkbox + Zustands-Badges — stehen mit Name/Disziplin in der Kopfzeile */
+    .comb-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    /* Werte links, Aktionsbuttons rechts untereinander */
+    .comb-columns { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+    .comb-col-stats { min-width: 0; }
     .initiative-badge {
       background: #3a3028; color: #c9a84c; width: 32px; height: 32px;
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
       font-weight: bold; font-size: 0.85rem; flex-shrink: 0;
     }
-    /* wrap: sonst quetscht eine lange Button-Reihe (viele Talente) die Buttons zusammen —
-       Beschriftungen werden abgeschnitten und Icons auf 0 Breite geschrumpft. */
-    .comb-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    /* Aktionsspalte: feste Breite, Buttons untereinander. Die feste Breite ist wichtig —
+       ohne sie quetscht eine lange Button-Liste die Icons auf 0 Breite. */
+    .comb-actions {
+      display: flex; flex-direction: column; align-items: stretch;
+      gap: 4px; width: 172px; flex-shrink: 0;
+    }
+    /* Buttons füllen die Spalte und richten Icon + Text linksbündig aus */
+    .comb-actions > button {
+      width: 100%; justify-content: flex-start; margin: 0; overflow: hidden;
+    }
+    /* Lange Namen werden gekürzt statt aus dem Button zu laufen — der Tooltip nennt den vollen Text */
+    .btn-label {
+      flex: 1; min-width: 0; text-align: left;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .attack-btn {
       height: 36px; padding: 0 12px; font-size: 13px; font-weight: 600;
       border-color: #c9a84c; color: #c9a84c;
@@ -2958,12 +2959,14 @@ export interface EffectChoice {
     .combat-option-btn {
       height: 32px; min-width: 0; padding: 0 8px; font-size: 12px;
       border-color: #3a3028; color: #888; display: flex; align-items: center; gap: 4px;
-      /* Buttons behalten ihre natürliche Breite und brechen um (siehe .comb-actions),
-         statt Beschriftung abzuschneiden und das Icon auf 0 Breite zu quetschen. */
       white-space: nowrap; flex-shrink: 0;
       mat-icon { font-size: 16px; height: 16px; width: 16px; flex-shrink: 0; }
       &.aggressive.active { border-color: #ff7043; color: #ff7043; background: rgba(255,112,67,0.1); }
       &.defensive.active { border-color: #42a5f5; color: #42a5f5; background: rgba(66,165,245,0.1); }
+      &.fear-resist-btn { border-color: #2f6f68; color: #80cbc4; background: rgba(128,203,196,0.08); }
+      &.fear-resist-btn:not([disabled]):hover { border-color: #80cbc4; background: rgba(128,203,196,0.16); }
+      &.remove-btn { border-color: #5c2b2b; color: #ef9a9a; }
+      &.remove-btn:not([disabled]):hover { border-color: #ef9a9a; background: rgba(239,154,154,0.1); }
       &.magische-markierung-btn { border-color: #3a1a40; color: #ce93d8; }
       &.magische-markierung-btn:not([disabled]):hover { border-color: #ce93d8; background: rgba(206,147,216,0.1); }
       &.active { border-color: #ff6d00; color: #ff6d00; background: rgba(255,109,0,0.1); }

@@ -2,6 +2,11 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Kombattanten-Kachel: zwei Spalten**
+Die Kopfzeile (Initiative, Name, Disziplin, Zustands-Badges und *Auto*) steht jetzt über der vollen Breite. Darunter stehen links die Werte — Schadensleiste, Wunden, Karma, Verteidigungen, Rüstung und aktive Effekte — und rechts alle Aktionsbuttons untereinander.
+
+**Jeder Aktionsbutton hat jetzt eine Beschriftung.** Vorher waren die meisten reine Icons, deren Bedeutung nur der Tooltip verriet. Zu lange Namen werden gekürzt statt aus dem Button zu laufen; der vollständige Text steht weiterhin im Tooltip. Der Button *Furcht abschütteln* ist nicht mehr grellgrün, sondern in gedämpftem Türkis wie die übrigen Buttons.
+
 **Freier Zusatzfaden aus der Erweiterten Matrize**
 Liegt ein Zauber **ohne Pflichtfäden** (z.B. Blitz) in einer Erweiterten Matrize, hat deren vorgewobener Faden nichts zu tun — er wird automatisch zum Zusatzfaden mit **Wirkung Verstärken (Wirkungsstufe +2)**. Ohne Wurf, ohne Aktion, und er zählt **nicht** gegen die Obergrenze: ein Adept mit Fadenweben-Rang 1 kann also den freien *und* einen selbst gewobenen Zusatzfaden nutzen. Zauber, die keine Wirkungsstufe kennen (z.B. Katastrophe), gehen leer aus.
 
