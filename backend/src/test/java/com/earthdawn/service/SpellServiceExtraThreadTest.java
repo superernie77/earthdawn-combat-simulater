@@ -334,6 +334,99 @@ class SpellServiceExtraThreadTest {
         verify(diceService).roll(11);
     }
 
+    // --- Erweiterte Matrize: freier Zusatzfaden für Sofortzauber ---
+
+    @Test
+    void zeroThreadSpellInErweiterteMatrize_getsFreeEffectStepThreadWithoutPreparation() {
+        SpellDefinition blitz = damageSpell(List.of(OPT_EFFECT_STEP, OPT_DISPLAY));
+        CombatantState caster = casterWithEnhancedMatrix(blitz, 4);
+        CombatantState target = target();
+        stub(blitz, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        // Kein Fadenweben, kein preparingSpellId — der Faden kommt allein aus der Matrize
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.getExtraThreadEffectStep()).isEqualTo(2);
+        assertThat(r.getExtraThreadLabels()).containsExactly(
+                "Wirkung Verstärken (Wirkungsstufe +2) — frei (Erweiterte Matrize)");
+        assertThat(r.getDamageStep()).isEqualTo(13); // 4 + 5 + 2 Übererfolge + 2 frei
+    }
+
+    @Test
+    void zeroThreadSpell_withoutErweiterteMatrize_getsNoFreeThread() {
+        SpellDefinition blitz = damageSpell(List.of(OPT_EFFECT_STEP));
+        CombatantState caster = caster(blitz, 4); // nur normale Matrize
+        CombatantState target = target();
+        stub(blitz, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.getExtraThreadEffectStep()).isZero();
+        assertThat(r.getExtraThreadLabels()).isEmpty();
+    }
+
+    @Test
+    void spellWithRequiredThreads_inErweiterteMatrize_getsNoFreeThread() {
+        // 2 Fäden − 1 vorgewoben = 1 Pflichtfaden: der Matrizenfaden ist verbraucht, nichts ist frei
+        SpellDefinition heal = healSpell(List.of(OPT_EFFECT_STEP));
+        heal.setThreads(2);
+        CombatantState caster = casterWithEnhancedMatrix(heal, 4);
+        prepared(caster, heal, 1, 1);
+        stub(heal, caster);
+
+        SpellCastResult r = spellService.castSpell(castReq());
+
+        assertThat(r.getExtraThreadEffectStep()).isZero();
+        assertThat(r.getExtraThreadLabels()).isEmpty();
+    }
+
+    @Test
+    void freeThread_stacksOnTopOfWovenExtraThreadsAndIgnoresTheRankCap() {
+        SpellDefinition blitz = damageSpell(List.of(OPT_EFFECT_STEP));
+        CombatantState caster = casterWithEnhancedMatrix(blitz, 1); // Rang 1 → max. 1 gewobener Zusatzfaden
+        CombatantState target = target();
+        prepared(caster, blitz, 0, 0);
+        caster.setExtraThreadChoices("0"); // dieser eine gewobene Zusatzfaden schöpft den Rang aus
+        stub(blitz, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        // gewoben (+2) UND frei (+2) — der freie Faden kommt oben drauf
+        assertThat(r.getExtraThreadEffectStep()).isEqualTo(4);
+        assertThat(r.getExtraThreadLabels()).hasSize(2);
+        assertThat(r.getExtraThreadLabels().get(1)).contains("frei (Erweiterte Matrize)");
+        assertThat(r.getDamageStep()).isEqualTo(15); // 4 + 5 + 2 Übererfolge + 4
+    }
+
+    @Test
+    void zeroThreadSpellWithoutEffectStepOption_getsNoFreeThread() {
+        // z.B. Katastrophe: BUFF ohne Wirkungsstufe — es gibt nichts zu erhöhen
+        SpellDefinition buff = SpellDefinition.builder()
+                .id(50L).name("Katastrophe").discipline("Illusionist").circle(1)
+                .threads(0).weavingDifficulty(5).castingDifficulty(1)
+                .effectType(SpellEffectType.BUFF).effectStep(0)
+                .modifyStat(StatType.PHYSICAL_DEFENSE).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(1).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .threadOptions(new ArrayList<>(List.of(OPT_DISPLAY)))
+                .build();
+        CombatantState caster = casterWithEnhancedMatrix(buff, 4);
+        stub(buff, caster);
+
+        SpellCastResult r = spellService.castSpell(castReq());
+
+        assertThat(r.getExtraThreadEffectStep()).isZero();
+        assertThat(r.getExtraThreadLabels()).isEmpty();
+    }
+
     // --- CSV-Helfer ---
 
     @Test
@@ -429,6 +522,17 @@ class SpellServiceExtraThreadTest {
                 .effectType(SpellEffectType.HEAL).effectStep(6)
                 .threadOptions(new ArrayList<>(options))
                 .build();
+    }
+
+    /** Wie caster(), aber der Zauber liegt zusätzlich in einer Erweiterten Matrize. */
+    private CombatantState casterWithEnhancedMatrix(SpellDefinition spell, int weavingRank) {
+        CombatantState c = caster(spell, weavingRank);
+        c.getCharacter().getTalents().add(CharacterTalent.builder().id(4L).rank(1)
+                .talentDefinition(TalentDefinition.builder().id(4L).name(TalentNames.ERWEITERTE_MATRIZE)
+                        .attribute(AttributeType.PERCEPTION).build())
+                .assignedSpell(spell)
+                .build());
+        return c;
     }
 
     /** Illusionist mit Illusionismus (Fadenweben) und Spruchzauberei. */

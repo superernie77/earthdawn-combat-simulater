@@ -224,6 +224,7 @@ public class SpellService {
         // Verrechnet wird ausschließlich EFFECT_STEP; alles andere ist Anzeige für den Spielleiter.
         java.util.List<String> extraThreadLabels = new java.util.ArrayList<>();
         int extraThreadEffectStep = 0;
+        int[] freeThreadEffectStep = {0};
         if (caster.getPreparingSpellId() != null && caster.getPreparingSpellId().equals(spell.getId())) {
             for (int idx : parseChoices(caster.getExtraThreadChoices())) {
                 if (idx < 0 || idx >= spell.getThreadOptions().size()) continue;
@@ -233,6 +234,22 @@ public class SpellService {
                     extraThreadEffectStep += opt.getValue();
                 }
             }
+        }
+
+        // Erweiterte Matrize + Sofortzauber: der vorgewobene Faden der Matrize hat keinen
+        // Pflichtfaden zu decken und wird zum freien Zusatzfaden — immer "Wirkungsstufe +2".
+        // Er kostet weder Wurf noch Aktion und zählt NICHT gegen den Fadenweben-Rang.
+        // Zauber ohne EFFECT_STEP-Option (z.B. Katastrophe, ein BUFF ohne Wirkungsstufe)
+        // erhalten nichts — dort gäbe es keine Wirkungsstufe zu erhöhen.
+        if (spell.getThreads() == 0 && isInErweiterteMatrize(caster, spell)) {
+            spell.getThreadOptions().stream()
+                    .filter(o -> o.getType() == SpellThreadOptionType.EFFECT_STEP)
+                    .findFirst()
+                    .ifPresent(free -> {
+                        extraThreadLabels.add(free.getLabel() + " — frei (Erweiterte Matrize)");
+                        freeThreadEffectStep[0] = free.getValue();
+                    });
+            extraThreadEffectStep += freeThreadEffectStep[0];
         }
 
         // Ziel bestimmen

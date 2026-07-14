@@ -2,6 +2,9 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Freier Zusatzfaden aus der Erweiterten Matrize**
+Liegt ein Zauber **ohne Pflichtfäden** (z.B. Blitz) in einer Erweiterten Matrize, hat deren vorgewobener Faden nichts zu tun — er wird automatisch zum Zusatzfaden mit **Wirkung Verstärken (Wirkungsstufe +2)**. Ohne Wurf, ohne Aktion, und er zählt **nicht** gegen die Obergrenze: ein Adept mit Fadenweben-Rang 1 kann also den freien *und* einen selbst gewobenen Zusatzfaden nutzen. Zauber, die keine Wirkungsstufe kennen (z.B. Katastrophe), gehen leer aus.
+
 **Zusätzliche Fäden bei Zaubern**
 Sind alle Pflichtfäden eines Zaubers gewoben, kann jeder weitere Faden eine der Zusatz-Optionen des Zaubers kaufen — auswählbar im Fadenweben-Dialog. Die Obergrenze ist der **Fadenweben-Rang**; dieselbe Option darf mehrfach gewählt werden. Auch **Sofortzauber ohne Pflichtfäden** (z.B. Blitz) können Zusatzfäden aufnehmen.
 
