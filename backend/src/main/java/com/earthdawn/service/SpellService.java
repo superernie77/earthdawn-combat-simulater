@@ -302,7 +302,7 @@ public class SpellService {
                     // Schadens-Amulette (Zauber) hier entladen und +6 je Amulett auf den Schadenswurf
                     int amuletDmg = combatService.applyAmulets(caster, req.getAmuletDamageIds(), true, "Schaden", amuletNotes);
                     applySpellDamage(session, caster, target, spell, extraSuccesses,
-                            amuletDmg + extraThreadEffectStep, result);
+                            amuletDmg, extraThreadEffectStep, result);
                 }
                 case BUFF   -> applySpellBuff(session, caster, target, spell, result);
                 case DEBUFF -> applySpellDebuff(session, target, spell, result);
@@ -345,12 +345,13 @@ public class SpellService {
 
     private void applySpellDamage(CombatSession session, CombatantState caster, CombatantState target,
                                    SpellDefinition spell, int extraSuccesses, int amuletDamageBonus,
+                                   int extraThreadEffectStep,
                                    SpellCastResult.SpellCastResultBuilder result) {
         if (target == null) throw new IllegalStateException("Schadenszauber benötigt ein Ziel.");
 
         int wilStep = Math.max(1, diceService.attributeToStep(caster.getCharacter().getWillpower()) - caster.getWounds());
         int damageBonus = "DAMAGE".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
-        int damageStep = spell.getEffectStep() + wilStep + damageBonus + amuletDamageBonus;
+        int damageStep = spell.getEffectStep() + wilStep + damageBonus + amuletDamageBonus + extraThreadEffectStep;
         RollResult damageRoll = diceService.roll(damageStep);
 
         StatType armorStat = spell.isUseMysticArmor() ? StatType.MYSTIC_ARMOR : StatType.PHYSICAL_ARMOR;

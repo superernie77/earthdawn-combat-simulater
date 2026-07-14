@@ -22,6 +22,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -290,6 +291,49 @@ class SpellServiceExtraThreadTest {
         assertThat(caster.getThreadsWoven()).isEqualTo(1); // Pflichtfaden dieses Zaubers
     }
 
+    // --- Schadenszauber: Aufschlüsselung der Stufe ---
+
+    @Test
+    void castDamage_addsExtraThreadEffectStepOnTopOfEffectStepAndExtraSuccesses() {
+        SpellDefinition blitz = damageSpell(List.of(OPT_EFFECT_STEP));
+        CombatantState caster = caster(blitz, 4);
+        CombatantState target = target();
+        prepared(caster, blitz, 0, 0);
+        caster.setExtraThreadChoices("0"); // 1x Wirkungsstufe +2
+        stub(blitz, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        // Wirkungsstufe 4 + WIL-Stufe 5 = 9 Basis, +2 Übererfolge (1 Übererfolg x2), +2 Zusatzfaden
+        assertThat(r.getExtraSuccesses()).isEqualTo(1);
+        assertThat(r.getDamageStepBonus()).isEqualTo(2);
+        assertThat(r.getExtraThreadEffectStep()).isEqualTo(2);
+        assertThat(r.getDamageStep()).isEqualTo(13);
+        // Die Basis muss sich exakt zurückrechnen lassen — genau das zeigt das UI in der Klammer an
+        assertThat(r.getDamageStep() - r.getDamageStepBonus() - r.getExtraThreadEffectStep()).isEqualTo(9);
+        verify(diceService).roll(13);
+    }
+
+    @Test
+    void castDamage_withoutExtraThreads_isUnchanged() {
+        SpellDefinition blitz = damageSpell(List.of(OPT_EFFECT_STEP));
+        CombatantState caster = caster(blitz, 4);
+        CombatantState target = target();
+        stub(blitz, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.getExtraThreadEffectStep()).isZero();
+        assertThat(r.getDamageStep()).isEqualTo(11); // 4 Wirkungsstufe + 5 WIL + 2 Übererfolge
+        verify(diceService).roll(11);
+    }
+
     // --- CSV-Helfer ---
 
     @Test
@@ -328,6 +372,35 @@ class SpellServiceExtraThreadTest {
         r.setSpellId(50L);
         r.setSpendKarma(false);
         r.setExtraThreadOptionIndex(optionIndex);
+        return r;
+    }
+
+    /** Schadenszauber mit Ziel: ZV 5, Wurf 10 -> (10-5)/5 = 1 Übererfolg -> +2 Schadensstufen. */
+    private SpellDefinition damageSpell(List<SpellThreadOption> options) {
+        return SpellDefinition.builder()
+                .id(50L).name("Blitz").discipline("Illusionist").circle(1)
+                .threads(0).weavingDifficulty(5).castingDifficulty(5)
+                .effectType(SpellEffectType.DAMAGE).effectStep(4)
+                .useMysticArmor(true).extraSuccessEffect("DAMAGE")
+                .threadOptions(new ArrayList<>(options))
+                .build();
+    }
+
+    private CombatantState target() {
+        GameCharacter c = GameCharacter.builder()
+                .id(2L).name("Orkbrenner").perception(10).willpower(10)
+                .equipment(new ArrayList<>()).talents(new ArrayList<>())
+                .skills(new ArrayList<>()).spells(new ArrayList<>())
+                .build();
+        return CombatantState.builder()
+                .id(20L).character(c).activeEffects(new ArrayList<>())
+                .currentKarma(0).wounds(0).currentDamage(0)
+                .build();
+    }
+
+    private SpellCastRequest castReqOn(long targetId) {
+        SpellCastRequest r = castReq();
+        r.setTargetCombatantId(targetId);
         return r;
     }
 

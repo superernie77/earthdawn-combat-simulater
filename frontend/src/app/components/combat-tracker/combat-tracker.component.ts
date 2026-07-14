@@ -2779,8 +2779,10 @@ export interface EffectChoice {
               <div class="roll-block-header">
                 <span class="roll-block-label">
                   Zauberschaden · Step {{ r.damageStep }}
-                  <span class="step-calc" *ngIf="r.damageStepBonus && r.damageStepBonus > 0">
-                    ({{ r.damageStep! - r.damageStepBonus }} + {{ r.damageStepBonus }} Übererfolge)
+                  <span class="step-calc" *ngIf="(r.damageStepBonus ?? 0) > 0 || (r.extraThreadEffectStep ?? 0) > 0">
+                    ({{ spellDamageBaseStep(r) }}<span
+                      *ngIf="(r.damageStepBonus ?? 0) > 0"> + {{ r.damageStepBonus }} Übererfolge</span><span
+                      *ngIf="(r.extraThreadEffectStep ?? 0) > 0"> + {{ r.extraThreadEffectStep }} Zusatzfäden</span>)
                   </span>
                 </span>
                 <div class="roll-block-totals">
@@ -4625,6 +4627,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   trackByOptionIndex(index: number): number {
     return index;
+  }
+
+  /**
+   * Grundstufe des Zauberschadens ohne die aufgeschlagenen Boni — also Wirkungsstufe + WIL-Stufe.
+   * Übererfolge und Zusatzfäden werden in der Klammer separat ausgewiesen.
+   */
+  spellDamageBaseStep(r: SpellCastResult): number {
+    return (r.damageStep ?? 0) - (r.damageStepBonus ?? 0) - (r.extraThreadEffectStep ?? 0);
   }
 
   performThreadweave(): void {
