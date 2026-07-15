@@ -56,7 +56,7 @@ import { CombatSession } from '../../models/combat.model';
 
       <ng-template #empty>
         <div class="empty-state">
-          <mat-icon>shield_outlined</mat-icon>
+          <mat-icon>shield</mat-icon>
           <p>Noch keine Kampfsessions. Starte einen Kampf!</p>
         </div>
       </ng-template>

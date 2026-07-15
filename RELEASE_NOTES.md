@@ -2,6 +2,12 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Bugfix: drei Icons wurden als Text ausgeschrieben**
+Die App lädt die klassische *Material Icons*-Schrift. Diese kennt weder `sentiment_extremely_dissatisfied` (Verängstigen-Button) noch `skull` (Gegner-Überschrift, Besiegt-Markierung, „ist bewusstlos"-Banner) noch `shield_outlined` (Konten, Kampfliste). Bei einem unbekannten Namen schreibt `mat-icon` das Wort **im Klartext** in den Button — es füllte ihn komplett aus und schob die Beschriftung aus dem sichtbaren Bereich. Genau deshalb wirkte der Verängstigen-Button „ohne Label". Ersetzt durch gültige Icons; ein neues Prüfskript (`frontend/scripts/check-mat-icons.py`) schlägt bei unbekannten Namen an — der Build bemerkt so etwas nicht.
+
+**Icons für die Ansage-Buttons**
+*Neutral*, *Aggressiv*, *Defensiv*, *Waffe*, *Zauber* und *Ändern* hatten Emoji oder gar kein Icon — jetzt echte Icons wie alle übrigen Buttons.
+
 **Kombattanten-Kachel: zwei Spalten**
 Die Kopfzeile (Initiative, Name, Disziplin, Zustands-Badges und *Auto*) steht jetzt über der vollen Breite. Darunter stehen links die Werte — Schadensleiste, Wunden, Karma, Verteidigungen, Rüstung und aktive Effekte — und rechts alle Aktionsbuttons untereinander.
 

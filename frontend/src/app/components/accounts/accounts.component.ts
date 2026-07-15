@@ -68,7 +68,7 @@ import { UserAccount } from '../../models/user-account.model';
             <button mat-stroked-button
               (click)="toggleGm(u)"
               [matTooltip]="u.gamemaster ? 'Spielleiter-Status entfernen' : 'Zum Spielleiter machen'">
-              <mat-icon>{{ u.gamemaster ? 'shield' : 'shield_outlined' }}</mat-icon>
+              <mat-icon>{{ u.gamemaster ? 'remove_moderator' : 'add_moderator' }}</mat-icon>
               {{ u.gamemaster ? 'Ist SL' : 'Zum SL' }}
             </button>
 

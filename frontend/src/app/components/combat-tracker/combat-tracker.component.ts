@@ -122,7 +122,7 @@ export interface EffectChoice {
             <mat-icon>shield</mat-icon> Held
           </button>
           <button class="group-toggle-btn enemy" [class.active]="isNpcAdd" (click)="isNpcAdd = true">
-            <mat-icon>skull</mat-icon> Gegner
+            <mat-icon>dangerous</mat-icon> Gegner
           </button>
         </div>
         <mat-form-field appearance="fill" style="width:300px">
@@ -153,7 +153,7 @@ export interface EffectChoice {
             </div>
             <!-- Enemies -->
             <div class="combatant-group">
-              <div class="group-header enemies-header"><mat-icon>skull</mat-icon> Gegner</div>
+              <div class="group-header enemies-header"><mat-icon>dangerous</mat-icon> Gegner</div>
               <div
                 class="combatant-card"
                 *ngFor="let c of enemies()"
@@ -177,7 +177,7 @@ export interface EffectChoice {
                 </span>
                 <span class="combatant-name">{{ cn(c) }}</span>
                 <span class="discipline-badge">{{ c.character.discipline?.name }}</span>
-                <mat-icon *ngIf="c.defeated" style="color:#f44336;font-size:16px">skull</mat-icon>
+                <mat-icon *ngIf="c.defeated" style="color:#f44336;font-size:16px">dangerous</mat-icon>
                 <span *ngIf="c.knockedDown && !c.defeated" class="knocked-badge" matTooltip="Niedergeschlagen: −3 auf alle Proben, −3 KV/MV/SV">↓ Nieder</span>
                 <span *ngIf="c.preparingSpellId && !c.defeated" class="spell-prep-badge"
                   matTooltip="Zauber vorbereitet: {{ spellNameOf(c) }} ({{ c.threadsWoven }}/{{ c.threadsRequired }} Fäden){{ extraThreadCountOf(c) ? ', ' + extraThreadCountOf(c) + ' Zusatzfäden' : '' }}">
@@ -206,27 +206,29 @@ export interface EffectChoice {
               <span class="declaration-label">Haltung:</span>
               <button class="decl-btn" [class.active]="c.declaredStance === 'NONE'"
                       (click)="setDeclaredStance(c, 'NONE')" matTooltip="Keine Haltung">
-                Neutral
+                <mat-icon>remove_circle_outline</mat-icon> Neutral
               </button>
               <button class="decl-btn aggressive" [class.active]="c.declaredStance === 'AGGRESSIVE'"
                       (click)="setDeclaredStance(c, 'AGGRESSIVE')"
                       matTooltip="Aggressiv: +3 Angriff, -3 Verteidigung, 1 Schaden">
-                ⚔ Aggressiv
+                <mat-icon>local_fire_department</mat-icon> Aggressiv
               </button>
               <button class="decl-btn defensive" [class.active]="c.declaredStance === 'DEFENSIVE'"
                       (click)="setDeclaredStance(c, 'DEFENSIVE')"
                       matTooltip="Defensiv: -3 Angriff, +3 Verteidigung">
-                🛡 Defensiv
+                <mat-icon>shield</mat-icon> Defensiv
               </button>
               <span class="declaration-label" style="margin-left:12px">Handlung:</span>
               <button class="decl-btn" [class.active]="c.declaredActionType === 'WEAPON'"
-                      (click)="setDeclaredActionType(c, 'WEAPON')">
-                🗡 Waffe
+                      (click)="setDeclaredActionType(c, 'WEAPON')"
+                      matTooltip="Diese Runde mit einer Waffe handeln">
+                <mat-icon>sports_martial_arts</mat-icon> Waffe
               </button>
               <button class="decl-btn" [class.active]="c.declaredActionType === 'SPELL'"
                       (click)="setDeclaredActionType(c, 'SPELL')"
-                      [disabled]="!isMagicCombatant(c)">
-                ✨ Zauber
+                      [disabled]="!isMagicCombatant(c)"
+                      matTooltip="Diese Runde zaubern">
+                <mat-icon>auto_fix_high</mat-icon> Zauber
               </button>
               <button mat-raised-button color="primary" class="decl-confirm"
                       *ngIf="!c.hasDeclared"
@@ -235,7 +237,10 @@ export interface EffectChoice {
               </button>
               <span *ngIf="c.hasDeclared" class="decl-confirmed">
                 <mat-icon style="color:#4caf50;font-size:18px">check_circle</mat-icon> Angesagt
-                <button mat-stroked-button (click)="undeclare(c)" style="margin-left:6px">Ändern</button>
+                <button mat-stroked-button class="decl-undo" (click)="undeclare(c)"
+                        matTooltip="Ansage ändern">
+                  <mat-icon>edit</mat-icon> Ändern
+                </button>
               </span>
             </div>
             <!-- Zwei Spalten: links die Werte, rechts die Aktionen -->
@@ -369,7 +374,7 @@ export interface EffectChoice {
                   [disabled]="!isActiveTurn(c)"
                   (click)="openFearDialog(c)"
                   matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
-                  <mat-icon>sentiment_extremely_dissatisfied</mat-icon><span class="btn-label">Verängstigen</span></button>
+                  <mat-icon>mood_bad</mat-icon><span class="btn-label">Verängstigen</span></button>
                 <!-- Magie neutralisieren: beendet einen aktiven Effekt (Aktion + 1 Überanstrengung) -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNeutralizeMagicTalent(c) && !c.defeated"
                   class="combat-option-btn neutralize-btn"
@@ -625,7 +630,7 @@ export interface EffectChoice {
               Gesamt: {{ r.totalWounds }} · WS {{ r.woundThreshold }}
             </div>
             <div class="defeat-banner" *ngIf="r.targetDefeated">
-              <mat-icon>skull</mat-icon> {{ r.targetName }} ist bewusstlos!
+              <mat-icon>dangerous</mat-icon> {{ r.targetName }} ist bewusstlos!
             </div>
             <ng-container *ngIf="r.knockdownResult as kd">
               <div class="knockdown-banner" [class.knocked]="kd.knockedDown" [class.stood]="!kd.knockedDown">
@@ -802,7 +807,7 @@ export interface EffectChoice {
               Gesamt: {{ r.totalWounds }} · WS {{ r.woundThreshold }}
             </div>
             <div class="defeat-banner" *ngIf="r.targetDefeated">
-              <mat-icon>skull</mat-icon> {{ r.defenderName }} ist bewusstlos!
+              <mat-icon>dangerous</mat-icon> {{ r.defenderName }} ist bewusstlos!
             </div>
             <ng-container *ngIf="r.knockdownResult as kd">
               <div class="knockdown-banner" [class.knocked]="kd.knockedDown" [class.stood]="!kd.knockedDown">
@@ -2467,7 +2472,7 @@ export interface EffectChoice {
     <div class="attack-dialog" *ngIf="fearDialog.open">
       <div class="dialog-backdrop" (click)="fearDialog.open = false"></div>
       <div class="dialog-box" style="max-width:440px">
-        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">sentiment_extremely_dissatisfied</mat-icon>Verängstigen: {{ fearDialog.actor?.character?.name }}</h3>
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#b39ddb">mood_bad</mat-icon>Verängstigen: {{ fearDialog.actor?.character?.name }}</h3>
         <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
           WIL + Rang vs. Mystische VK · Standardaktion · 0 Überanstrengung
           <br>−2/Erfolg auf Aktionsproben für Rang Runden. Das Ziel darf jede Runde eine WIL-Probe zum Abschütteln ablegen.
@@ -2495,7 +2500,7 @@ export interface EffectChoice {
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
           <button mat-stroked-button (click)="fearDialog.open = false">Abbrechen</button>
           <button mat-raised-button color="warn" (click)="performFear()" [disabled]="!fearDialog.targetId">
-            <mat-icon>sentiment_extremely_dissatisfied</mat-icon> Verängstigen
+            <mat-icon>mood_bad</mat-icon> Verängstigen
           </button>
         </div>
       </div>
@@ -2506,7 +2511,7 @@ export interface EffectChoice {
       <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="fearModal.result as r">
         <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
-          <mat-icon>{{ r.success ? 'sentiment_extremely_dissatisfied' : 'close' }}</mat-icon>
+          <mat-icon>{{ r.success ? 'mood_bad' : 'close' }}</mat-icon>
           {{ r.success ? 'VERÄNGSTIGT!' : 'VERFEHLT' }}
         </div>
         <div class="result-names">
@@ -2544,7 +2549,7 @@ export interface EffectChoice {
               <span class="roll-value extra-success">{{ r.successes }}</span>
             </div>
             <div class="taunt-effect-banner">
-              <mat-icon>sentiment_extremely_dissatisfied</mat-icon>
+              <mat-icon>mood_bad</mat-icon>
               −{{ r.penalty }} auf Aktionsproben für {{ r.duration }} Runden · Abschütteln: WIL-Probe vs. {{ r.resistTargetNumber }}
             </div>
           </ng-container>
@@ -2789,7 +2794,7 @@ export interface EffectChoice {
               Gesamt: {{ r.totalWounds }} · WS {{ r.woundThreshold }}
             </div>
             <div class="defeat-banner" *ngIf="r.targetDefeated">
-              <mat-icon>skull</mat-icon> {{ r.targetName }} ist bewusstlos!
+              <mat-icon>dangerous</mat-icon> {{ r.targetName }} ist bewusstlos!
             </div>
             <ng-container *ngIf="r.knockdownResult as kd">
               <div class="knockdown-banner" [class.knocked]="kd.knockedDown" [class.stood]="!kd.knockedDown">
@@ -2907,8 +2912,11 @@ export interface EffectChoice {
     }
     .declaration-label { font-size: 0.78rem; color: #aaa; font-weight: 600; }
     .decl-btn {
+      display: inline-flex; align-items: center; gap: 4px;
       padding: 4px 10px; border-radius: 6px; border: 1px solid #3a3028;
       background: transparent; color: #aaa; font-size: 0.82rem; cursor: pointer;
+      white-space: nowrap;
+      mat-icon { font-size: 15px; height: 15px; width: 15px; flex-shrink: 0; }
     }
     .decl-btn:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; }
     .decl-btn.active { border-color: #c9a84c; color: #c9a84c; background: rgba(201,168,76,0.12); }
@@ -2917,6 +2925,10 @@ export interface EffectChoice {
     .decl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .decl-confirm { margin-left: auto; }
     .decl-confirmed { display: inline-flex; align-items: center; gap: 4px; color: #4caf50; font-size: 0.82rem; margin-left: auto; }
+    .decl-undo {
+      margin-left: 6px;
+      mat-icon { font-size: 15px; height: 15px; width: 15px; flex-shrink: 0; margin-right: 2px; }
+    }
 
     .comb-header {
       display: flex; justify-content: space-between; align-items: center;
