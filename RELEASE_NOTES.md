@@ -2,6 +2,11 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Eigenes App-Icon**
+Die App hat jetzt ein eigenes Zeichen: ein **Fadenring, von einem Schwert durchstoßen** — der Ring steht für das Fadenweben, die Kernmechanik von Earthdawn, das Schwert für den Kampf. Gehalten im Gold der App auf dunklem Grund. Es ist ein eigener Entwurf, nicht das FASA-Logo.
+
+Das Zeichen erscheint im **Browser-Tab** und als **Logo in der Seitenleiste** neben dem Schriftzug — beides aus derselben SVG-Datei, es gibt also nur eine Quelle. Für Browser ohne SVG-Favicon liegt eine `favicon.ico` (16/32/48) daneben.
+
 **Bugfix: drei Icons wurden als Text ausgeschrieben**
 Die App lädt die klassische *Material Icons*-Schrift. Diese kennt weder `sentiment_extremely_dissatisfied` (Verängstigen-Button) noch `skull` (Gegner-Überschrift, Besiegt-Markierung, „ist bewusstlos"-Banner) noch `shield_outlined` (Konten, Kampfliste). Bei einem unbekannten Namen schreibt `mat-icon` das Wort **im Klartext** in den Button — es füllte ihn komplett aus und schob die Beschriftung aus dem sichtbaren Bereich. Genau deshalb wirkte der Verängstigen-Button „ohne Label". Ersetzt durch gültige Icons; ein neues Prüfskript (`frontend/scripts/check-mat-icons.py`) schlägt bei unbekannten Namen an — der Build bemerkt so etwas nicht.
 

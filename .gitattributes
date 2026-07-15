@@ -1,0 +1,3 @@
+# Binaerdaten nie durch Zeilenende-Konvertierung schicken — das wuerde die Datei zerstoeren
+*.ico binary
+*.png binary

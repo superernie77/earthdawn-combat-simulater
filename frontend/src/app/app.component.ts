@@ -22,8 +22,12 @@ import { UserAccount } from './models/user-account.model';
     <mat-sidenav-container class="app-container">
       <mat-sidenav mode="side" opened class="sidenav">
         <div class="sidenav-header">
-          <span class="brand">Earthdawn</span>
-          <span class="brand-sub">Combat Simulator</span>
+          <!-- Dasselbe SVG wie im Browser-Tab — eine Quelle für Favicon und Logo -->
+          <img src="favicon.svg" alt="" class="brand-logo" width="38" height="38">
+          <div class="brand-text">
+            <span class="brand">Earthdawn</span>
+            <span class="brand-sub">Combat Simulator</span>
+          </div>
         </div>
         <mat-nav-list>
           <a mat-list-item routerLink="/characters" routerLinkActive="active-link">
@@ -78,7 +82,21 @@ import { UserAccount } from './models/user-account.model';
       padding: 20px 16px 12px;
       border-bottom: 1px solid #3a3028;
       display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+    }
+
+    /* Schriftzug bleibt gestapelt — die Kopfzeile selbst liegt jetzt nebeneinander */
+    .brand-text {
+      display: flex;
       flex-direction: column;
+      min-width: 0;
     }
 
     .brand {

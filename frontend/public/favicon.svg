@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img"
+     aria-label="Earthdawn Combat Simulator">
+  <title>Earthdawn Combat Simulator</title>
+  <!--
+    Fadenring + Schwert: der Ring steht für das Fadenweben (Kernmechanik von Earthdawn),
+    das Schwert für den Kampf. Farben aus dem App-Theme (Gold #c9a84c auf #17120d).
+    Auf 16 px reduziert sich die Marke auf "Kreis mit Balken" — bewusst so gebaut:
+    kräftige Flächen statt feiner Linien, damit sie im Browser-Tab lesbar bleibt.
+  -->
+  <defs>
+    <linearGradient id="ed-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8d5a0"/>
+      <stop offset="1" stop-color="#b8933c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dunkler Grund: trägt die Marke auch auf hellen Tab-Leisten -->
+  <rect width="64" height="64" rx="14" fill="#17120d"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#4a3f2a" stroke-width="2"/>
+
+  <!-- Fadenring -->
+  <circle cx="32" cy="32" r="19" fill="none" stroke="url(#ed-gold)" stroke-width="4"/>
+
+  <!-- Schwert: erst dunkel umrandet, damit es den Ring optisch durchschneidet … -->
+  <g stroke="#17120d" stroke-width="4" stroke-linejoin="round">
+    <path d="M32 5 L36 15 V40 H28 V15 Z"/>
+    <rect x="18" y="40" width="28" height="5" rx="2.5"/>
+    <rect x="29.5" y="45" width="5" height="8"/>
+    <circle cx="32" cy="56" r="3.5"/>
+  </g>
+  <!-- … dann die goldene Fläche darüber -->
+  <g fill="url(#ed-gold)">
+    <path d="M32 5 L36 15 V40 H28 V15 Z"/>
+    <rect x="18" y="40" width="28" height="5" rx="2.5"/>
+    <rect x="29.5" y="45" width="5" height="8"/>
+    <circle cx="32" cy="56" r="3.5"/>
+  </g>
+</svg>
