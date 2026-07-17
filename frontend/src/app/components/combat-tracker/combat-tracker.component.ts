@@ -4448,9 +4448,11 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   /** Protokoll-Einträge fürs UI: chronologisch absteigend (neueste oben) + geparste Wurf-Details. */
   private toLogEntries(log: any[] | undefined): any[] {
+    // Das Backend liefert bereits absteigend (@OrderBy("id DESC") — neueste zuerst).
+    // Zur Sicherheit explizit sortieren statt blind umzudrehen.
     return (log ?? [])
       .map(e => ({ ...e, details: e.rollDetailsJson ? this.safeParseJson(e.rollDetailsJson) : null }))
-      .reverse();
+      .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
   }
 
   private safeParseJson(s: string): any {

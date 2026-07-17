@@ -657,3 +657,26 @@ describe('CombatTrackerComponent — Kampfkarte: Reichweiten-Filter', () => {
     expect(comp.spellTargets().map((t: any) => t.id)).toEqual([2]);
   });
 });
+
+describe('CombatTrackerComponent — Kampfprotokoll-Reihenfolge', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  it('toLogEntries zeigt die neuesten Einträge oben — unabhängig von der Eingabereihenfolge', () => {
+    const desc = [{ id: 3, description: 'neu' }, { id: 2 }, { id: 1, description: 'alt' }];
+    const asc = [{ id: 1, description: 'alt' }, { id: 2 }, { id: 3, description: 'neu' }];
+    for (const input of [desc, asc]) {
+      const out = (comp as any).toLogEntries(input);
+      expect(out.map((e: any) => e.id)).toEqual([3, 2, 1]);
+    }
+  });
+
+  it('toLogEntries parst rollDetailsJson und übersteht kaputtes JSON', () => {
+    const out = (comp as any).toLogEntries([
+      { id: 2, rollDetailsJson: '{"hit":true}' },
+      { id: 1, rollDetailsJson: 'kaputt{' }
+    ]);
+    expect(out[0].details).toEqual({ hit: true });
+    expect(out[1].details).toBeNull();
+  });
+});

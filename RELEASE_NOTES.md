@@ -2,6 +2,9 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Bugfix: Kampfprotokoll war falsch herum**
+Das Backend liefert das Protokoll bereits mit den neuesten Einträgen zuerst; das Frontend drehte die Liste ein zweites Mal um — dadurch standen die ältesten Einträge oben. Jetzt wird explizit absteigend sortiert: die neuesten Einträge stehen oben.
+
 **Hexfeld-Kampfkarte (optional)**
 Der Kampf kann jetzt räumlich auf einer Hexfeld-Karte ausgetragen werden — als **optionale Zusatzschicht**: Ohne Aktivierung bleibt alles exakt wie bisher. Aktivierung per Checkbox beim Anlegen der Session (Größe wählbar, Standard 24×16) oder per Button im Setup; der „Karte"-Knopf öffnet die Karte **in einem eigenen Fenster**, das sich live mit dem Kampfscreen synchronisiert.
 
