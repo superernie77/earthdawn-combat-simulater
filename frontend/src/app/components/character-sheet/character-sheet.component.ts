@@ -411,7 +411,7 @@ import { ProbeResult } from '../../models/dice.model';
                 <div class="equip-empty" *ngIf="!weapons().length">Keine Waffen eingetragen</div>
               </div>
               <div class="equip-add-form">
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Name</mat-label>
                   <input matInput [(ngModel)]="newWeapon.name" placeholder="z.B. Langschwert">
                 </mat-form-field>
@@ -455,7 +455,7 @@ import { ProbeResult } from '../../models/dice.model';
                     <mat-option [value]="true">Ja (Schwanz)</mat-option>
                   </mat-select>
                 </mat-form-field>
-                <mat-form-field appearance="fill" style="flex:3">
+                <mat-form-field appearance="fill" style="flex:3 1 200px;min-width:200px">
                   <mat-label>Beschreibung (optional)</mat-label>
                   <input matInput [(ngModel)]="newWeapon.description">
                 </mat-form-field>
@@ -493,7 +493,7 @@ import { ProbeResult } from '../../models/dice.model';
                 <div class="equip-empty" *ngIf="!armors().length">Keine Rüstung eingetragen</div>
               </div>
               <div class="equip-add-form">
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Name</mat-label>
                   <input matInput [(ngModel)]="newArmor.name" placeholder="z.B. Kettenhemd">
                 </mat-form-field>
@@ -509,7 +509,7 @@ import { ProbeResult } from '../../models/dice.model';
                   <mat-label>Init.-Malus</mat-label>
                   <input matInput type="number" [(ngModel)]="newArmor.initiativePenalty" min="0">
                 </mat-form-field>
-                <mat-form-field appearance="fill" style="flex:3">
+                <mat-form-field appearance="fill" style="flex:3 1 200px;min-width:200px">
                   <mat-label>Beschreibung (optional)</mat-label>
                   <input matInput [(ngModel)]="newArmor.description">
                 </mat-form-field>
@@ -549,7 +549,7 @@ import { ProbeResult } from '../../models/dice.model';
                 <div class="equip-empty" *ngIf="!shields().length">Kein Schild eingetragen</div>
               </div>
               <div class="equip-add-form">
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Name</mat-label>
                   <input matInput [(ngModel)]="newShield.name" placeholder="z.B. Rundschild">
                 </mat-form-field>
@@ -567,7 +567,7 @@ import { ProbeResult } from '../../models/dice.model';
                 </mat-form-field>
                 <mat-checkbox [(ngModel)]="newShield.buckler" style="margin:0 8px"
                   matTooltip="Buckler: darf auch mit zweihändigen Waffen geführt werden">Buckler</mat-checkbox>
-                <mat-form-field appearance="fill" style="flex:3">
+                <mat-form-field appearance="fill" style="flex:3 1 200px;min-width:200px">
                   <mat-label>Beschreibung (optional)</mat-label>
                   <input matInput [(ngModel)]="newShield.description">
                 </mat-form-field>
@@ -637,7 +637,7 @@ import { ProbeResult } from '../../models/dice.model';
               </div>
 
               <div class="equip-add-form">
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Name</mat-label>
                   <input matInput [(ngModel)]="newAmulet.name" placeholder="z.B. Verzweiflungsschlag-Amulett">
                 </mat-form-field>
@@ -648,7 +648,7 @@ import { ProbeResult } from '../../models/dice.model';
                     <mat-option [value]="true">Zauber</mat-option>
                   </mat-select>
                 </mat-form-field>
-                <mat-form-field appearance="fill" style="flex:3">
+                <mat-form-field appearance="fill" style="flex:3 1 200px;min-width:200px">
                   <mat-label>Beschreibung (optional)</mat-label>
                   <input matInput [(ngModel)]="newAmulet.description">
                 </mat-form-field>
@@ -732,11 +732,11 @@ import { ProbeResult } from '../../models/dice.model';
                 </button>
               </div>
               <div class="equip-add-form">
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Name</mat-label>
                   <input matInput [(ngModel)]="newGear.name" placeholder="z.B. Leichte Stiefel">
                 </mat-form-field>
-                <mat-form-field appearance="fill" style="flex:2">
+                <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
                   <mat-label>Bonus auf Talent/Fertigkeit</mat-label>
                   <mat-select [(ngModel)]="newGear.probeBonusTalentName">
                     <mat-option *ngFor="let n of probeTargetNames()" [value]="n">{{ n }}</mat-option>

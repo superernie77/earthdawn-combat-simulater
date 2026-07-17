@@ -2,6 +2,9 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Bugfix: Ausrüstungsformulare schnitten Felder ab**
+In den Hinzufügen-Zeilen der Ausrüstung wurden die flexiblen Felder (Name, Beschreibung) von den festen Nachbarfeldern — etwa den neuen Kurz/Mittel/Weit-Reichweiten — auf Splitterbreite gequetscht. Alle flexiblen Felder haben jetzt eine Mindestbreite und brechen stattdessen in eine zweite Zeile um.
+
 **Bugfix: Kampfprotokoll war falsch herum**
 Das Backend liefert das Protokoll bereits mit den neuesten Einträgen zuerst; das Frontend drehte die Liste ein zweites Mal um — dadurch standen die ältesten Einträge oben. Jetzt wird explizit absteigend sortiert: die neuesten Einträge stehen oben.
 
