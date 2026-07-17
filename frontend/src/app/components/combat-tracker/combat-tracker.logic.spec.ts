@@ -574,3 +574,86 @@ describe('CombatTrackerComponent — Zusatzfäden', () => {
     expect(comp.trackByOptionIndex(3)).toBe(3);
   });
 });
+
+describe('CombatTrackerComponent — Kampfkarte: Reichweiten-Filter', () => {
+  let comp: CombatTrackerComponent;
+  beforeEach(() => { comp = Object.create(CombatTrackerComponent.prototype) as CombatTrackerComponent; });
+
+  function combatant(id: number, q: number | null, r: number | null, extra: any = {}): any {
+    return { id, mapQ: q, mapR: r, defeated: false,
+      character: { name: 'C' + id, talents: [], skills: [], spells: [], equipment: [] }, ...extra };
+  }
+
+  function setup(mapEnabled: boolean, combatants: any[]): void {
+    (comp as any).session = { id: 1, mapEnabled, mapWidth: 24, mapHeight: 16, combatants };
+    (comp as any).attackDialog = { open: false };
+  }
+
+  it('mapDistanceBetween liefert die Hexdistanz platzierter Kombattanten', () => {
+    const a = combatant(1, 2, 2), b = combatant(2, 5, 2);
+    setup(true, [a, b]);
+    expect(comp.mapDistanceBetween(a, b)).toBe(3);
+  });
+
+  it('mapDistanceBetween ist null ohne Karte oder ohne Platzierung', () => {
+    const a = combatant(1, 2, 2), b = combatant(2, null, null);
+    setup(false, [a, b]);
+    expect(comp.mapDistanceBetween(a, combatant(2, 5, 2))).toBeNull();
+    setup(true, [a, b]);
+    expect(comp.mapDistanceBetween(a, b)).toBeNull();
+  });
+
+  it('possibleTargets(actor) filtert Nahkampf auf angrenzende Felder', () => {
+    const actor = combatant(1, 2, 2);
+    const adjacent = combatant(2, 3, 2);
+    const far = combatant(3, 6, 2);
+    setup(true, [actor, adjacent, far]);
+    const targets = comp.possibleTargets(actor);
+    expect(targets.map((t: any) => t.id)).toEqual([2]);
+  });
+
+  it('possibleTargets(actor) lässt unplatzierte Ziele wählbar', () => {
+    const actor = combatant(1, 2, 2);
+    const unplaced = combatant(2, null, null);
+    setup(true, [actor, unplaced]);
+    expect(comp.possibleTargets(actor).map((t: any) => t.id)).toEqual([2]);
+  });
+
+  it('possibleTargets(actor) filtert nicht, wenn die Karte aus ist oder der Akteur unplatziert', () => {
+    const far = combatant(3, 9, 9);
+    const actorOff = combatant(1, 2, 2);
+    setup(false, [actorOff, far]);
+    expect(comp.possibleTargets(actorOff).map((t: any) => t.id)).toEqual([3]);
+    const actorUnplaced = combatant(1, null, null);
+    setup(true, [actorUnplaced, far]);
+    expect(comp.possibleTargets(actorUnplaced).map((t: any) => t.id)).toEqual([3]);
+  });
+
+  it('Angriffsdialog: Fernkampf nutzt die Weit-Reichweite der gewählten Waffe', () => {
+    const bow = { id: 7, name: 'Bogen', type: 'WEAPON', attackTalentName: 'Projektilwaffen',
+                  rangeShort: 3, rangeMedium: 6, rangeLong: 10 };
+    const actor = combatant(1, 0, 0, { character: { name: 'A',
+      talents: [{ talentDefinition: { id: 5, name: 'Projektilwaffen' }, rank: 3 }],
+      skills: [], spells: [], equipment: [bow] } });
+    const near = combatant(2, 8, 0);   // Distanz 8 ≤ 10
+    const far = combatant(3, 15, 0);   // Distanz 15 > 10
+    setup(true, [actor, near, far]);
+    (comp as any).attackDialog = { open: true, attacker: actor, weaponId: 7,
+      talentId: 5, attackSource: 't:5' };
+    const targets = comp.possibleTargets();
+    expect(targets.map((t: any) => t.id)).toEqual([2]);
+  });
+
+  it('spellTargets filtert nach Zauberreichweite', () => {
+    const blitz = { spellDefinition: { id: 50, name: 'Blitz', threads: 0, effectType: 'DAMAGE',
+      rangeHexes: 5, requiresTarget: false } };
+    const caster = combatant(1, 0, 0, { character: { name: 'Z',
+      talents: [{ talentDefinition: { name: 'Zaubermatritze' }, assignedSpell: blitz.spellDefinition, rank: 1 }],
+      skills: [], spells: [blitz], equipment: [] } });
+    const near = combatant(2, 4, 0);
+    const far = combatant(3, 9, 0);
+    setup(true, [caster, near, far]);
+    (comp as any).spellCastDialog = { open: true, caster, spellId: 50 };
+    expect(comp.spellTargets().map((t: any) => t.id)).toEqual([2]);
+  });
+});

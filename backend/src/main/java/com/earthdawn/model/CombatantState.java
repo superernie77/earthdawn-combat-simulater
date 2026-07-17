@@ -222,6 +222,19 @@ public class CombatantState {
     @Column(length = 200)
     private String extraThreadChoices;
 
+    // --- Kampfkarte: Position (null = nicht platziert) + Bewegungsbudget ---
+
+    @Column(name = "map_q")
+    private Integer mapQ;
+
+    @Column(name = "map_r")
+    private Integer mapR;
+
+    /** In dieser Runde bereits gelaufene Felder. Reset in nextRound(). */
+    @Column(name = "moved_hexes_this_round", columnDefinition = "integer default 0")
+    @Builder.Default
+    private int movedHexesThisRound = 0;
+
     // --- Deklarationsphase (Ansage zu Rundenbeginn) ---
 
     /** Hat dieser Kombattant für die aktuelle Runde bereits deklariert? */

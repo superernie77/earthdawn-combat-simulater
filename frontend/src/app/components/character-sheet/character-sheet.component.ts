@@ -387,6 +387,9 @@ import { ProbeResult } from '../../models/dice.model';
                   <div class="equip-stats">
                     <span class="equip-badge weapon">+{{ e.damageBonus }} Schaden</span>
                     <span class="equip-badge" *ngIf="e.attackTalentName" style="background:rgba(66,165,245,0.15);border:1px solid #42a5f5;color:#90caf9" matTooltip="Im Kampf nur bei diesem Angriffstalent/-fertigkeit wählbar">⚔ {{ e.attackTalentName }}</span>
+                    <span class="equip-badge" *ngIf="e.rangeLong"
+                      style="background:rgba(129,212,250,0.12);border:1px solid #4fc3f7;color:#81d4fa"
+                      matTooltip="Reichweite auf der Kampfkarte (Kurz/Mittel/Weit in Feldern)">🎯 {{ e.rangeShort ?? '–' }}/{{ e.rangeMedium ?? '–' }}/{{ e.rangeLong }}</span>
                     <span class="equip-badge" *ngIf="e.tailWeapon" style="background:rgba(129,199,132,0.15);border:1px solid #81c784;color:#a5d6a7" matTooltip="Schwanzwaffe (T'skrang-Schwanzangriff)">🦎 Schwanzwaffe</span>
                     <span class="equip-badge two-handed-badge" *ngIf="e.twoHanded" matTooltip="Zweihändig: kann nicht zusammen mit einem Schild geführt werden (außer Buckler)">✋✋ Zweihändig</span>
                     <span class="equip-badge claw-badge" *ngIf="e.clawWeapon" matTooltip="Krallenhand: ersetzt STR-Stufe, Karma auf Schaden möglich, nicht entwaffenbar">Krallenhand</span>
@@ -429,6 +432,21 @@ import { ProbeResult } from '../../models/dice.model';
                     <mat-option [value]="''">— beliebig —</mat-option>
                     <mat-option *ngFor="let n of weaponAttackTalents" [value]="n">{{ n }}</mat-option>
                   </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:90px" *ngIf="isRangedTalent(newWeapon.attackTalentName)"
+                  matTooltip="Kampfkarte: Reichweite Kurz in Feldern">
+                  <mat-label>Kurz</mat-label>
+                  <input matInput type="number" [(ngModel)]="newWeapon.rangeShort" min="1">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:90px" *ngIf="isRangedTalent(newWeapon.attackTalentName)"
+                  matTooltip="Kampfkarte: Reichweite Mittel in Feldern">
+                  <mat-label>Mittel</mat-label>
+                  <input matInput type="number" [(ngModel)]="newWeapon.rangeMedium" min="1">
+                </mat-form-field>
+                <mat-form-field appearance="fill" style="width:90px" *ngIf="isRangedTalent(newWeapon.attackTalentName)"
+                  matTooltip="Kampfkarte: Reichweite Weit in Feldern (maximale Schussdistanz)">
+                  <mat-label>Weit</mat-label>
+                  <input matInput type="number" [(ngModel)]="newWeapon.rangeLong" min="1">
                 </mat-form-field>
                 <mat-form-field appearance="fill" style="width:150px" matTooltip="Am Schwanz befestigte Waffe (bis Größe 2) — nur für den T'skrang-Schwanzangriff wählbar.">
                   <mat-label>Schwanzwaffe</mat-label>
@@ -1278,7 +1296,7 @@ export class CharacterSheetComponent implements OnInit {
   /** Angriffstalente/-fertigkeiten, denen eine Waffe zugeordnet werden kann. */
   weaponAttackTalents = ['Nahkampfwaffen', 'Projektilwaffen', 'Wurfwaffen', 'Waffenloser Kampf'];
 
-  newWeapon: { name: string; damageBonus: number; twoHanded: boolean; attackTalentName: string; tailWeapon: boolean; description: string } = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', tailWeapon: false, description: '' };
+  newWeapon: { name: string; damageBonus: number; twoHanded: boolean; attackTalentName: string; tailWeapon: boolean; description: string; rangeShort?: number; rangeMedium?: number; rangeLong?: number } = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', tailWeapon: false, description: '' };
   newArmor: { name: string; physicalArmor: number; mysticalArmor: number; initiativePenalty: number; description: string } = { name: '', physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, description: '' };
   newShield: { name: string; physicalDefenseBonus: number; mysticDefenseBonus: number; initiativePenalty: number; buckler: boolean; description: string } = { name: '', physicalDefenseBonus: 0, mysticDefenseBonus: 0, initiativePenalty: 0, buckler: false, description: '' };
   newPotionQty: number = 1;
@@ -1330,6 +1348,7 @@ export class CharacterSheetComponent implements OnInit {
     { field: 'healthBonus',     label: 'Lebenspunkte-Bonus (BW & TD)' },
     { field: 'initiativeBonus', label: 'Initiative-Bonus' },
     { field: 'recoveryBonus',   label: 'Erholungsstufen-Bonus' },
+    { field: 'movementHexes',   label: 'Bewegung (Felder, Kampfkarte)' },
   ];
 
   currencies = [
@@ -1992,9 +2011,15 @@ export class CharacterSheetComponent implements OnInit {
     });
   }
 
+  /** Projektil-/Wurfwaffen brauchen Reichweiten für die Kampfkarte. */
+  isRangedTalent(talentName?: string): boolean {
+    return talentName === 'Projektilwaffen' || talentName === 'Wurfwaffen';
+  }
+
   addWeapon(): void {
     if (!this.character?.id || !this.newWeapon.name.trim()) return;
-    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, twoHanded: this.newWeapon.twoHanded, attackTalentName: this.newWeapon.attackTalentName || undefined, tailWeapon: this.newWeapon.tailWeapon, description: this.newWeapon.description };
+    const ranged = this.isRangedTalent(this.newWeapon.attackTalentName);
+    const eq: Equipment = { name: this.newWeapon.name.trim(), type: 'WEAPON', damageBonus: this.newWeapon.damageBonus, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0, physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0, twoHanded: this.newWeapon.twoHanded, attackTalentName: this.newWeapon.attackTalentName || undefined, tailWeapon: this.newWeapon.tailWeapon, description: this.newWeapon.description, rangeShort: ranged ? this.newWeapon.rangeShort : undefined, rangeMedium: ranged ? this.newWeapon.rangeMedium : undefined, rangeLong: ranged ? this.newWeapon.rangeLong : undefined };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => {
       this.character = c;
       this.newWeapon = { name: '', damageBonus: 0, twoHanded: false, attackTalentName: '', tailWeapon: false, description: '' };

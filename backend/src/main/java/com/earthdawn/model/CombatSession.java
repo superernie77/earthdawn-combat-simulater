@@ -54,6 +54,24 @@ public class CombatSession {
     @Builder.Default
     private List<CombatLog> log = new ArrayList<>();
 
+    // --- Kampfkarte (optional; ohne Aktivierung verhält sich alles wie bisher) ---
+
+    @Column(name = "map_enabled", columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean mapEnabled = false;
+
+    @Column(name = "map_width", columnDefinition = "integer default 24")
+    @Builder.Default
+    private int mapWidth = 24;
+
+    @Column(name = "map_height", columnDefinition = "integer default 16")
+    @Builder.Default
+    private int mapHeight = 16;
+
+    @OneToMany(mappedBy = "combatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    private List<MapObstacle> obstacles = new ArrayList<>();
+
     /**
      * Letzte Initiative-Probe (pro Kombattant: Würfel + Total + Reihenfolge). Wird bei jeder
      * Initiative-Probe gesetzt und über WebSocket mit der Session verteilt — damit das Frontend

@@ -104,6 +104,10 @@ export interface Equipment {
   attackTalentName?: string;
   /** Waffe: am Schwanz befestigte Schwanzwaffe (nur für T'skrang-Schwanzangriff). */
   tailWeapon?: boolean;
+  /** Kampfkarte: Reichweite in Feldern (nur Projektil-/Wurfwaffen; Kurz/Mittel/Weit). */
+  rangeShort?: number;
+  rangeMedium?: number;
+  rangeLong?: number;
   /** Schild: Buckler — auch mit zweihändigen Waffen führbar. */
   buckler?: boolean;
   /** Schild: vom System wegen Zweihandwaffe automatisch abgelegt (wird bei Einhandangriff wieder angelegt). */
@@ -151,6 +155,8 @@ export interface SpellDefinition {
   requiresTarget?: boolean;
   /** Wählbare Zusatzfaden-Optionen (leer/undefined = Zauber kennt keine Zusatzfäden). */
   threadOptions?: SpellThreadOption[];
+  /** Kampfkarte: Reichweite in Hexfeldern (0 = Selbst/Berührung). */
+  rangeHexes?: number;
 }
 
 export interface SpellThreadOption {
@@ -201,6 +207,8 @@ export interface Character {
   healthBonus?: number;
   initiativeBonus?: number;
   recoveryBonus?: number;
+  /** Kampfkarte: Bewegungsrate in Hexfeldern pro Runde. */
+  movementHexes?: number;
 
   // Waffe
   weaponName: string;

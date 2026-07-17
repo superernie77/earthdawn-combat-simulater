@@ -2,6 +2,14 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Hexfeld-Kampfkarte (optional)**
+Der Kampf kann jetzt räumlich auf einer Hexfeld-Karte ausgetragen werden — als **optionale Zusatzschicht**: Ohne Aktivierung bleibt alles exakt wie bisher. Aktivierung per Checkbox beim Anlegen der Session (Größe wählbar, Standard 24×16) oder per Button im Setup; der „Karte"-Knopf öffnet die Karte **in einem eigenen Fenster**, das sich live mit dem Kampfscreen synchronisiert.
+
+- **Spielleiter platziert**: Helden, Monster sowie Wände, Türen (zum Öffnen/Schließen), Bäume, Felsen und Möbel.
+- **Bewegung in Initiative-Reihenfolge**: Jeder Kombattant läuft pro Runde bis zu seiner **Bewegungsrate** (neues Feld auf dem Charakterbogen, in Feldern). Eigenen Token anklicken → erreichbare Felder leuchten → Zielfeld anklicken. Hindernisse erzwingen Umwege (kürzester Weg zählt). Der Spielleiter darf jederzeit jeden versetzen.
+- **Reichweiten steuern die Zielauswahl** im Kampfscreen: Nahkampf nur gegen angrenzende Felder, Projektil-/Wurfwaffen nach ihrer neuen **Kurz/Mittel/Weit-Reichweite**, Zauber nach ihrer neuen **Zauberreichweite**. Die Reichweiten filtern nur die Auswahl — die Kampfmechanik selbst bleibt unangetastet.
+- **Animationen**: Nahkampfhiebe, fliegende Pfeile und Zauberbolzen werden auf der Karte animiert, sobald im Kampf gewürfelt wird — bei allen Zuschauern.
+
 **Eigenes App-Icon**
 Die App hat jetzt ein eigenes Zeichen: ein **Fadenring, von einem Schwert durchstoßen** — der Ring steht für das Fadenweben, die Kernmechanik von Earthdawn, das Schwert für den Kampf. Gehalten im Gold der App auf dunklem Grund. Es ist ein eigener Entwurf, nicht das FASA-Logo.
 

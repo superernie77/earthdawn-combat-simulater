@@ -28,6 +28,17 @@ import { CombatSession } from '../../models/combat.model';
             <mat-label>Session-Name</mat-label>
             <input matInput [(ngModel)]="newName" (keydown.enter)="create()" placeholder="z.B. Goblin-Höhle">
           </mat-form-field>
+          <label class="map-toggle" matTooltip="Hexfeld-Kampfkarte für diese Session aktivieren">
+            <input type="checkbox" [(ngModel)]="withMap"> 🗺 Kampfkarte
+          </label>
+          <mat-form-field appearance="fill" style="width:80px" *ngIf="withMap">
+            <mat-label>Breite</mat-label>
+            <input matInput type="number" [(ngModel)]="mapWidth" min="8" max="60">
+          </mat-form-field>
+          <mat-form-field appearance="fill" style="width:80px" *ngIf="withMap">
+            <mat-label>Höhe</mat-label>
+            <input matInput type="number" [(ngModel)]="mapHeight" min="6" max="40">
+          </mat-form-field>
           <button mat-raised-button color="primary" [disabled]="!newName.trim()" (click)="create()">
             <mat-icon>add</mat-icon> Erstellen
           </button>
@@ -63,6 +74,11 @@ import { CombatSession } from '../../models/combat.model';
     </div>
   `,
   styles: [`
+    .map-toggle {
+      display: inline-flex; align-items: center; gap: 6px; color: #aaa;
+      font-size: 0.85rem; cursor: pointer; white-space: nowrap; margin: 0 4px;
+    }
+    .map-toggle input { accent-color: #c9a84c; }
     .page-container { padding: 24px; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     h1 { font-family: 'Cinzel', serif; color: #c9a84c; margin: 0; }
@@ -83,6 +99,9 @@ import { CombatSession } from '../../models/combat.model';
 export class CombatListComponent implements OnInit {
   sessions: CombatSession[] = [];
   newName = '';
+  withMap = false;
+  mapWidth = 24;
+  mapHeight = 16;
 
   constructor(
     private combatService: CombatService,
@@ -99,7 +118,14 @@ export class CombatListComponent implements OnInit {
     this.combatService.create(this.newName.trim()).subscribe(s => {
       this.newName = '';
       this.snack.open(`Session "${s.name}" erstellt.`, 'OK', { duration: 2000 });
-      this.router.navigate(['/combat', s.id]);
+      // Kampfkarte optional direkt beim Anlegen aktivieren — eigener Aufruf,
+      // damit der bestehende Create-Endpoint unverändert bleibt.
+      if (this.withMap) {
+        this.combatService.configureMap(s.id, true, this.mapWidth, this.mapHeight)
+          .subscribe(() => this.router.navigate(['/combat', s.id]));
+      } else {
+        this.router.navigate(['/combat', s.id]);
+      }
     });
   }
 

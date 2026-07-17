@@ -65,6 +65,11 @@ public class SpellDefinition {
     @Builder.Default
     private TriggerContext modifyTrigger = TriggerContext.ALWAYS;
 
+    /** Reichweite auf der Kampfkarte in Hexfeldern (0 = Selbst/Berührung). */
+    @Column(name = "range_hexes", columnDefinition = "integer default 10")
+    @Builder.Default
+    private int rangeHexes = 10;
+
     /** Effekt-Dauer in Runden (-1 = permanent) */
     @Builder.Default
     private int duration = 0;

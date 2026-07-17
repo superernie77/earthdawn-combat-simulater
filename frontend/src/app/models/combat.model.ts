@@ -98,6 +98,11 @@ export interface CombatantState {
   pendingBlattschussWeaponId: number;
   pendingBlattschussDefense: number;
   preparingSpellId?: number;
+  /** Kampfkarte: Position (null/undefined = nicht platziert). */
+  mapQ?: number | null;
+  mapR?: number | null;
+  /** Kampfkarte: in dieser Runde bereits gelaufene Felder. */
+  movedHexesThisRound?: number;
   threadsWoven: number;
   threadsRequired: number;
   /** Gewählte Zusatzfaden-Optionen als CSV der Indizes, z.B. "0,0,3". */
@@ -163,6 +168,12 @@ export interface CombatSession {
   liveModal?: LiveModalState;
   /** Aktive Dialog-Zustände: combatantId → was ein Spieler gerade plant. */
   activeDialogs?: { [combatantId: number]: DialogState };
+  /** Kampfkarte (optional): aktiviert, Abmessungen in Hexfeldern, Hindernisse. */
+  mapEnabled?: boolean;
+  mapWidth?: number;
+  mapHeight?: number;
+  obstacles?: MapObstacle[];
+
 }
 
 export interface AttackActionRequest {
@@ -667,4 +678,15 @@ export interface NeutralizeMagicResult {
   success: boolean;
   effectRemoved: boolean;
   description: string;
+}
+
+export type ObstacleType = 'WALL' | 'DOOR' | 'TREE' | 'ROCK' | 'FURNITURE';
+
+export interface MapObstacle {
+  id: number;
+  type: ObstacleType;
+  q: number;
+  r: number;
+  /** Nur für DOOR: offene Türen sind passierbar. */
+  doorOpen: boolean;
 }

@@ -35,5 +35,6 @@ public enum ActionType {
     NACHTRETEN,
     SCHWANZANGRIFF,
     FEAR,
-    NEUTRALIZE_MAGIC
+    NEUTRALIZE_MAGIC,
+    MAP_MOVE
 }

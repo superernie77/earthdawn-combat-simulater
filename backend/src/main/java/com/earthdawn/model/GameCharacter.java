@@ -65,6 +65,10 @@ public class GameCharacter {
     /** Konfigurierbarer Bonus/Malus auf die Erholungsstufe. */
     @Column(columnDefinition = "integer default 0")
     @Builder.Default private int recoveryBonus = 0;
+
+    /** Bewegungsrate auf der Kampfkarte in Hexfeldern pro Runde. */
+    @Column(name = "movement_hexes", columnDefinition = "integer default 8")
+    @Builder.Default private int movementHexes = 8;
     private Integer unconsciousnessRating;
     private Integer deathRating;
     private Integer physicalArmor;

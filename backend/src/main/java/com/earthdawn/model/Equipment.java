@@ -48,6 +48,17 @@ public class Equipment {
     @Builder.Default
     private int initiativePenalty = 0;
 
+    // --- Kampfkarte: Reichweite in Feldern (nur Projektil-/Wurfwaffen; null = Nahkampf) ---
+
+    @Column(name = "range_short")
+    private Integer rangeShort;
+
+    @Column(name = "range_medium")
+    private Integer rangeMedium;
+
+    @Column(name = "range_long")
+    private Integer rangeLong;
+
     /** Schild: Bonus auf Körperliche Verteidigung (KV) */
     @Builder.Default
     private int physicalDefenseBonus = 0;

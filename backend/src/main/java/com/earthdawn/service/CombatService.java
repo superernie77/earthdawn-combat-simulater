@@ -836,6 +836,7 @@ public class CombatService {
             combatant.setPendingLufttanzWeaponId(-1L);
             combatant.setBlattschussUsedThisRound(false);
             combatant.setKarmaInitiativeThisRound(false);
+            combatant.setMovedHexesThisRound(0);
             clearBlattschussPending(combatant);
             combatant.setPendingRiposteAttackTotal(-1);
             combatant.setPendingRiposteAttackerId(null);

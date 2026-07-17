@@ -221,6 +221,39 @@ export class CombatService {
 
   // --- Zauber ---
 
+  // --- Kampfkarte ---
+
+  configureMap(sessionId: number, enabled: boolean, width?: number, height?: number): Observable<CombatSession> {
+    let params = `enabled=${enabled}`;
+    if (width != null) params += `&width=${width}`;
+    if (height != null) params += `&height=${height}`;
+    return this.http.post<CombatSession>(`${this.base}/sessions/${sessionId}/map/configure?${params}`, {});
+  }
+
+  placeOnMap(sessionId: number, combatantId: number, q: number, r: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/map/place?combatantId=${combatantId}&q=${q}&r=${r}`, {});
+  }
+
+  moveOnMap(sessionId: number, combatantId: number, q: number, r: number, gmOverride = false): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/map/move?combatantId=${combatantId}&q=${q}&r=${r}&gmOverride=${gmOverride}`, {});
+  }
+
+  addObstacle(sessionId: number, type: string, q: number, r: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/map/obstacles?type=${type}&q=${q}&r=${r}`, {});
+  }
+
+  removeObstacle(sessionId: number, obstacleId: number): Observable<CombatSession> {
+    return this.http.delete<CombatSession>(`${this.base}/sessions/${sessionId}/map/obstacles/${obstacleId}`);
+  }
+
+  toggleDoor(sessionId: number, obstacleId: number): Observable<CombatSession> {
+    return this.http.post<CombatSession>(
+      `${this.base}/sessions/${sessionId}/map/obstacles/${obstacleId}/toggle-door`, {});
+  }
+
   weaveThread(sessionId: number, req: ThreadweaveRequest): Observable<ThreadweaveResult> {
     return this.http.post<ThreadweaveResult>(`${this.base}/sessions/${sessionId}/weave-thread`, req);
   }

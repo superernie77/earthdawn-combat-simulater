@@ -8,6 +8,8 @@ import com.earthdawn.model.CombatLog;
 import com.earthdawn.model.CombatSession;
 import com.earthdawn.model.enums.DeclaredActionType;
 import com.earthdawn.model.enums.DeclaredStance;
+import com.earthdawn.model.enums.ObstacleType;
+import com.earthdawn.service.CombatMapService;
 import com.earthdawn.service.CombatService;
 import com.earthdawn.service.SpellService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class CombatController {
 
     private final CombatService combatService;
     private final SpellService spellService;
+    private final CombatMapService mapService;
 
     @GetMapping("/sessions")
     public List<CombatSession> findAll() {
@@ -38,6 +41,51 @@ public class CombatController {
     @PostMapping("/sessions")
     public CombatSession create(@RequestBody Map<String, String> body) {
         return combatService.createSession(body.get("name"));
+    }
+
+    // --- Kampfkarte (optionale Zusatzschicht — fasst keine Kampf-Logik an) ---
+
+    @PostMapping("/sessions/{id}/map/configure")
+    public CombatSession configureMap(@PathVariable Long id,
+                                       @RequestParam boolean enabled,
+                                       @RequestParam(required = false) Integer width,
+                                       @RequestParam(required = false) Integer height) {
+        return mapService.configureMap(id, enabled, width, height);
+    }
+
+    @PostMapping("/sessions/{id}/map/place")
+    public CombatSession placeOnMap(@PathVariable Long id,
+                                     @RequestParam Long combatantId,
+                                     @RequestParam int q,
+                                     @RequestParam int r) {
+        return mapService.placeCombatant(id, combatantId, q, r);
+    }
+
+    @PostMapping("/sessions/{id}/map/move")
+    public CombatSession moveOnMap(@PathVariable Long id,
+                                    @RequestParam Long combatantId,
+                                    @RequestParam int q,
+                                    @RequestParam int r,
+                                    @RequestParam(defaultValue = "false") boolean gmOverride) {
+        return mapService.moveCombatant(id, combatantId, q, r, gmOverride);
+    }
+
+    @PostMapping("/sessions/{id}/map/obstacles")
+    public CombatSession addObstacle(@PathVariable Long id,
+                                      @RequestParam ObstacleType type,
+                                      @RequestParam int q,
+                                      @RequestParam int r) {
+        return mapService.addObstacle(id, type, q, r);
+    }
+
+    @DeleteMapping("/sessions/{id}/map/obstacles/{obstacleId}")
+    public CombatSession removeObstacle(@PathVariable Long id, @PathVariable Long obstacleId) {
+        return mapService.removeObstacle(id, obstacleId);
+    }
+
+    @PostMapping("/sessions/{id}/map/obstacles/{obstacleId}/toggle-door")
+    public CombatSession toggleDoor(@PathVariable Long id, @PathVariable Long obstacleId) {
+        return mapService.toggleDoor(id, obstacleId);
     }
 
     @PostMapping("/sessions/{id}/combatants")

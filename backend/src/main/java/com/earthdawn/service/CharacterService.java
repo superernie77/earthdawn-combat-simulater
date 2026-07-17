@@ -136,6 +136,7 @@ public class CharacterService {
             case "healthBonus"           -> c.getHealthBonus();
             case "initiativeBonus"       -> c.getInitiativeBonus();
             case "recoveryBonus"         -> c.getRecoveryBonus();
+            case "movementHexes"         -> c.getMovementHexes();
             default                      -> 0;
         };
     }
@@ -173,6 +174,7 @@ public class CharacterService {
             case "healthBonus"           -> c.setHealthBonus(value);
             case "initiativeBonus"       -> c.setInitiativeBonus(value);
             case "recoveryBonus"         -> c.setRecoveryBonus(value);
+            case "movementHexes"         -> c.setMovementHexes(Math.max(1, value));
             case "notes"                 -> {} // notes werden als String separat behandelt
         }
     }

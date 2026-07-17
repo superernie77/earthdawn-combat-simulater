@@ -40,6 +40,7 @@ import {
   InitiativeRollDetail, DialogState
 } from '../../models/combat.model';
 import { Character, SpellDefinition, CharacterSpell, SpellThreadOption } from '../../models/character.model';
+import { hexDistance } from '../../services/hex-util';
 
 /** Ein auswählbarer Effekt im "Magie neutralisieren"-Dialog. */
 export interface EffectChoice {
@@ -99,6 +100,14 @@ export interface EffectChoice {
                 style="background:rgba(239,154,154,0.15);border:1px solid #ef9a9a;color:#ef9a9a">
             🏁 Kampf beendet
           </span>
+          <button mat-stroked-button *ngIf="session.mapEnabled" (click)="openMapWindow()"
+                  matTooltip="Kampfkarte in eigenem Fenster öffnen">
+            <mat-icon>map</mat-icon> Karte
+          </button>
+          <button mat-stroked-button *ngIf="!session.mapEnabled && session.status === 'SETUP'" (click)="enableMap()"
+                  matTooltip="Hexfeld-Kampfkarte für diese Session aktivieren">
+            <mat-icon>grid_on</mat-icon> Karte aktivieren
+          </button>
           <button mat-stroked-button *ngIf="session.status === 'ACTIVE'" (click)="openGmEffectDialog()"
                   matTooltip="Beliebigen Bonus/Malus-Effekt auf einen Kombattanten anwenden">
             <mat-icon>auto_fix_normal</mat-icon> GM-Effekt
@@ -4087,8 +4096,67 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   possibleTargets(actor?: CombatantState): CombatantState[] {
-    const excludeId = actor?.id ?? this.attackDialog.attacker?.id;
-    return (this.session?.combatants ?? []).filter(c => c.id !== excludeId && !c.defeated);
+    const a = actor ?? this.attackDialog.attacker;
+    const excludeId = a?.id;
+    const base = (this.session?.combatants ?? []).filter(c => c.id !== excludeId && !c.defeated);
+    // Angriffsdialog: Reichweite der gewählten Angriffsart (nur wenn Karte aktiv).
+    // Manövrieren/Zweitwaffe (actor gesetzt) sind Nahkampf → angrenzend.
+    if (actor) return this.filterByMapRange(actor, base, 1);
+    return this.filterByMapRange(a, base, this.currentAttackRange());
+  }
+
+  // --- Kampfkarte: Fenster + Reichweiten ---
+
+  openMapWindow(): void {
+    if (!this.session) return;
+    window.open(`/combat/${this.session.id}/map`, 'earthdawn-map-' + this.session.id,
+      'width=1280,height=860');
+  }
+
+  enableMap(): void {
+    if (!this.session) return;
+    const w = prompt('Kartenbreite in Feldern (8–60):', '24');
+    if (w === null) return;
+    const h = prompt('Kartenhöhe in Feldern (6–40):', '16');
+    if (h === null) return;
+    this.combatService.configureMap(this.session.id, true, Number(w) || 24, Number(h) || 16)
+      .subscribe({
+        next: s => { this.session = s; this.openMapWindow(); },
+        error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err?.message), 'OK', { duration: 4000 })
+      });
+  }
+
+  /** Hexdistanz zwischen zwei platzierten Kombattanten; null wenn einer nicht platziert ist. */
+  mapDistanceBetween(a?: CombatantState, b?: CombatantState): number | null {
+    if (!this.session?.mapEnabled) return null;
+    if (a?.mapQ == null || a?.mapR == null || b?.mapQ == null || b?.mapR == null) return null;
+    return hexDistance(a.mapQ, a.mapR, b.mapQ, b.mapR);
+  }
+
+  /**
+   * Filtert Ziele nach Kartendistanz. Kein Filter, wenn die Karte aus ist, der Akteur nicht
+   * platziert ist oder keine Reichweite bestimmbar ist; unplatzierte Ziele bleiben wählbar.
+   */
+  private filterByMapRange(actor: CombatantState | undefined, targets: CombatantState[],
+                           maxRange: number | null): CombatantState[] {
+    if (!this.session?.mapEnabled || maxRange == null) return targets;
+    if (actor?.mapQ == null || actor?.mapR == null) return targets;
+    return targets.filter(t => {
+      const d = this.mapDistanceBetween(actor, t);
+      return d == null || d <= maxRange;
+    });
+  }
+
+  /** Maximale Reichweite der aktuell im Angriffsdialog gewählten Angriffsart (Felder). */
+  private currentAttackRange(): number | null {
+    if (!this.attackDialog.open) return null;
+    if (this.resolveActionType() === 'RANGED_ATTACK') {
+      const w = this.attackWeaponsFor(this.attackDialog.attacker)
+        .find(e => e.id === this.attackDialog.weaponId);
+      // Weit-Reichweite der Waffe; ohne gepflegte Reichweite kein Filter
+      return w?.rangeLong ?? w?.rangeMedium ?? w?.rangeShort ?? null;
+    }
+    return 1; // Nahkampf: gegenüberstehen = angrenzendes Feld
   }
 
   /** Waffen-Angriffstalente, die im Angriffsdialog auswählbar sind. Spruchzauberei läuft über den
@@ -4375,7 +4443,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
   }
 
   isSystem(actionType: string): boolean {
-    return ['INITIATIVE', 'ROUND_CHANGE', 'EFFECT_ADDED', 'EFFECT_REMOVED', 'VALUE_CHANGED'].includes(actionType);
+    return ['INITIATIVE', 'ROUND_CHANGE', 'EFFECT_ADDED', 'EFFECT_REMOVED', 'VALUE_CHANGED', 'MAP_MOVE'].includes(actionType);
   }
 
   /** Protokoll-Einträge fürs UI: chronologisch absteigend (neueste oben) + geparste Wurf-Details. */
@@ -4702,12 +4770,17 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     const spell = this.spellsOf(this.spellCastDialog.caster)
       .find(s => s.spellDefinition.id === this.spellCastDialog.spellId)?.spellDefinition;
     if (!spell) return [];
+    const caster = this.spellCastDialog.caster;
+    // Reichweite in Feldern: 0 = Selbst/Berührung → angrenzend (und sich selbst)
+    const range = Math.max(1, spell.rangeHexes ?? 10);
     if (spell.effectType === 'BUFF' || spell.effectType === 'HEAL' || spell.requiresTarget) {
       // Friendly targets (same side) — inkl. des Zauberers selbst (Selbstbuff möglich)
-      return (this.session?.combatants ?? []).filter(c => !c.defeated);
+      const base = (this.session?.combatants ?? []).filter(c => !c.defeated);
+      return this.filterByMapRange(caster, base, range);
     }
     // Enemy targets
-    return (this.session?.combatants ?? []).filter(c => c.id !== this.spellCastDialog.caster?.id && !c.defeated);
+    const base = (this.session?.combatants ?? []).filter(c => c.id !== caster?.id && !c.defeated);
+    return this.filterByMapRange(caster, base, range);
   }
 
   performSpellCast(): void {

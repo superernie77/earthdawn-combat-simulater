@@ -23,6 +23,11 @@ export const routes: Routes = [
       .then(m => m.CombatTrackerComponent)
   },
   {
+    path: 'combat/:id/map',
+    loadComponent: () => import('./components/combat-map/combat-map.component')
+      .then(m => m.CombatMapComponent)
+  },
+  {
     path: 'dice',
     loadComponent: () => import('./components/dice-roller/dice-roller.component')
       .then(m => m.DiceRollerComponent)
