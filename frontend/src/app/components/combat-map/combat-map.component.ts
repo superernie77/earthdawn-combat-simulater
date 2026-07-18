@@ -43,7 +43,7 @@ interface AttackAnim {
         <span class="map-round" *ngIf="s.status === 'ACTIVE'">Runde {{ s.round }} · {{ s.phase === 'DECLARATION' ? 'Ansage' : 'Aktion' }}</span>
         <span class="map-turn" *ngIf="activeTurn() as t">
           <mat-icon>play_arrow</mat-icon> {{ cn(t) }} ist dran
-          <span class="move-budget">({{ remainingMove(t) }}/{{ t.character.movementHexes ?? 8 }} Felder)</span>
+          <span class="move-budget">({{ remainingMove(t) }}/{{ effectiveMovement(t) }} Felder)</span>
         </span>
         <span class="spacer"></span>
         <span class="gm-badge" *ngIf="isGm()" matTooltip="Spielleiter-Werkzeuge aktiv">SL</span>
@@ -182,7 +182,7 @@ interface AttackAnim {
       <!-- Fußzeile: Auswahl-Info -->
       <div class="map-footer" *ngIf="selected as sel">
         <span class="sel-name" [style.color]="sel.npc ? '#ef9a9a' : '#e8d5a0'">{{ cn(sel) }}</span>
-        <span>Bewegung: {{ remainingMove(sel) }}/{{ sel.character.movementHexes ?? 8 }} Felder</span>
+        <span>Bewegung: {{ remainingMove(sel) }}/{{ effectiveMovement(sel) }} Felder</span>
         <span *ngIf="!canMove(sel)" class="sel-hint">— {{ moveBlockReason(sel) }}</span>
         <span *ngIf="canMove(sel)" class="sel-hint ok">— erreichbare Felder anklicken</span>
         <button mat-stroked-button class="sel-close" (click)="clearSelection()">
@@ -407,8 +407,22 @@ export class CombatMapComponent implements OnInit, OnDestroy {
     return this.activeTurn()?.id === c.id;
   }
 
+  /**
+   * Effektive Bewegungsrate — Basis vom Charakterbogen, moduliert durch aktive Effekte
+   * mit targetStat MOVEMENT_HEXES (Spiegel des ModifierAggregators: erst ADD, dann MULTIPLY).
+   */
+  effectiveMovement(c: CombatantState): number {
+    let value = c.character.movementHexes ?? 8;
+    const mods = (c.activeEffects ?? [])
+      .flatMap(e => e.modifiers ?? [])
+      .filter(m => m.targetStat === 'MOVEMENT_HEXES');
+    for (const m of mods.filter(m => m.operation === 'ADD')) value += m.value;
+    for (const m of mods.filter(m => m.operation === 'MULTIPLY')) value *= m.value;
+    return Math.max(0, Math.floor(value));
+  }
+
   remainingMove(c: CombatantState): number {
-    return Math.max(0, (c.character.movementHexes ?? 8) - (c.movedHexesThisRound ?? 0));
+    return Math.max(0, this.effectiveMovement(c) - (c.movedHexesThisRound ?? 0));
   }
 
   canMove(c: CombatantState): boolean {

@@ -102,6 +102,7 @@ class CombatServiceFearTest {
     void reapply_replacesExistingEffect() {
         when(diceService.roll(8)).thenReturn(roll(13)).thenReturn(roll(8)); // 2 Erfolge, dann 1
         combatService.performFear(1L, req());
+        actor.setHasActedThisRound(false); // neue Runde — Verängstigen ist eine Standardaktion
         combatService.performFear(1L, req());
 
         long count = target.getActiveEffects().stream()
@@ -166,6 +167,41 @@ class CombatServiceFearTest {
     }
 
     // --- Helpers ---
+
+    // --- Schädel des Todes: Verängstigen ohne Hauptaktion, +Bonus aus Zusatzfäden ---
+
+    @Test
+    void fear_consumesTheMainAction_withoutSchaedel() {
+        when(diceService.roll(8)).thenReturn(roll(13)); // rollStep = 5 + 3
+        combatService.performFear(1L, req());
+        org.assertj.core.api.Assertions.assertThat(actor.isHasActedThisRound()).isTrue();
+
+        // Zweites Verängstigen in derselben Runde wird abgelehnt
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> combatService.performFear(1L, req()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("bereits gehandelt");
+    }
+
+    @Test
+    void fear_withSchaedelDesTodes_keepsActionAndAddsBonus() {
+        actor.getActiveEffects().add(com.earthdawn.model.ActiveEffect.builder()
+                .name(com.earthdawn.model.TalentNames.EFFECT_SCHAEDEL_DES_TODES)
+                .negative(false).remainingRounds(10)
+                .modifiers(new ArrayList<>(List.of(com.earthdawn.model.ModifierEntry.builder()
+                        .targetStat(com.earthdawn.model.enums.StatType.ATTACK_STEP)
+                        .operation(com.earthdawn.model.enums.ModifierOperation.ADD)
+                        .value(2)
+                        .triggerContext(com.earthdawn.model.enums.TriggerContext.ON_SOCIAL_ACTION)
+                        .build())))
+                .build());
+        actor.setHasActedThisRound(true); // trotz verbrauchter Aktion erlaubt
+        when(diceService.roll(10)).thenReturn(roll(13)); // 5 + 3 + Schädel-Bonus 2
+
+        combatService.performFear(1L, req());
+
+        // Wurfstufe: WIL-Step 5 + Rang 3 + Schädel-Bonus 2 = 10; Aktion bleibt unangetastet
+        org.mockito.Mockito.verify(diceService).roll(10);
+    }
 
     private FearRequest req() {
         return FearRequest.builder()

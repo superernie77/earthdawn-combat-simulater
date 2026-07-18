@@ -520,6 +520,129 @@ class SpellServiceExtraThreadTest {
         assertThat(eff.getModifiers().get(0).getValue()).isEqualTo(-4.0);
     }
 
+    // --- Geisterbeschwörer: Geisterpfeil, Nebelschild, Schmerzen, Schädel des Todes ---
+
+    @Test
+    void geisterpfeil_addsMrDebuff_scaledByThreadsAndSuccesses() {
+        SpellDefinition gp = SpellDefinition.builder()
+                .id(50L).name("Geisterpfeil").discipline("Geisterbeschwörer").circle(1)
+                .threads(0).weavingDifficulty(5).castingDifficulty(0)
+                .effectType(SpellEffectType.DAMAGE).effectStep(2).useMysticArmor(true)
+                .duration(2).extraSuccessEffect("DURATION")
+                .threadOptions(new ArrayList<>(List.of(
+                        SpellThreadOption.builder().label("Wirkung Verstärken (Mystische Rüstung −2)")
+                                .type(SpellThreadOptionType.BUFF_VALUE).value(2).build())))
+                .build();
+        CombatantState caster = caster(gp, 4);
+        CombatantState target = target();
+        caster.setPreparingSpellId(50L);
+        caster.setExtraThreadChoices("0"); // 1× MR −2 → insgesamt −4
+        stub(gp, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        // ZV 5, Wurf 10 → 1 Übererfolg → MR-Dauer 2 + 2 = 4
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(5);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.MYSTIC_ARMOR), any())).thenReturn(2);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.WOUND_THRESHOLD), any())).thenReturn(9);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.isSuccess()).isTrue();
+        var mr = target.getActiveEffects().stream()
+                .filter(e -> e.getName().startsWith("Geisterpfeil")).findFirst().orElseThrow();
+        assertThat(mr.getModifiers().get(0).getTargetStat()).isEqualTo(StatType.MYSTIC_ARMOR);
+        assertThat(mr.getModifiers().get(0).getValue()).isEqualTo(-4.0); // 2 Basis + 2 Faden
+        assertThat(mr.getRemainingRounds()).isEqualTo(4);                // 2 Basis + 2 Übererfolg
+        // Übererfolge geben KEINEN Schadensbonus (extraSuccessEffect = DURATION)
+        assertThat(r.getDamageStepBonus()).isZero();
+    }
+
+    @Test
+    void nebelschild_buffsDodgeStepOnly_andScalesWithThreads() {
+        SpellDefinition ns = SpellDefinition.builder()
+                .id(50L).name("Nebelschild").discipline("Geisterbeschwörer").circle(2)
+                .threads(0).weavingDifficulty(6).castingDifficulty(1)
+                .effectType(SpellEffectType.BUFF).effectStep(0)
+                .modifyStat(StatType.DODGE_STEP).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(4.0).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .extraSuccessEffect("DURATION")
+                .threadOptions(new ArrayList<>(List.of(
+                        SpellThreadOption.builder().label("Wirkung Verstärken (Bonus +2)")
+                                .type(SpellThreadOptionType.BUFF_VALUE).value(2).build())))
+                .build();
+        CombatantState caster = caster(ns, 4);
+        caster.setPreparingSpellId(50L);
+        caster.setExtraThreadChoices("0");
+        stub(ns, caster);
+
+        SpellCastResult r = spellService.castSpell(castReq());
+
+        assertThat(r.isSuccess()).isTrue();
+        var eff = caster.getActiveEffects().get(0);
+        assertThat(eff.getModifiers().get(0).getTargetStat()).isEqualTo(StatType.DODGE_STEP);
+        assertThat(eff.getModifiers().get(0).getValue()).isEqualTo(6.0); // 4 + 2 Faden
+    }
+
+    @Test
+    void schmerzen_appliesTestPenaltyAndHalvedMovement() {
+        SpellDefinition sm = SpellDefinition.builder()
+                .id(50L).name("Schmerzen").discipline("Geisterbeschwörer").circle(3)
+                .threads(0).weavingDifficulty(7).castingDifficulty(0)
+                .effectType(SpellEffectType.DEBUFF).effectStep(0)
+                .modifyStat(StatType.ATTACK_STEP).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(-3.0).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .extraSuccessEffect("DURATION")
+                .threadOptions(new ArrayList<>(List.of(
+                        SpellThreadOption.builder().label("Wirkung Verstärken (+1 Wunde)")
+                                .type(SpellThreadOptionType.BUFF_VALUE).value(1).build())))
+                .build();
+        CombatantState caster = caster(sm, 4);
+        CombatantState target = target();
+        caster.setPreparingSpellId(50L);
+        caster.setExtraThreadChoices("0"); // +1 Wunde → −4
+        stub(sm, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(10);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.isSuccess()).isTrue();
+        var eff = target.getActiveEffects().get(0);
+        assertThat(eff.getModifiers()).hasSize(2);
+        assertThat(eff.getModifiers().get(0).getTargetStat()).isEqualTo(StatType.ATTACK_STEP);
+        assertThat(eff.getModifiers().get(0).getValue()).isEqualTo(-4.0); // 3 Wunden + 1 Faden
+        assertThat(eff.getModifiers().get(1).getTargetStat()).isEqualTo(StatType.MOVEMENT_HEXES);
+        assertThat(eff.getModifiers().get(1).getOperation()).isEqualTo(ModifierOperation.MULTIPLY);
+        assertThat(eff.getModifiers().get(1).getValue()).isEqualTo(0.5);
+    }
+
+    @Test
+    void schaedelDesTodes_putsEffectOnCaster_rankPlusFivePlusSuccesses() {
+        SpellDefinition sk = SpellDefinition.builder()
+                .id(50L).name("Schädel des Todes").discipline("Geisterbeschwörer").circle(2)
+                .threads(0).weavingDifficulty(6).castingDifficulty(5)
+                .effectType(SpellEffectType.BUFF).effectStep(0).duration(0)
+                .threadOptions(new ArrayList<>(List.of(
+                        SpellThreadOption.builder().label("Wirkung Verstärken (Bonus +2 auf Verängstigen)")
+                                .type(SpellThreadOptionType.BUFF_VALUE).value(2).build())))
+                .build();
+        CombatantState caster = caster(sk, 4); // Spruchzauberei-Rang 5
+        caster.setPreparingSpellId(50L);
+        caster.setExtraThreadChoices("0"); // +2 auf Verängstigen
+        stub(sk, caster);
+
+        // Wurf 10 vs feste 5 → 1 Übererfolg → Dauer 5 (Rang) + 5 + 2 = 12
+        SpellCastResult r = spellService.castSpell(castReq());
+
+        assertThat(r.isSuccess()).isTrue();
+        var eff = caster.getActiveEffects().stream()
+                .filter(e -> "Schädel des Todes".equals(e.getName())).findFirst().orElseThrow();
+        assertThat(eff.getRemainingRounds()).isEqualTo(12);
+        assertThat(eff.getModifiers()).hasSize(1);
+        assertThat(eff.getModifiers().get(0).getValue()).isEqualTo(2.0);
+        assertThat(eff.getModifiers().get(0).getTriggerContext()).isEqualTo(TriggerContext.ON_SOCIAL_ACTION);
+        assertThat(r.getEffectDuration()).isEqualTo(12);
+    }
+
     // --- CSV-Helfer ---
 
     @Test

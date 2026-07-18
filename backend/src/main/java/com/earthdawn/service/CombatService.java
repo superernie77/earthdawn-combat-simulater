@@ -1274,9 +1274,10 @@ public class CombatService {
             defender.setCurrentKarma(Math.max(0, defender.getCurrentKarma() - 1));
         }
 
-        // Probe: DEX-Stufe + Rang + Bonus - Wunden
+        // Probe: DEX-Stufe + Rang + Bonus - Wunden + Ausweichen-Boni (z.B. Nebelschild)
         int dexStep = Math.max(1, diceService.attributeToStep(defender.getCharacter().getDexterity()) - defender.getWounds());
-        int rollStep = Math.max(1, dexStep + dodgeTalent.getRank() + req.getBonusSteps());
+        int dodgeBonus = modifiers.getEffectiveValue(defender, StatType.DODGE_STEP, TriggerContext.ALWAYS);
+        int rollStep = Math.max(1, dexStep + dodgeTalent.getRank() + req.getBonusSteps() + dodgeBonus);
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
         durchschauenCheck(session, defender, total);
@@ -1625,9 +1626,21 @@ public class CombatService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Talent 'Verängstigen' nicht gefunden."));
 
+        // Schädel des Todes: Verängstigen kostet keine Hauptaktion; Zusatzfäden geben +Bonus.
+        // Ohne den Effekt ist Verängstigen eine Standardaktion und verbraucht die Aktion.
+        ActiveEffect schaedel = actor.getActiveEffects().stream()
+                .filter(e -> TalentNames.EFFECT_SCHAEDEL_DES_TODES.equals(e.getName()))
+                .findFirst().orElse(null);
+        if (schaedel == null && actor.isHasActedThisRound()) {
+            throw new IllegalStateException("Diese Runde wurde bereits gehandelt.");
+        }
+        int schaedelBonus = schaedel == null ? 0 : (int) schaedel.getModifiers().stream()
+                .mapToDouble(m -> m.getValue()).sum();
+
         // Würfelstufe: WIL-Step + Rang + Bonus − Wunden (0 Überanstrengung)
         int wilStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower()) - actor.getWounds());
-        int rollStep = Math.max(1, wilStep + ct.getRank() + req.getBonusSteps());
+        int rollStep = Math.max(1, wilStep + ct.getRank() + req.getBonusSteps() + schaedelBonus);
+        if (schaedel == null) actor.setHasActedThisRound(true);
 
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {

@@ -327,7 +327,7 @@ public class SpellService {
                     // Schadens-Amulette (Zauber) hier entladen und +6 je Amulett auf den Schadenswurf
                     int amuletDmg = combatService.applyAmulets(caster, req.getAmuletDamageIds(), true, "Schaden", amuletNotes);
                     applySpellDamage(session, caster, target, spell, extraSuccesses,
-                            amuletDmg, extraThreadEffectStep, result);
+                            amuletDmg, extraThreadEffectStep, extraThreadBuffValue, result);
                 }
                 case BUFF   -> applySpellBuff(session, caster, target, spell, extraSuccesses, extraThreadBuffValue, extraThreadDurationRounds, result);
                 case DEBUFF -> applySpellDebuff(session, target, spell, extraSuccesses, extraThreadBuffValue, extraThreadDurationRounds, result);
@@ -370,7 +370,7 @@ public class SpellService {
 
     private void applySpellDamage(CombatSession session, CombatantState caster, CombatantState target,
                                    SpellDefinition spell, int extraSuccesses, int amuletDamageBonus,
-                                   int extraThreadEffectStep,
+                                   int extraThreadEffectStep, int buffBonus,
                                    SpellCastResult.SpellCastResultBuilder result) {
         if (target == null) throw new IllegalStateException("Schadenszauber benötigt ein Ziel.");
 
@@ -378,6 +378,32 @@ public class SpellService {
         int damageBonus = "DAMAGE".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
         int damageStep = spell.getEffectStep() + wilStep + damageBonus + amuletDamageBonus + extraThreadEffectStep;
         RollResult damageRoll = diceService.roll(damageStep);
+
+        // Geisterpfeil: senkt zusätzlich die Mystische Rüstung des Ziels — Basis −2, je
+        // "MR −2"-Zusatzfaden 2 weiter; Dauer = spell.duration (+2 Runden je Übererfolg,
+        // extraSuccessEffect DURATION über effectiveDuration). Erneutes Wirken ersetzt.
+        if ("Geisterpfeil".equals(spell.getName())) {
+            int mrReduction = 2 + buffBonus;
+            int mrDuration = effectiveDuration(spell, extraSuccesses, 0);
+            target.getActiveEffects().removeIf(e -> e.getName().startsWith("Geisterpfeil"));
+            target.getActiveEffects().add(ActiveEffect.builder()
+                    .combatantState(target)
+                    .name("Geisterpfeil (MR −" + mrReduction + ")")
+                    .description("Mystische Rüstung um " + mrReduction + " gesenkt")
+                    .sourceType(SourceType.SPELL)
+                    .sourceId(spell.getId())
+                    .remainingRounds(mrDuration)
+                    .negative(true)
+                    .modifiers(new java.util.ArrayList<>(List.of(ModifierEntry.builder()
+                            .targetStat(StatType.MYSTIC_ARMOR)
+                            .operation(ModifierOperation.ADD)
+                            .value(-mrReduction)
+                            .triggerContext(TriggerContext.ALWAYS)
+                            .build())))
+                    .build());
+            result.effectApplied("Mystische Rüstung −" + mrReduction + " für " + mrDuration + " Runden")
+                  .effectDuration(mrDuration);
+        }
 
         StatType armorStat = spell.isUseMysticArmor() ? StatType.MYSTIC_ARMOR : StatType.PHYSICAL_ARMOR;
         int armor = modifiers.getEffectiveValue(target, armorStat, TriggerContext.ON_DAMAGE_RECEIVED);
@@ -406,6 +432,43 @@ public class SpellService {
                                  SpellCastResult.SpellCastResultBuilder result) {
         CombatantState effectTarget = target != null ? target : caster;
         int duration = effectiveDuration(spell, extraSuccesses, threadDurationRounds);
+
+        // Schädel des Todes: Effekt auf dem ZAUBERER — Verängstigen kostet keine Hauptaktion,
+        // je "Bonus +2"-Zusatzfaden +2 auf Verängstigen-Proben (als ON_SOCIAL_ACTION-Eintrag
+        // gespeichert; CombatService.performFear liest ihn aus). Dauer: Spruchzauberei-Rang + 5
+        // (+2 je Übererfolg). Erneutes Wirken ersetzt den Effekt.
+        if (TalentNames.EFFECT_SCHAEDEL_DES_TODES.equals(spell.getName())) {
+            int rank = caster.getCharacter().getTalents().stream()
+                    .filter(t -> "Spruchzauberei".equals(t.getTalentDefinition().getName()))
+                    .mapToInt(CharacterTalent::getRank).findFirst().orElse(0);
+            int skullDuration = rank + 5 + extraSuccesses * 2;
+            java.util.List<ModifierEntry> mods = new java.util.ArrayList<>();
+            if (buffBonus > 0) {
+                mods.add(ModifierEntry.builder()
+                        .targetStat(StatType.ATTACK_STEP)
+                        .operation(ModifierOperation.ADD)
+                        .value(buffBonus)
+                        .triggerContext(TriggerContext.ON_SOCIAL_ACTION)
+                        .build());
+            }
+            caster.getActiveEffects().removeIf(e -> TalentNames.EFFECT_SCHAEDEL_DES_TODES.equals(e.getName()));
+            caster.getActiveEffects().add(ActiveEffect.builder()
+                    .combatantState(caster)
+                    .name(TalentNames.EFFECT_SCHAEDEL_DES_TODES)
+                    .description("Verängstigen ist eine einfache Aktion (verbraucht keine Hauptaktion)"
+                            + (buffBonus > 0 ? " und erhält +" + buffBonus + " auf die Probe" : ""))
+                    .sourceType(SourceType.SPELL)
+                    .sourceId(spell.getId())
+                    .remainingRounds(skullDuration)
+                    .negative(false)
+                    .modifiers(mods)
+                    .build());
+            result.effectApplied("Verängstigen ohne Hauptaktion"
+                            + (buffBonus > 0 ? ", +" + buffBonus + " auf Verängstigen" : ""))
+                  .effectDuration(skullDuration);
+            return;
+        }
+
         // Utility buffs have no modifyStat – just log the effect, no active modifier needed
         if (spell.getModifyStat() != null) {
             ActiveEffect effect = createSpellEffect(spell, effectTarget, false, buffBonus, duration);
@@ -445,6 +508,15 @@ public class SpellService {
         if (target == null) throw new IllegalStateException("Debuff-Zauber benötigt ein Ziel.");
         int duration = effectiveDuration(spell, extraSuccesses, threadDurationRounds);
         ActiveEffect effect = createSpellEffect(spell, target, true, buffBonus, duration);
+        // Schmerzen: zusätzlich halbe Bewegungsrate auf der Kampfkarte (skaliert nicht mit Fäden)
+        if ("Schmerzen".equals(spell.getName())) {
+            effect.getModifiers().add(ModifierEntry.builder()
+                    .targetStat(StatType.MOVEMENT_HEXES)
+                    .operation(ModifierOperation.MULTIPLY)
+                    .value(0.5)
+                    .triggerContext(TriggerContext.ALWAYS)
+                    .build());
+        }
         target.getActiveEffects().add(effect);
 
         result.effectApplied(spell.getEffectDescription()
@@ -508,7 +580,7 @@ public class SpellService {
                 .sourceId(spell.getId())
                 .remainingRounds(durationRounds)
                 .negative(negative)
-                .modifiers(List.of(modifier))
+                .modifiers(new java.util.ArrayList<>(List.of(modifier)))
                 .build();
     }
 

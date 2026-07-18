@@ -2,6 +2,14 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Vier Geisterbeschwörer-Zauber mechanisiert**
+- **Geisterpfeil**: senkt zusätzlich zum Schaden die **Mystische Rüstung des Ziels um 2** (2 Runden, +2 je Übererfolg). Zusatzfäden: Wirkungsstufe +2 und/oder MR um weitere 2 senken.
+- **Nebelschild**: Der Bonus wirkt jetzt regelgetreu **nur auf Ausweichen-Proben** (vorher pauschal +4 KV). Zusatzfaden: Bonus +2. Übererfolge verlängern die Dauer.
+- **Schmerzen**: 3 temporäre Wunden als **−3 auf alle Proben** plus **halbierte Bewegungsrate auf der Kampfkarte**. Zusatzfaden: +1 Wunde (→ −4 …). Übererfolge verlängern die Dauer.
+- **Schädel des Todes**: endlich ein echter Effekt — **Verängstigen kostet keine Hauptaktion** mehr, solange der Schädel aktiv ist (Spruchzauberei-Rang + 5 Runden, +2 je Übererfolg). Zusatzfaden: +2 auf Verängstigen-Proben.
+
+**Verhaltensfix Verängstigen**: Ohne Schädel des Todes verbraucht Verängstigen jetzt korrekt die Hauptaktion — bisher verbrauchte es gar keine, obwohl es als Standardaktion dokumentiert war.
+
 **Blindheit: komplett mechanisiert**
 - Der Zauber gibt jetzt **−4 auf alle Proben** (vorher nur −3 auf Angriffe).
 - **Übererfolge** beim Wirken und der Zusatzfaden **„+2 Minuten"** verlängern die Wirkungsdauer um je **2 Minuten (20 Kampfrunden)** — beides wird automatisch verrechnet.

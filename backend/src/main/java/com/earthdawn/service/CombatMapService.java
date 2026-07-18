@@ -6,6 +6,8 @@ import com.earthdawn.model.MapObstacle;
 import com.earthdawn.model.enums.ActionType;
 import com.earthdawn.model.enums.CombatStatus;
 import com.earthdawn.model.enums.ObstacleType;
+import com.earthdawn.model.enums.StatType;
+import com.earthdawn.model.enums.TriggerContext;
 import com.earthdawn.repository.CombatSessionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -32,6 +34,12 @@ public class CombatMapService {
 
     private final CombatSessionRepository sessionRepo;
     private final CombatService combatService;
+    private final ModifierAggregator modifiers;
+
+    /** Effektive Bewegungsrate in Feldern — Basis vom Charakterbogen, moduliert durch Effekte (z.B. Schmerzen ×0,5). */
+    int effectiveMovement(CombatantState c) {
+        return Math.max(0, modifiers.getEffectiveValue(c, StatType.MOVEMENT_HEXES, TriggerContext.ALWAYS));
+    }
 
     // --- Karte aktivieren / konfigurieren ---
 
@@ -94,7 +102,7 @@ public class CombatMapService {
                 throw new IllegalStateException("Bewegung nur in Initiative-Reihenfolge — "
                         + (active != null ? cn(active) + " ist dran." : "diese Runde ist abgeschlossen."));
             }
-            int budget = Math.max(0, c.getCharacter().getMovementHexes() - c.getMovedHexesThisRound());
+            int budget = Math.max(0, effectiveMovement(c) - c.getMovedHexesThisRound());
             Integer cost = pathCost(session, c.getMapQ(), c.getMapR(), q, r, budget);
             if (cost == null) {
                 throw new IllegalStateException("Zielfeld nicht erreichbar (Budget: noch "
@@ -105,7 +113,7 @@ public class CombatMapService {
             c.setMapR(r);
             combatService.addLog(session, cn(c), null, ActionType.MAP_MOVE,
                     cn(c) + " bewegt sich " + cost + " Feld" + (cost == 1 ? "" : "er")
-                            + " (" + c.getMovedHexesThisRound() + "/" + c.getCharacter().getMovementHexes() + ").",
+                            + " (" + c.getMovedHexesThisRound() + "/" + effectiveMovement(c) + ").",
                     true);
         }
         sessionRepo.save(session);

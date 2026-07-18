@@ -89,6 +89,8 @@ public class ModifierAggregator {
             case KARMA_STEP           -> c.getDiscipline() != null ? c.getDiscipline().getKarmaStep() : 4;
             case RECOVERY_STEP        -> Math.max(0, stepRoll.attributeToStep(c.getToughness()) + c.getRecoveryBonus());
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
+            case DODGE_STEP           -> 0;
+            case MOVEMENT_HEXES       -> c.getMovementHexes();
         };
     }
 
@@ -115,6 +117,8 @@ public class ModifierAggregator {
             case KARMA_STEP           -> c.getDiscipline() != null ? c.getDiscipline().getKarmaStep() : 4;
             case RECOVERY_STEP        -> Math.max(0, stepRoll.attributeToStep(c.getToughness()) + c.getRecoveryBonus());
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
+            case DODGE_STEP           -> 0;
+            case MOVEMENT_HEXES       -> c.getMovementHexes();
         };
     }
 

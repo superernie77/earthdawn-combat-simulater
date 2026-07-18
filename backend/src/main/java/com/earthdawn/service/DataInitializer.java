@@ -505,6 +505,22 @@ public class DataInitializer {
 
         // Bestehende Datenbanken auf die neue Blindheit-Mechanik heben
         migrateBlindheit();
+
+        setThreadOptions("Geisterpfeil",
+                display(REICHWEITE_10),
+                buffValue("Wirkung Verstärken (Mystische Rüstung −2)", 2),
+                effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
+                display(ZIEL_1));
+        setThreadOptions("Nebelschild",
+                buffValue("Wirkung Verstärken (Bonus +2)", 2));
+        setThreadOptions("Schmerzen",
+                display(REICHWEITE_10),
+                buffValue("Wirkung Verstärken (+1 Wunde)", 1));
+        setThreadOptions("Schädel des Todes",
+                buffValue("Wirkung Verstärken (Bonus +2 auf Verängstigen)", 2));
+
+        // Bestehende Datenbanken auf die neue Geisterbeschwörer-Mechanik heben
+        migrateGeisterbeschwoererZauber();
         setThreadOptions("Gedankennebel",
                 display(REICHWEITE_10), effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
                 display(ZIEL_1));
@@ -524,6 +540,55 @@ public class DataInitializer {
     private SpellThreadOption display(String label) {
         return SpellThreadOption.builder()
                 .label(label).type(SpellThreadOptionType.DISPLAY).value(0).build();
+    }
+
+    /**
+     * Geisterpfeil, Nebelschild, Schmerzen, Schädel des Todes auf die mechanisierten
+     * Regeln heben (Übererfolge, Grundeffekte). Idempotent für Bestands-DBs.
+     */
+    private void migrateGeisterbeschwoererZauber() {
+        spellRepo.findAll().forEach(sp -> {
+            boolean changed = false;
+            switch (sp.getName()) {
+                case "Geisterpfeil" -> {
+                    if (sp.getWeavingDifficulty() == 0) { sp.setWeavingDifficulty(5); changed = true; }
+                    if (sp.getDuration() != 2) { sp.setDuration(2); changed = true; }
+                    if (!"DURATION".equals(sp.getExtraSuccessEffect())) { sp.setExtraSuccessEffect("DURATION"); changed = true; }
+                    if (sp.getEffectDescription() == null || !sp.getEffectDescription().contains("MR −2")) {
+                        sp.setEffectDescription("WIL+" + sp.getEffectStep() + " Mystisch, MR −2");
+                        sp.setDescription("Ein Geschoss aus Geisterenergie; senkt die Mystische Rüstung des Ziels um 2 für 2 Runden (+2 Runden je Übererfolg)");
+                        changed = true;
+                    }
+                }
+                case "Nebelschild" -> {
+                    if (sp.getModifyStat() != StatType.DODGE_STEP) {
+                        sp.setModifyStat(StatType.DODGE_STEP);
+                        sp.setDescription("+4 auf Ausweichen-Proben (schützender Nebel)");
+                        changed = true;
+                    }
+                    if (!"DURATION".equals(sp.getExtraSuccessEffect())) { sp.setExtraSuccessEffect("DURATION"); changed = true; }
+                }
+                case "Schmerzen" -> {
+                    if (sp.getModifyStat() != StatType.ATTACK_STEP) {
+                        sp.setModifyStat(StatType.ATTACK_STEP);
+                        sp.setModifyValue(-3.0);
+                        sp.setDescription("3 temporäre Wunden (−3 auf alle Proben) und halbe Bewegungsrate");
+                        sp.setEffectDescription("−3 auf alle Proben; halbe Bewegung");
+                        changed = true;
+                    }
+                    if (!"DURATION".equals(sp.getExtraSuccessEffect())) { sp.setExtraSuccessEffect("DURATION"); changed = true; }
+                }
+                case "Schädel des Todes" -> {
+                    if (sp.getEffectDescription() == null || !sp.getEffectDescription().contains("ohne Hauptaktion")) {
+                        sp.setDescription("Blutiger Schädel: Verängstigen kostet keine Hauptaktion (Spruchzauberei-Rang + 5 Runden, +2 je Übererfolg)");
+                        sp.setEffectDescription("Verängstigen ohne Hauptaktion");
+                        changed = true;
+                    }
+                }
+                default -> { }
+            }
+            if (changed) spellRepo.save(sp);
+        });
     }
 
     private SpellThreadOption durationRounds(String label, int rounds) {
@@ -1245,8 +1310,11 @@ public class DataInitializer {
                 SpellEffectType.BUFF, 0, "Übermittelt Botschaft per nachtaktivem Flugtier", "Botschaft senden"));
         saveSpellIfAbsent(spell("Geisterhand", "Geisterbeschwörer", 1, 0, 5, 0,
                 SpellEffectType.DAMAGE, 2, "WIL+2/Mystisch; -2 auf KV & MV des Ziels", "WIL+2 Mystisch"));
-        saveSpellIfAbsent(spell("Geisterpfeil", "Geisterbeschwörer", 1, 0, 5, 0,
-                SpellEffectType.DAMAGE, 2, "WIL+2/Mystisch; -2 auf Mystische Rüstung des Ziels", "WIL+2 Mystisch"));
+        saveSpellIfAbsent(spellWith(spell("Geisterpfeil", "Geisterbeschwörer", 1, 0, 5, 0,
+                SpellEffectType.DAMAGE, 2,
+                "WIL+2/Mystisch; senkt die Mystische Rüstung des Ziels um 2 für 2 Runden (+2 Runden je Übererfolg)",
+                "WIL+2 Mystisch, MR −2"),
+                sp -> { sp.setDuration(2); sp.setExtraSuccessEffect("DURATION"); }));
         saveSpellIfAbsent(spell("Kleiner Bannkreis", "Geisterbeschwörer", 1, 1, 5, 6,
                 SpellEffectType.BUFF, 0, "Schützt vor Untoten/Dämonen; verursacht Schaden bei ihnen (4 Schritt Radius)", "Bannkreis"));
         saveSpellIfAbsent(spell("Knochenkreis", "Geisterbeschwörer", 1, 3, 5, 0,
@@ -1267,11 +1335,14 @@ public class DataInitializer {
                 SpellEffectType.DAMAGE, 4, "WIL+4/Mystisch; Kälteschaden; Bewegungsrate halbiert (2 Schritt Radius)", "WIL+4 Mystisch (Kälte)"));
         saveSpellIfAbsent(spell("Nebelgeist Beschwören", "Geisterbeschwörer", 2, 1, 6, 0,
                 SpellEffectType.BUFF, 0, "Beschwört Nebelgeist; greift Ziele an", "Nebelgeist beschwören"));
-        saveSpellIfAbsent(spell("Nebelschild", "Geisterbeschwörer", 2, 0, 6, 0,
-                SpellEffectType.BUFF, 0, "+4 auf Proben auf Hieb Ausweichen", "+4 Ausweichen",
-                StatType.PHYSICAL_DEFENSE, ModifierOperation.ADD, 4.0, TriggerContext.ALWAYS, 3));
+        saveSpellIfAbsent(spellWith(spell("Nebelschild", "Geisterbeschwörer", 2, 0, 6, 0,
+                SpellEffectType.BUFF, 0, "+4 auf Ausweichen-Proben (schützender Nebel)", "+4 Ausweichen",
+                StatType.DODGE_STEP, ModifierOperation.ADD, 4.0, TriggerContext.ALWAYS, 3),
+                sp -> sp.setExtraSuccessEffect("DURATION")));
         saveSpellIfAbsent(spell("Schädel des Todes", "Geisterbeschwörer", 2, 0, 6, 0,
-                SpellEffectType.BUFF, 0, "Verängstigen wird zur einfachen Aktion möglich", "Verängstigen verbessern"));
+                SpellEffectType.BUFF, 0,
+                "Blutiger Schädel: Verängstigen kostet keine Hauptaktion (Spruchzauberei-Rang + 5 Runden, +2 je Übererfolg)",
+                "Verängstigen ohne Hauptaktion"));
         saveSpellIfAbsent(spell("Schattengeflüster", "Geisterbeschwörer", 2, 1, 6, 0,
                 SpellEffectType.BUFF, 0, "Lauschen über Schatten (bis 100 Schritt Reichweite)", "Durch Schatten lauschen"));
         saveSpellIfAbsent(spell("Schneide der Nacht", "Geisterbeschwörer", 2, 0, 6, 0,
@@ -1294,9 +1365,12 @@ public class DataInitializer {
         saveSpellIfAbsent(spell("Pfeil der Nacht", "Geisterbeschwörer", 3, 0, 7, 6,
                 SpellEffectType.BUFF, 0, "+6 auf Projektilschaden; -2 auf Mystische Rüstung des Ziels", "+6 Projektilschaden",
                 StatType.DAMAGE_STEP, ModifierOperation.ADD, 6.0, TriggerContext.ON_RANGED_ATTACK, 2));
-        saveSpellIfAbsent(spell("Schmerzen", "Geisterbeschwörer", 3, 0, 7, 0,
-                SpellEffectType.DEBUFF, 0, "Fügt 3 temporäre Wunden zu; halbiert Bewegungsrate", "-3 Wundschwelle",
-                StatType.WOUND_THRESHOLD, ModifierOperation.ADD, -3.0, TriggerContext.ALWAYS, 3));
+        saveSpellIfAbsent(spellWith(spell("Schmerzen", "Geisterbeschwörer", 3, 0, 7, 0,
+                SpellEffectType.DEBUFF, 0,
+                "3 temporäre Wunden (−3 auf alle Proben) und halbe Bewegungsrate",
+                "−3 auf alle Proben; halbe Bewegung",
+                StatType.ATTACK_STEP, ModifierOperation.ADD, -3.0, TriggerContext.ALWAYS, 3),
+                sp -> sp.setExtraSuccessEffect("DURATION")));
 
         // --- Kreis 4 ---
         saveSpellIfAbsent(spell("Aspekt des Bedrohlichen Tyrannen", "Geisterbeschwörer", 4, 1, 8, 0,

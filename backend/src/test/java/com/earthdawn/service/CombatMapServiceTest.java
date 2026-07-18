@@ -30,6 +30,7 @@ class CombatMapServiceTest {
 
     @Mock CombatSessionRepository sessionRepo;
     @Mock CombatService combatService;
+    @Mock ModifierAggregator modifiers;
 
     @InjectMocks CombatMapService mapService;
 
@@ -51,6 +52,11 @@ class CombatMapServiceTest {
         session.getCombatants().add(orc);
 
         lenient().when(combatService.findById(1L)).thenReturn(session);
+        // Effektive Bewegungsrate = Wert vom Charakterbogen (keine Effekte im Standard-Setup)
+        lenient().when(modifiers.getEffectiveValue(org.mockito.ArgumentMatchers.any(CombatantState.class),
+                        eq(com.earthdawn.model.enums.StatType.MOVEMENT_HEXES),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> ((CombatantState) inv.getArgument(0)).getCharacter().getMovementHexes());
         lenient().when(combatService.findCombatant(eq(session), eq(10L))).thenReturn(hero);
         lenient().when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(orc);
     }
@@ -235,6 +241,22 @@ class CombatMapServiceTest {
         assertThatThrownBy(() -> mapService.toggleDoor(1L, 500L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Nur Türen");
+    }
+
+    @Test
+    void move_halvedMovement_limitsTheBudget() {
+        // Schmerzen-artiger Effekt: effektive Bewegung 2 statt 5 → Distanz 3 nicht erreichbar
+        lenient().when(modifiers.getEffectiveValue(eq(hero),
+                        eq(com.earthdawn.model.enums.StatType.MOVEMENT_HEXES),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenReturn(2);
+
+        assertThatThrownBy(() -> mapService.moveCombatant(1L, 10L, 5, 2, false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("nicht erreichbar");
+
+        mapService.moveCombatant(1L, 10L, 4, 2, false); // Distanz 2 geht
+        assertThat(hero.getMovedHexesThisRound()).isEqualTo(2);
     }
 
     @Test

@@ -44,6 +44,8 @@ public final class TalentNames {
     public static final String EFFECT_VERAENGSTIGT        = "Verängstigt";
     /** Effektname des Blindheit-Zaubers (Aktionsprobe > 17 des Opfers beendet ihn — "Durchschauen"). */
     public static final String EFFECT_BLINDHEIT           = "Blindheit";
+    /** Effekt des Zaubers Schädel des Todes: Verängstigen ohne Hauptaktion, +Bonus je Zusatzfaden. */
+    public static final String EFFECT_SCHAEDEL_DES_TODES  = "Schädel des Todes";
 
     // Magie neutralisieren (WIL + Rang vs. Effektstufe + 10): beendet einen beliebigen aktiven Effekt
     public static final String MAGIE_NEUTRALISIEREN       = "Magie neutralisieren";
