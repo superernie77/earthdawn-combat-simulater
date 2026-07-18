@@ -1,6 +1,10 @@
 # Release Notes
 
-## v1.2.0 (in Entwicklung)
+## v1.3.0 (in Entwicklung)
+
+_Noch keine Einträge._
+
+## v1.2.0 (18.07.2026)
 
 ### 🗺 Hexfeld-Kampfkarte (optional)
 
