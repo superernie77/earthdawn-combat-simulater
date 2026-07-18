@@ -105,6 +105,7 @@ public class SpellService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        combatService.durchschauenCheck(session, caster, total);
         int targetNumber = spell.getWeavingDifficulty();
         boolean success = total >= targetNumber;
 
@@ -225,6 +226,7 @@ public class SpellService {
         java.util.List<String> extraThreadLabels = new java.util.ArrayList<>();
         int extraThreadEffectStep = 0;
         int extraThreadBuffValue = 0;
+        int extraThreadDurationRounds = 0;
         int[] freeThreadEffectStep = {0};
         if (caster.getPreparingSpellId() != null && caster.getPreparingSpellId().equals(spell.getId())) {
             for (int idx : parseChoices(caster.getExtraThreadChoices())) {
@@ -235,6 +237,8 @@ public class SpellService {
                     extraThreadEffectStep += opt.getValue();
                 } else if (opt.getType() == SpellThreadOptionType.BUFF_VALUE) {
                     extraThreadBuffValue += opt.getValue();
+                } else if (opt.getType() == SpellThreadOptionType.DURATION_ROUNDS) {
+                    extraThreadDurationRounds += opt.getValue();
                 }
             }
         }
@@ -285,6 +289,7 @@ public class SpellService {
 
         RollResult castRoll = diceService.roll(castStep);
         int total = castRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        combatService.durchschauenCheck(session, caster, total);
 
         // Verteidigung bestimmen
         int defenseValue;
@@ -324,8 +329,8 @@ public class SpellService {
                     applySpellDamage(session, caster, target, spell, extraSuccesses,
                             amuletDmg, extraThreadEffectStep, result);
                 }
-                case BUFF   -> applySpellBuff(session, caster, target, spell, extraSuccesses, extraThreadBuffValue, result);
-                case DEBUFF -> applySpellDebuff(session, target, spell, extraSuccesses, extraThreadBuffValue, result);
+                case BUFF   -> applySpellBuff(session, caster, target, spell, extraSuccesses, extraThreadBuffValue, extraThreadDurationRounds, result);
+                case DEBUFF -> applySpellDebuff(session, target, spell, extraSuccesses, extraThreadBuffValue, extraThreadDurationRounds, result);
                 case HEAL   -> applySpellHeal(target != null ? target : caster, spell, extraThreadEffectStep, result);
             }
         }
@@ -397,10 +402,10 @@ public class SpellService {
     }
 
     private void applySpellBuff(CombatSession session, CombatantState caster, CombatantState target,
-                                 SpellDefinition spell, int extraSuccesses, int buffBonus,
+                                 SpellDefinition spell, int extraSuccesses, int buffBonus, int threadDurationRounds,
                                  SpellCastResult.SpellCastResultBuilder result) {
         CombatantState effectTarget = target != null ? target : caster;
-        int duration = effectiveDuration(spell, extraSuccesses);
+        int duration = effectiveDuration(spell, extraSuccesses, threadDurationRounds);
         // Utility buffs have no modifyStat – just log the effect, no active modifier needed
         if (spell.getModifyStat() != null) {
             ActiveEffect effect = createSpellEffect(spell, effectTarget, false, buffBonus, duration);
@@ -435,10 +440,10 @@ public class SpellService {
     }
 
     private void applySpellDebuff(CombatSession session, CombatantState target, SpellDefinition spell,
-                                   int extraSuccesses, int buffBonus,
+                                   int extraSuccesses, int buffBonus, int threadDurationRounds,
                                    SpellCastResult.SpellCastResultBuilder result) {
         if (target == null) throw new IllegalStateException("Debuff-Zauber benötigt ein Ziel.");
-        int duration = effectiveDuration(spell, extraSuccesses);
+        int duration = effectiveDuration(spell, extraSuccesses, threadDurationRounds);
         ActiveEffect effect = createSpellEffect(spell, target, true, buffBonus, duration);
         target.getActiveEffects().add(effect);
 
@@ -448,13 +453,19 @@ public class SpellService {
     }
 
     /**
-     * Effektive Dauer in Runden: extraSuccessEffect "DURATION" verlängert um 2 Runden je
-     * Übererfolg. Permanente Effekte (duration = -1) bleiben permanent.
+     * Effektive Dauer in Runden. Übererfolge: "DURATION" = +2 Runden je Übererfolg,
+     * "DURATION_MINUTES" = +2 Minuten je Übererfolg (20 Runden à 6 Sekunden, z.B. Blindheit).
+     * Dazu die per DURATION_ROUNDS-Zusatzfäden gekauften Runden.
+     * Permanente Effekte (duration = -1) bleiben permanent.
      */
-    private int effectiveDuration(SpellDefinition spell, int extraSuccesses) {
+    private int effectiveDuration(SpellDefinition spell, int extraSuccesses, int threadDurationRounds) {
         if (spell.getDuration() < 0) return spell.getDuration();
-        int bonus = "DURATION".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
-        return spell.getDuration() + bonus;
+        int successBonus = switch (spell.getExtraSuccessEffect() == null ? "" : spell.getExtraSuccessEffect()) {
+            case "DURATION" -> extraSuccesses * 2;
+            case "DURATION_MINUTES" -> extraSuccesses * 20;
+            default -> 0;
+        };
+        return spell.getDuration() + successBonus + threadDurationRounds;
     }
 
     private void applySpellHeal(CombatantState target, SpellDefinition spell, int extraThreadEffectStep,

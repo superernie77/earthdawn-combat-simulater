@@ -501,7 +501,10 @@ public class DataInitializer {
                 display(REICHWEITE_10), effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
                 display(ZIEL_1));
         setThreadOptions("Blindheit",
-                display(DAUER_2MIN));
+                durationRounds(DAUER_2MIN, 20));
+
+        // Bestehende Datenbanken auf die neue Blindheit-Mechanik heben
+        migrateBlindheit();
         setThreadOptions("Gedankennebel",
                 display(REICHWEITE_10), effectStep("Wirkung Verstärken (Wirkungsstufe +2)", 2),
                 display(ZIEL_1));
@@ -521,6 +524,49 @@ public class DataInitializer {
     private SpellThreadOption display(String label) {
         return SpellThreadOption.builder()
                 .label(label).type(SpellThreadOptionType.DISPLAY).value(0).build();
+    }
+
+    private SpellThreadOption durationRounds(String label, int rounds) {
+        return SpellThreadOption.builder()
+                .label(label).type(SpellThreadOptionType.DURATION_ROUNDS).value(rounds).build();
+    }
+
+    /** Wendet eine Nachbearbeitung auf eine Spell-Definition an (für Seed-Sonderfälle). */
+    private SpellDefinition spellWith(SpellDefinition s, java.util.function.Consumer<SpellDefinition> f) {
+        f.accept(s);
+        return s;
+    }
+
+    /**
+     * Blindheit: −4 auf alle Proben (statt −3 Angriff), Übererfolge +2 Minuten,
+     * Zusatzfaden "+2 Minuten" wird verrechnet (20 Runden). Idempotent für Bestands-DBs.
+     */
+    private void migrateBlindheit() {
+        spellRepo.findAll().stream()
+                .filter(s -> "Blindheit".equals(s.getName()))
+                .forEach(s -> {
+                    boolean changed = false;
+                    if (s.getModifyValue() != -4.0) { s.setModifyValue(-4.0); changed = true; }
+                    if (!"DURATION_MINUTES".equals(s.getExtraSuccessEffect())) {
+                        s.setExtraSuccessEffect("DURATION_MINUTES");
+                        changed = true;
+                    }
+                    if (!"−4 auf alle Proben (blind)".equals(s.getEffectDescription())) {
+                        s.setEffectDescription("−4 auf alle Proben (blind)");
+                        s.setDescription("Ziel sieht nur Schwärze; −4 auf alle Proben. "
+                                + "Aktionsprobe über 17 durchschaut die Illusion und beendet sie.");
+                        changed = true;
+                    }
+                    for (SpellThreadOption o : s.getThreadOptions()) {
+                        if (o.getLabel() != null && o.getLabel().contains("+2 Minuten")
+                                && o.getType() != SpellThreadOptionType.DURATION_ROUNDS) {
+                            o.setType(SpellThreadOptionType.DURATION_ROUNDS);
+                            o.setValue(20);
+                            changed = true;
+                        }
+                    }
+                    if (changed) spellRepo.save(s);
+                });
     }
 
     private SpellThreadOption buffValue(String label, int value) {
@@ -1059,9 +1105,12 @@ public class DataInitializer {
         // --- Kreis 2 ---
         saveSpellIfAbsent(spell("Abbild Versetzen", "Illusionist", 2, 1, 6, 0,
                 SpellEffectType.BUFF, 0, "Projiziert Bild des Ziels; macht es unsichtbar", "Unsichtbar machen"));
-        saveSpellIfAbsent(spell("Blindheit", "Illusionist", 2, 1, 6, 0,
-                SpellEffectType.DEBUFF, 0, "Ziel sieht nur Schwärze; Blindheitsmalus auf alle Proben", "-3 Angriff (blind)",
-                StatType.ATTACK_STEP, ModifierOperation.ADD, -3.0, TriggerContext.ALWAYS, 3));
+        saveSpellIfAbsent(spellWith(spell("Blindheit", "Illusionist", 2, 1, 6, 0,
+                SpellEffectType.DEBUFF, 0,
+                "Ziel sieht nur Schwärze; −4 auf alle Proben. Aktionsprobe über 17 durchschaut die Illusion und beendet sie.",
+                "−4 auf alle Proben (blind)",
+                StatType.ATTACK_STEP, ModifierOperation.ADD, -4.0, TriggerContext.ALWAYS, 3),
+                s -> s.setExtraSuccessEffect("DURATION_MINUTES")));
         saveSpellIfAbsent(spell("Gedankennebel", "Illusionist", 2, 1, 6, 0,
                 SpellEffectType.DAMAGE, 3, "WIL+3/Mystisch; Ziel vergisst geplante Aktionen", "WIL+3 Mystisch"));
         saveSpellIfAbsent(spell("Harmloses Treiben", "Illusionist", 2, 1, 6, 0,

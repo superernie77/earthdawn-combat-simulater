@@ -162,7 +162,7 @@ export interface SpellDefinition {
 export interface SpellThreadOption {
   label: string;
   /** EFFECT_STEP/BUFF_VALUE werden automatisch verrechnet, DISPLAY ist reine Anzeige für den Spielleiter. */
-  type: 'EFFECT_STEP' | 'BUFF_VALUE' | 'DISPLAY';
+  type: 'EFFECT_STEP' | 'BUFF_VALUE' | 'DURATION_ROUNDS' | 'DISPLAY';
   value: number;
 }
 

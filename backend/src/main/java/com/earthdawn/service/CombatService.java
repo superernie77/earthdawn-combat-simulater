@@ -447,6 +447,7 @@ public class CombatService {
         attackStep = Math.max(1, attackStep);
         RollResult attackRoll = diceService.roll(attackStep);
         int attackTotal = attackRoll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, attacker, attackTotal);
 
         // 4. Verteidigung
         TriggerContext defCtx = req.getActionType() == ActionType.RANGED_ATTACK
@@ -1278,6 +1279,7 @@ public class CombatService {
         int rollStep = Math.max(1, dexStep + dodgeTalent.getRank() + req.getBonusSteps());
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, defender, total);
 
         boolean success = total >= attackTotal;
 
@@ -1441,6 +1443,7 @@ public class CombatService {
         }
 
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
         boolean success = total >= targetNumber;
 
         // 2 Schaden in jedem Fall
@@ -1507,6 +1510,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Soziale Verteidigung des Ziels
         int socialDef = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
@@ -1633,6 +1637,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         int spellDef = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ON_SPELL_DEFENSE);
         boolean success = total >= spellDef;
@@ -1800,6 +1805,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         int effectLevel = Math.max(0, req.getEffectLevel());
         int targetNumber = effectLevel + 10;
@@ -1868,6 +1874,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Ziel-TN: höchste KV aller nicht-besiegten Gegner
         int targetNumber = session.getCombatants().stream()
@@ -1986,6 +1993,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Mystische Verteidigung des Ziels
         int mysticDef  = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ALWAYS);
@@ -2102,6 +2110,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Soziale Verteidigung des Ziels
         int socialDef  = modifiers.getEffectiveValue(target, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION);
@@ -2218,6 +2227,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // TN = max(MV, physische Rüstung)
         int spellDef = modifiers.getEffectiveValue(target, StatType.SPELL_DEFENSE, TriggerContext.ON_SPELL_DEFENSE);
@@ -2329,6 +2339,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Erfolg wenn Ergebnis ≥ Angriffswurf des Zauberers
         boolean success      = total >= attackTotal;
@@ -2403,6 +2414,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         // Ziel-Verteidigung
         CombatantState target = null;
@@ -2652,6 +2664,7 @@ public class CombatService {
 
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+        durchschauenCheck(session, actor, total);
 
         int pd = modifiers.getEffectiveValue(target, StatType.PHYSICAL_DEFENSE, TriggerContext.ALWAYS);
         boolean success = total >= pd;
@@ -3373,6 +3386,24 @@ public class CombatService {
                 .filter(c -> c.getId().equals(combatantId))
                 .findFirst()
                 .orElseThrow(() -> new EntityNotFoundException("Kombattant nicht gefunden: " + combatantId));
+    }
+
+    /**
+     * Blindheit durchschauen: Gelingt dem geblendeten Opfer eine Aktionsprobe mit einem
+     * Ergebnis über 17 (trotz des −4-Malus), erkennt es die Illusion — der Blindheit-Effekt
+     * endet sofort. Wird nach jedem Aktionswurf des Betroffenen aufgerufen.
+     */
+    void durchschauenCheck(CombatSession session, CombatantState roller, int rollTotal) {
+        if (rollTotal <= 17) return;
+        boolean removed = roller.getActiveEffects()
+                .removeIf(e -> TalentNames.EFFECT_BLINDHEIT.equals(e.getName()));
+        if (removed) {
+            String name = roller.getDisplayName() != null
+                    ? roller.getDisplayName() : roller.getCharacter().getName();
+            addLog(session, name, null, ActionType.EFFECT_REMOVED,
+                    name + " durchschaut die Blindheit (Wurf " + rollTotal + " > 17) — der Zauber endet.",
+                    true);
+        }
     }
 
     void addLog(CombatSession session, String actorName, String targetName,

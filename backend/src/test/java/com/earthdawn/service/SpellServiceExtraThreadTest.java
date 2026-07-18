@@ -496,6 +496,30 @@ class SpellServiceExtraThreadTest {
         assertThat(r.getExtraThreadLabels()).hasSize(1);
     }
 
+    // --- Blindheit: +2 Minuten je Übererfolg und je Zusatzfaden ---
+
+    @Test
+    void blindheit_extraSuccessesAndDurationThreads_extendByTwentyRoundsEach() {
+        SpellDefinition blind = blindheit();
+        CombatantState caster = caster(blind, 4);
+        CombatantState target = target();
+        prepared(caster, blind, 1, 1);
+        caster.setExtraThreadChoices("0"); // 1× "+2 Minuten" = +20 Runden
+        stub(blind, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        // ZV 5, Wurf 10 → 1 Übererfolg = +20 Runden
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(5);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.isSuccess()).isTrue();
+        // Basis 3 + 20 (Übererfolg) + 20 (Zusatzfaden) = 43 Runden
+        assertThat(r.getEffectDuration()).isEqualTo(43);
+        var eff = target.getActiveEffects().get(0);
+        assertThat(eff.getRemainingRounds()).isEqualTo(43);
+        assertThat(eff.getModifiers().get(0).getValue()).isEqualTo(-4.0);
+    }
+
     // --- CSV-Helfer ---
 
     @Test
@@ -535,6 +559,22 @@ class SpellServiceExtraThreadTest {
         r.setSpendKarma(false);
         r.setExtraThreadOptionIndex(optionIndex);
         return r;
+    }
+
+    /** Blindheit: 1 Faden, DEBUFF −4 auf alle Proben, Dauer 3, Übererfolge/Fäden je +2 Minuten. */
+    private SpellDefinition blindheit() {
+        return SpellDefinition.builder()
+                .id(50L).name("Blindheit").discipline("Illusionist").circle(2)
+                .threads(1).weavingDifficulty(6).castingDifficulty(0)
+                .effectType(SpellEffectType.DEBUFF).effectStep(0)
+                .modifyStat(StatType.ATTACK_STEP).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(-4.0).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .extraSuccessEffect("DURATION_MINUTES")
+                .threadOptions(new ArrayList<>(List.of(
+                        SpellThreadOption.builder()
+                                .label("Wirkungsdauer Verlängern (+2 Minuten)")
+                                .type(SpellThreadOptionType.DURATION_ROUNDS).value(20).build())))
+                .build();
     }
 
     /** Phantomkrieger: 1 Faden, BUFF +3 KV, Dauer 3, DURATION-Übererfolge, "+1 Bild" = BUFF_VALUE(1). */

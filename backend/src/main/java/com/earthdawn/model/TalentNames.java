@@ -42,6 +42,8 @@ public final class TalentNames {
     // Verängstigen (WIL vs. MV): −2/Erfolg auf Aktionsproben, per Willenskraftprobe abschüttelbar
     public static final String VERAENGSTIGEN              = "Verängstigen";
     public static final String EFFECT_VERAENGSTIGT        = "Verängstigt";
+    /** Effektname des Blindheit-Zaubers (Aktionsprobe > 17 des Opfers beendet ihn — "Durchschauen"). */
+    public static final String EFFECT_BLINDHEIT           = "Blindheit";
 
     // Magie neutralisieren (WIL + Rang vs. Effektstufe + 10): beendet einen beliebigen aktiven Effekt
     public static final String MAGIE_NEUTRALISIEREN       = "Magie neutralisieren";

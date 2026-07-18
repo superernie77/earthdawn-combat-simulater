@@ -10,6 +10,8 @@ public enum SpellThreadOptionType {
      * Phantomkrieger skaliert zusätzlich der Angreifer-Malus mit.
      */
     BUFF_VALUE,
+    /** Wird automatisch verrechnet: verlängert die Wirkungsdauer um `value` Runden je Faden. */
+    DURATION_ROUNDS,
     /**
      * Wird nur angezeigt (Log/Modal) — die Auswirkung interpretiert der Spielleiter.
      * Für alles, was die Engine nicht kennt: Reichweite (kein Distanzsystem), zusätzliche Ziele
