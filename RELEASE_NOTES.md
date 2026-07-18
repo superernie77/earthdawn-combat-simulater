@@ -2,30 +2,8 @@
 
 ## v1.2.0 (in Entwicklung)
 
-**Vier Geisterbeschwörer-Zauber mechanisiert**
-- **Geisterpfeil**: senkt zusätzlich zum Schaden die **Mystische Rüstung des Ziels um 2** (2 Runden, +2 je Übererfolg). Zusatzfäden: Wirkungsstufe +2 und/oder MR um weitere 2 senken.
-- **Nebelschild**: Der Bonus wirkt jetzt regelgetreu **nur auf Ausweichen-Proben** (vorher pauschal +4 KV). Zusatzfaden: Bonus +2. Übererfolge verlängern die Dauer.
-- **Schmerzen**: 3 temporäre Wunden als **−3 auf alle Proben** plus **halbierte Bewegungsrate auf der Kampfkarte**. Zusatzfaden: +1 Wunde (→ −4 …). Übererfolge verlängern die Dauer.
-- **Schädel des Todes**: endlich ein echter Effekt — **Verängstigen kostet keine Hauptaktion** mehr, solange der Schädel aktiv ist (Spruchzauberei-Rang + 5 Runden, +2 je Übererfolg). Zusatzfaden: +2 auf Verängstigen-Proben.
+### 🗺 Hexfeld-Kampfkarte (optional)
 
-**Verhaltensfix Verängstigen**: Ohne Schädel des Todes verbraucht Verängstigen jetzt korrekt die Hauptaktion — bisher verbrauchte es gar keine, obwohl es als Standardaktion dokumentiert war.
-
-**Blindheit: komplett mechanisiert**
-- Der Zauber gibt jetzt **−4 auf alle Proben** (vorher nur −3 auf Angriffe).
-- **Übererfolge** beim Wirken und der Zusatzfaden **„+2 Minuten"** verlängern die Wirkungsdauer um je **2 Minuten (20 Kampfrunden)** — beides wird automatisch verrechnet.
-- **Durchschauen**: Würfelt das geblendete Opfer bei irgendeiner Aktionsprobe (Angriff, Ausweichen, Zaubern, Talente, freie Aktionen) **über 17** — trotz des −4-Malus —, durchschaut es die Illusion: der Effekt endet sofort, mit Eintrag im Kampfprotokoll.
-
-**Phantomkrieger: Übererfolge und Zusatzfäden wirken jetzt mechanisch**
-- **Übererfolge** beim Zauberwurf verlängern die Wirkungsdauer um **2 Runden je Übererfolg** (statt fix 3 Runden). Das gilt generell für Buff-/Debuff-Zauber mit „Dauer verlängern"-Übererfolg — auch die anderen Zauber aus dieser Liste profitieren.
-- Der Zusatzfaden **„Wirkung Verstärken (+1 Bild)"** wird jetzt verrechnet: jedes zusätzliche Abbild gibt **+1 KV auf das Ziel und −1 auf Angriffe gegen das Ziel** — zusätzlich zu den +3/−3 der Grundwirkung, mehrfach wählbar (bis Fadenweben-Rang).
-
-**Bugfix: Ausrüstungsformulare schnitten Felder ab**
-In den Hinzufügen-Zeilen der Ausrüstung wurden die flexiblen Felder (Name, Beschreibung) von den festen Nachbarfeldern — etwa den neuen Kurz/Mittel/Weit-Reichweiten — auf Splitterbreite gequetscht. Alle flexiblen Felder haben jetzt eine Mindestbreite und brechen stattdessen in eine zweite Zeile um.
-
-**Bugfix: Kampfprotokoll war falsch herum**
-Das Backend liefert das Protokoll bereits mit den neuesten Einträgen zuerst; das Frontend drehte die Liste ein zweites Mal um — dadurch standen die ältesten Einträge oben. Jetzt wird explizit absteigend sortiert: die neuesten Einträge stehen oben.
-
-**Hexfeld-Kampfkarte (optional)**
 Der Kampf kann jetzt räumlich auf einer Hexfeld-Karte ausgetragen werden — als **optionale Zusatzschicht**: Ohne Aktivierung bleibt alles exakt wie bisher. Aktivierung per Checkbox beim Anlegen der Session (Größe wählbar, Standard 24×16) oder per Button im Setup; der „Karte"-Knopf öffnet die Karte **in einem eigenen Fenster**, das sich live mit dem Kampfscreen synchronisiert.
 
 - **Spielleiter platziert**: Helden, Monster sowie Wände, Türen (zum Öffnen/Schließen), Bäume, Felsen und Möbel.
@@ -33,47 +11,53 @@ Der Kampf kann jetzt räumlich auf einer Hexfeld-Karte ausgetragen werden — al
 - **Reichweiten steuern die Zielauswahl** im Kampfscreen: Nahkampf nur gegen angrenzende Felder, Projektil-/Wurfwaffen nach ihrer neuen **Kurz/Mittel/Weit-Reichweite**, Zauber nach ihrer neuen **Zauberreichweite**. Die Reichweiten filtern nur die Auswahl — die Kampfmechanik selbst bleibt unangetastet.
 - **Animationen**: Nahkampfhiebe, fliegende Pfeile und Zauberbolzen werden auf der Karte animiert, sobald im Kampf gewürfelt wird — bei allen Zuschauern.
 
-**Eigenes App-Icon**
-Die App hat jetzt ein eigenes Zeichen: ein **Fadenring, von einem Schwert durchstoßen** — der Ring steht für das Fadenweben, die Kernmechanik von Earthdawn, das Schwert für den Kampf. Gehalten im Gold der App auf dunklem Grund. Es ist ein eigener Entwurf, nicht das FASA-Logo.
+### 🧵 Zusätzliche Fäden bei Zaubern
 
-Das Zeichen erscheint im **Browser-Tab** und als **Logo in der Seitenleiste** neben dem Schriftzug — beides aus derselben SVG-Datei, es gibt also nur eine Quelle. Für Browser ohne SVG-Favicon liegt eine `favicon.ico` (16/32/48) daneben.
+Sind alle Pflichtfäden eines Zaubers gewoben, kann jeder weitere Faden eine der Zusatz-Optionen des Zaubers kaufen — auswählbar im Fadenweben-Dialog. Obergrenze: **Fadenweben-Rang**; dieselbe Option darf mehrfach gewählt werden. Auch **Sofortzauber ohne Pflichtfäden** (z.B. Blitz) können Zusatzfäden aufnehmen.
 
-**Bugfix: drei Icons wurden als Text ausgeschrieben**
-Die App lädt die klassische *Material Icons*-Schrift. Diese kennt weder `sentiment_extremely_dissatisfied` (Verängstigen-Button) noch `skull` (Gegner-Überschrift, Besiegt-Markierung, „ist bewusstlos"-Banner) noch `shield_outlined` (Konten, Kampfliste). Bei einem unbekannten Namen schreibt `mat-icon` das Wort **im Klartext** in den Button — es füllte ihn komplett aus und schob die Beschriftung aus dem sichtbaren Bereich. Genau deshalb wirkte der Verängstigen-Button „ohne Label". Ersetzt durch gültige Icons; ein neues Prüfskript (`frontend/scripts/check-mat-icons.py`) schlägt bei unbekannten Namen an — der Build bemerkt so etwas nicht.
+- Automatisch verrechnet werden **Wirkungsstufe** (+2 Schaden/Heilung), **Wirkungs-Verstärkung** (Buff-/Debuff-Modifikator) und **Wirkungsdauer** — je nach Zauber. Optionen wie Reichweite oder zusätzliche Ziele werden gewählt, protokolliert und angezeigt; die Auslegung liegt beim Spielleiter.
+- **Freier Zusatzfaden aus der Erweiterten Matrize**: Ein Sofortzauber in einer Erweiterten Matrize erhält beim Wirken automatisch einen Gratis-Faden „Wirkungsstufe +2" — ohne Wurf, ohne Aktion, zählt nicht gegen die Obergrenze.
+- Das Ergebnisfenster schlüsselt die Schadensstufe sauber auf: `Step 12 (6 + 4 Übererfolge + 2 Zusatzfäden)`.
+- Optionen hinterlegt für 10 Illusionisten-Zauber (Katastrophe, Umhang, Vertrauen, Blitz, Illusionärer Blitz, Blindheit, Gedankennebel, Sehen von Verborgenem, Niemand Da, Phantomkrieger) sowie die vier Geisterbeschwörer-Zauber unten.
 
-**Icons für die Ansage-Buttons**
-*Neutral*, *Aggressiv*, *Defensiv*, *Waffe*, *Zauber* und *Ändern* hatten Emoji oder gar kein Icon — jetzt echte Icons wie alle übrigen Buttons.
+### ✨ Zauber regelgetreu mechanisiert
 
-**Kombattanten-Kachel: zwei Spalten**
-Die Kopfzeile (Initiative, Name, Disziplin, Zustands-Badges und *Auto*) steht jetzt über der vollen Breite. Darunter stehen links die Werte — Schadensleiste, Wunden, Karma, Verteidigungen, Rüstung und aktive Effekte — und rechts alle Aktionsbuttons untereinander.
+**Phantomkrieger**: Übererfolge verlängern die Dauer um **2 Runden je**; der Zusatzfaden „+1 Bild" gibt je Bild **+1 KV und −1 auf Angriffe gegen das Ziel** (aus +3/−3 wird mit zwei Bildern +5/−5).
 
-**Jeder Aktionsbutton hat jetzt eine Beschriftung.** Vorher waren die meisten reine Icons, deren Bedeutung nur der Tooltip verriet. Zu lange Namen werden gekürzt statt aus dem Button zu laufen; der vollständige Text steht weiterhin im Tooltip. Der Button *Furcht abschütteln* ist nicht mehr grellgrün, sondern in gedämpftem Türkis wie die übrigen Buttons.
+**Blindheit**: jetzt **−4 auf alle Proben** (vorher −3 nur auf Angriffe). Übererfolge und der Zusatzfaden „+2 Minuten" verlängern um je **2 Minuten (20 Kampfrunden)**. **Durchschauen**: Würfelt das Opfer bei irgendeiner Aktionsprobe **über 17** — trotz des Malus —, endet der Effekt sofort (mit Protokolleintrag).
 
-**Freier Zusatzfaden aus der Erweiterten Matrize**
-Liegt ein Zauber **ohne Pflichtfäden** (z.B. Blitz) in einer Erweiterten Matrize, hat deren vorgewobener Faden nichts zu tun — er wird automatisch zum Zusatzfaden mit **Wirkung Verstärken (Wirkungsstufe +2)**. Ohne Wurf, ohne Aktion, und er zählt **nicht** gegen die Obergrenze: ein Adept mit Fadenweben-Rang 1 kann also den freien *und* einen selbst gewobenen Zusatzfaden nutzen. Zauber, die keine Wirkungsstufe kennen (z.B. Katastrophe), gehen leer aus.
+**Geisterpfeil**: senkt zusätzlich zum Schaden die **Mystische Rüstung des Ziels um 2** (2 Runden, +2 je Übererfolg). Zusatzfäden: Wirkungsstufe +2 und/oder MR um weitere 2 senken.
 
-**Zusätzliche Fäden bei Zaubern**
-Sind alle Pflichtfäden eines Zaubers gewoben, kann jeder weitere Faden eine der Zusatz-Optionen des Zaubers kaufen — auswählbar im Fadenweben-Dialog. Die Obergrenze ist der **Fadenweben-Rang**; dieselbe Option darf mehrfach gewählt werden. Auch **Sofortzauber ohne Pflichtfäden** (z.B. Blitz) können Zusatzfäden aufnehmen.
+**Nebelschild**: Der Bonus wirkt regelgetreu **nur auf Ausweichen-Proben** (vorher pauschal +4 KV). Zusatzfaden: Bonus +2; Übererfolge verlängern die Dauer.
 
-Automatisch verrechnet wird nur **„Wirkung Verstärken (Wirkungsstufe +2)"**. Alle übrigen Optionen — Reichweite, zusätzliche Ziele, Wirkungsdauer und Boni auf Heimlichkeit/Wahrnehmung — werden gewählt, gespeichert und im Kampfprotokoll sowie im Ergebnisfenster angezeigt, aber bewusst **nicht** gerechnet: dafür fehlen dem Kampfsystem die Grundlagen (kein Distanzsystem, einzelzielige Zauber, Dauer in Runden statt Minuten, keine Nicht-Kampf-Proben). Der Spielleiter entscheidet.
+**Schmerzen**: 3 temporäre Wunden als **−3 auf alle Proben** plus **halbierte Bewegungsrate auf der Kampfkarte**. Zusatzfaden: +1 Wunde; Übererfolge verlängern die Dauer.
 
-Hinterlegt für 10 Illusionisten-Zauber: Katastrophe, Umhang, Vertrauen, Blitz, Illusionärer Blitz, Blindheit, Gedankennebel, Sehen von Verborgenem, Niemand Da, Phantomkrieger.
+**Schädel des Todes**: endlich ein echter Effekt — **Verängstigen kostet keine Hauptaktion**, solange der Schädel aktiv ist (Spruchzauberei-Rang + 5 Runden, +2 je Übererfolg). Zusatzfaden: +2 auf Verängstigen-Proben.
 
-**Neues Talent: Magie neutralisieren**
-Beendet einen beliebigen aktiven Effekt auf einem beliebigen Kombattanten (WIL + Rang vs. **Effektstufe + 10**). Verbraucht die Aktion der Runde und kostet 1 Überanstrengung. Beim Anwenden öffnet sich **bei allen Mitspielern** ein Auswahldialog mit allen aktuell aktiven Effekten; dort wird der Effekt gewählt und seine Stufe eingetragen (Effekte haben keine eigene Stufe — maßgeblich ist der auslösende Zauber bzw. das Talent). Das Ergebnis erscheint ebenfalls bei allen. Welche Effekte sich neutralisieren lassen, entscheidet der Spielleiter — es stehen alle zur Auswahl.
+### 🪄 Neue Talente
 
-**Neues Talent: Verängstigen**
-Der Adept jagt einem Gegner übernatürliche Furcht ein (WIL + Rang vs. Mystische Verteidigung, Standardaktion, 0 Überanstrengung). Bei Erfolg erleidet das Ziel **−2 auf alle Aktionsproben je Erfolg** für Rang Runden. Das Ziel darf in jeder seiner Runden eine Willenskraftprobe gegen die Verängstigen-Stufe ablegen („Furcht abschütteln") — Erfolg beendet den Effekt vorzeitig. Disziplintalent des Geisterbeschwörers (1. Kreis), Talentoption für Illusionisten (Kreis 5–8).
+**Magie neutralisieren**: Beendet einen beliebigen aktiven Effekt (WIL + Rang vs. **Effektstufe + 10**, Aktion + 1 Überanstrengung). Auswahldialog und Ergebnis erscheinen **bei allen Mitspielern**; die Effektstufe wird im Dialog eingetragen, der Spielleiter entscheidet, was neutralisierbar ist.
 
-**Bugfix: Schwimmen-Talent überlebt Neustarts**
-Das Talent Schwimmen wurde beim Backend-Start fälschlich als „nicht implementiert" gelöscht (inklusive Charakter-Zuweisungen) und neu angelegt — es bleibt jetzt erhalten.
+**Verängstigen**: WIL + Rang vs. Mystische Verteidigung — bei Erfolg **−2 auf alle Aktionsproben je Erfolg** für Rang Runden. Das Ziel darf jede Runde eine Willenskraftprobe zum „Furcht abschütteln" ablegen. Geisterbeschwörer (1. Kreis), Illusionisten-Talentoption (Kreis 5–8).
 
-**Arzt-Umbau: zwei Behandlungsmodi**
-Die Arzt-Fertigkeit unterscheidet jetzt zwei Anwendungen:
-- **Verletzungen behandeln** (verlorene LP): nur 1× pro Erholungsprobe — Erfolg gibt +Rang auf den nächsten Erholungswurf.
-- **Wunde versorgen**: unterdrückt den −1-Wundmalus einer Wunde bei Erholungsproben — mehrfach anwendbar, bis alle Wunden versorgt sind (Verband bleibt bestehen).
+### 🎨 Oberfläche
 
-Beide Modi würfeln WAH-Stufe + Rang gegen MW 5 und verbrauchen je 1× Verbandszeug — auch bei Fehlschlag.
+- **Eigenes App-Icon**: Fadenring mit Schwert — im Browser-Tab und als Logo in der Seitenleiste (eigener Entwurf, nicht das FASA-Logo).
+- **Kombattanten-Kachel zweispaltig**: Kopfzeile über volle Breite, links die Werte, rechts alle Aktionsbuttons untereinander — **jeder Button jetzt mit Beschriftung und Icon**.
+- **Ansage-Buttons** (Neutral/Aggressiv/Defensiv/Waffe/Zauber) mit echten Icons statt Emoji.
+
+### 🐛 Bugfixes
+
+- **Verängstigen verbraucht jetzt die Hauptaktion** (verbrauchte bisher gar keine, obwohl als Standardaktion dokumentiert). Mit Schädel des Todes entfällt der Verbrauch.
+- **Kampfprotokoll war falsch herum** — die neuesten Einträge stehen jetzt oben (doppelte Umkehr zwischen Backend und Frontend).
+- **Drei Icons wurden als Text ausgeschrieben** (Verängstigen-Button, Gegner-Schädel, Schild-Umriss): unbekannte Namen in der Material-Icons-Schrift. Ersetzt; ein Prüfskript (`frontend/scripts/check-mat-icons.py`) verhindert Wiederholung.
+- **Ausrüstungsformulare** quetschten Name/Beschreibung auf Splitterbreite — Felder brechen jetzt um.
+- **Browser-Freeze** beim Öffnen des Magie-neutralisieren-Dialogs behoben (Endlosschleife der Änderungserkennung).
+- **Schwimmen-Talent** wurde beim Backend-Start fälschlich gelöscht — bleibt jetzt erhalten.
+
+### ⚕️ Arzt-Umbau
+
+Zwei Behandlungsmodi: **Verletzungen behandeln** (1× pro Erholungsprobe, +Rang auf den Wurf) und **Wunde versorgen** (unterdrückt den −1-Wundmalus je versorgter Wunde, mehrfach anwendbar). Beide würfeln WAH + Rang vs. MW 5 und verbrauchen je 1× Verbandszeug — auch bei Fehlschlag.
 
 ## v1.1.0
 
