@@ -224,6 +224,7 @@ public class SpellService {
         // Verrechnet wird ausschließlich EFFECT_STEP; alles andere ist Anzeige für den Spielleiter.
         java.util.List<String> extraThreadLabels = new java.util.ArrayList<>();
         int extraThreadEffectStep = 0;
+        int extraThreadBuffValue = 0;
         int[] freeThreadEffectStep = {0};
         if (caster.getPreparingSpellId() != null && caster.getPreparingSpellId().equals(spell.getId())) {
             for (int idx : parseChoices(caster.getExtraThreadChoices())) {
@@ -232,6 +233,8 @@ public class SpellService {
                 extraThreadLabels.add(opt.getLabel());
                 if (opt.getType() == SpellThreadOptionType.EFFECT_STEP) {
                     extraThreadEffectStep += opt.getValue();
+                } else if (opt.getType() == SpellThreadOptionType.BUFF_VALUE) {
+                    extraThreadBuffValue += opt.getValue();
                 }
             }
         }
@@ -321,8 +324,8 @@ public class SpellService {
                     applySpellDamage(session, caster, target, spell, extraSuccesses,
                             amuletDmg, extraThreadEffectStep, result);
                 }
-                case BUFF   -> applySpellBuff(session, caster, target, spell, result);
-                case DEBUFF -> applySpellDebuff(session, target, spell, result);
+                case BUFF   -> applySpellBuff(session, caster, target, spell, extraSuccesses, extraThreadBuffValue, result);
+                case DEBUFF -> applySpellDebuff(session, target, spell, extraSuccesses, extraThreadBuffValue, result);
                 case HEAL   -> applySpellHeal(target != null ? target : caster, spell, extraThreadEffectStep, result);
             }
         }
@@ -394,11 +397,13 @@ public class SpellService {
     }
 
     private void applySpellBuff(CombatSession session, CombatantState caster, CombatantState target,
-                                 SpellDefinition spell, SpellCastResult.SpellCastResultBuilder result) {
+                                 SpellDefinition spell, int extraSuccesses, int buffBonus,
+                                 SpellCastResult.SpellCastResultBuilder result) {
         CombatantState effectTarget = target != null ? target : caster;
+        int duration = effectiveDuration(spell, extraSuccesses);
         // Utility buffs have no modifyStat – just log the effect, no active modifier needed
         if (spell.getModifyStat() != null) {
-            ActiveEffect effect = createSpellEffect(spell, effectTarget, false);
+            ActiveEffect effect = createSpellEffect(spell, effectTarget, false, buffBonus, duration);
             effectTarget.getActiveEffects().add(effect);
         }
 
@@ -410,13 +415,13 @@ public class SpellService {
                     .description("Angriffe gegen " + target.getCharacter().getName() + " erleiden −3 auf Angriffsstufe")
                     .sourceType(SourceType.SPELL)
                     .sourceId(spell.getId())
-                    .remainingRounds(spell.getDuration())
+                    .remainingRounds(duration)
                     .negative(false)
                     .modifiers(List.of(
                             com.earthdawn.model.ModifierEntry.builder()
                                     .targetStat(com.earthdawn.model.enums.StatType.ATTACK_STEP)
                                     .operation(com.earthdawn.model.enums.ModifierOperation.ADD)
-                                    .value(-3)
+                                    .value(-3 - buffBonus)
                                     .triggerContext(com.earthdawn.model.enums.TriggerContext.ON_INCOMING_ATTACK)
                                     .build()
                     ))
@@ -424,18 +429,32 @@ public class SpellService {
             target.getActiveEffects().add(attackPenalty);
         }
 
-        result.effectApplied(spell.getEffectDescription())
-              .effectDuration(spell.getDuration());
+        result.effectApplied(spell.getEffectDescription()
+                      + (buffBonus > 0 ? " — um " + buffBonus + " verstärkt (Zusatzfäden)" : ""))
+              .effectDuration(duration);
     }
 
     private void applySpellDebuff(CombatSession session, CombatantState target, SpellDefinition spell,
+                                   int extraSuccesses, int buffBonus,
                                    SpellCastResult.SpellCastResultBuilder result) {
         if (target == null) throw new IllegalStateException("Debuff-Zauber benötigt ein Ziel.");
-        ActiveEffect effect = createSpellEffect(spell, target, true);
+        int duration = effectiveDuration(spell, extraSuccesses);
+        ActiveEffect effect = createSpellEffect(spell, target, true, buffBonus, duration);
         target.getActiveEffects().add(effect);
 
-        result.effectApplied(spell.getEffectDescription())
-              .effectDuration(spell.getDuration());
+        result.effectApplied(spell.getEffectDescription()
+                      + (buffBonus > 0 ? " — um " + buffBonus + " verstärkt (Zusatzfäden)" : ""))
+              .effectDuration(duration);
+    }
+
+    /**
+     * Effektive Dauer in Runden: extraSuccessEffect "DURATION" verlängert um 2 Runden je
+     * Übererfolg. Permanente Effekte (duration = -1) bleiben permanent.
+     */
+    private int effectiveDuration(SpellDefinition spell, int extraSuccesses) {
+        if (spell.getDuration() < 0) return spell.getDuration();
+        int bonus = "DURATION".equals(spell.getExtraSuccessEffect()) ? extraSuccesses * 2 : 0;
+        return spell.getDuration() + bonus;
     }
 
     private void applySpellHeal(CombatantState target, SpellDefinition spell, int extraThreadEffectStep,
@@ -450,10 +469,23 @@ public class SpellService {
     }
 
     private ActiveEffect createSpellEffect(SpellDefinition spell, CombatantState target, boolean negative) {
+        return createSpellEffect(spell, target, negative, 0, spell.getDuration());
+    }
+
+    /**
+     * Variante mit Zusatzfaden-Verstärkung und (ggf. durch Übererfolge verlängerter) Dauer.
+     * Die Verstärkung wirkt in Wirkrichtung: positive Modifikatoren steigen, negative sinken.
+     */
+    private ActiveEffect createSpellEffect(SpellDefinition spell, CombatantState target, boolean negative,
+                                            int valueBonus, int durationRounds) {
+        double value = spell.getModifyValue();
+        if (valueBonus != 0) {
+            value += spell.getModifyValue() >= 0 ? valueBonus : -valueBonus;
+        }
         ModifierEntry modifier = ModifierEntry.builder()
                 .targetStat(spell.getModifyStat())
                 .operation(spell.getModifyOperation())
-                .value(spell.getModifyValue())
+                .value(value)
                 .triggerContext(spell.getModifyTrigger())
                 .build();
 
@@ -463,7 +495,7 @@ public class SpellService {
                 .description(spell.getEffectDescription())
                 .sourceType(SourceType.SPELL)
                 .sourceId(spell.getId())
-                .remainingRounds(spell.getDuration())
+                .remainingRounds(durationRounds)
                 .negative(negative)
                 .modifiers(List.of(modifier))
                 .build();

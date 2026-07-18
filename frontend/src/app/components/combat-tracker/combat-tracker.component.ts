@@ -1711,7 +1711,7 @@ export interface EffectChoice {
             </mat-select>
           </mat-form-field>
           <div class="extra-thread-note" *ngIf="threadweaveOptions().length > 0 && !threadweaveExtraExhausted()">
-            Nur „Wirkungsstufe" wird automatisch verrechnet. Alle übrigen Optionen werden nur
+            Optionen ohne „Spielleiter"-Vermerk werden automatisch verrechnet. Der Rest wird nur
             protokolliert — Reichweite, Ziele, Dauer und Nicht-Kampf-Boni kennt die Engine nicht.
           </div>
         </div>

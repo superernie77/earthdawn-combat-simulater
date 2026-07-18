@@ -5,6 +5,12 @@ public enum SpellThreadOptionType {
     /** Wird automatisch verrechnet: erhöht die Wirkungsstufe (effectStep) um `value`. */
     EFFECT_STEP,
     /**
+     * Wird automatisch verrechnet: verstärkt den Buff-/Debuff-Modifikator des Zaubers um `value`
+     * (in Wirkrichtung — positive Modifikatoren steigen, negative sinken weiter). Bei
+     * Phantomkrieger skaliert zusätzlich der Angreifer-Malus mit.
+     */
+    BUFF_VALUE,
+    /**
      * Wird nur angezeigt (Log/Modal) — die Auswirkung interpretiert der Spielleiter.
      * Für alles, was die Engine nicht kennt: Reichweite (kein Distanzsystem), zusätzliche Ziele
      * (Zauberpfad ist einzelzielig), Wirkungsdauer (Regel in Minuten, App rechnet in Runden),

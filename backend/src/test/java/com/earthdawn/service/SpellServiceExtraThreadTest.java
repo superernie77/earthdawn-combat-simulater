@@ -427,6 +427,75 @@ class SpellServiceExtraThreadTest {
         assertThat(r.getExtraThreadLabels()).isEmpty();
     }
 
+    // --- Phantomkrieger: Übererfolge verlängern Dauer, "+1 Bild"-Fäden verstärken ---
+
+    @Test
+    void phantomkrieger_extraSuccesses_extendDurationByTwoRoundsEach() {
+        SpellDefinition pk = phantomkrieger();
+        CombatantState caster = caster(pk, 4);
+        CombatantState target = target();
+        prepared(caster, pk, 1, 1); // Pflichtfaden gewoben
+        stub(pk, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        // ZV 5, Wurf 10 → 1 Übererfolg → Dauer 3 + 2 = 5
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(5);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.isSuccess()).isTrue();
+        assertThat(r.getExtraSuccesses()).isEqualTo(1);
+        assertThat(r.getEffectDuration()).isEqualTo(5);
+        assertThat(target.getActiveEffects()).hasSize(2); // KV-Buff + Angreifer-Malus
+        assertThat(target.getActiveEffects())
+                .allSatisfy(e -> assertThat(e.getRemainingRounds()).isEqualTo(5));
+    }
+
+    @Test
+    void phantomkrieger_buffValueThreads_raiseKvAndAttackPenalty() {
+        SpellDefinition pk = phantomkrieger();
+        CombatantState caster = caster(pk, 4);
+        CombatantState target = target();
+        prepared(caster, pk, 1, 1);
+        caster.setExtraThreadChoices("1,1"); // 2× "+1 Bild" (Index 1 = BUFF_VALUE)
+        stub(pk, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        // Wurf 10 vs ZV 10 → Erfolg ohne Übererfolg → Dauer bleibt 3
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(10);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        assertThat(r.isSuccess()).isTrue();
+        var kv = target.getActiveEffects().stream()
+                .filter(e -> "Phantomkrieger".equals(e.getName())).findFirst().orElseThrow();
+        assertThat(kv.getModifiers().get(0).getValue()).isEqualTo(5.0); // 3 + 2
+        var malus = target.getActiveEffects().stream()
+                .filter(e -> e.getName().contains("Angreifer")).findFirst().orElseThrow();
+        assertThat(malus.getModifiers().get(0).getValue()).isEqualTo(-5.0); // −3 − 2
+        assertThat(r.getEffectDuration()).isEqualTo(3);
+        assertThat(r.getEffectApplied()).contains("verstärkt");
+        // BUFF_VALUE darf NICHT in die Wirkungsstufe fließen
+        assertThat(r.getExtraThreadEffectStep()).isZero();
+    }
+
+    @Test
+    void phantomkrieger_displayThread_changesNothingMechanically() {
+        SpellDefinition pk = phantomkrieger();
+        CombatantState caster = caster(pk, 4);
+        CombatantState target = target();
+        prepared(caster, pk, 1, 1);
+        caster.setExtraThreadChoices("0"); // Reichweite — nur Anzeige
+        stub(pk, caster);
+        when(combatService.findCombatant(eq(session), eq(20L))).thenReturn(target);
+        lenient().when(modifiers.getEffectiveValue(eq(target), eq(StatType.SPELL_DEFENSE), any())).thenReturn(10);
+
+        SpellCastResult r = spellService.castSpell(castReqOn(20L));
+
+        var kv = target.getActiveEffects().stream()
+                .filter(e -> "Phantomkrieger".equals(e.getName())).findFirst().orElseThrow();
+        assertThat(kv.getModifiers().get(0).getValue()).isEqualTo(3.0);
+        assertThat(r.getExtraThreadLabels()).hasSize(1);
+    }
+
     // --- CSV-Helfer ---
 
     @Test
@@ -466,6 +535,23 @@ class SpellServiceExtraThreadTest {
         r.setSpendKarma(false);
         r.setExtraThreadOptionIndex(optionIndex);
         return r;
+    }
+
+    /** Phantomkrieger: 1 Faden, BUFF +3 KV, Dauer 3, DURATION-Übererfolge, "+1 Bild" = BUFF_VALUE(1). */
+    private SpellDefinition phantomkrieger() {
+        return SpellDefinition.builder()
+                .id(50L).name("Phantomkrieger").discipline("Illusionist").circle(3)
+                .threads(1).weavingDifficulty(7).castingDifficulty(0)
+                .effectType(SpellEffectType.BUFF).effectStep(0)
+                .modifyStat(StatType.PHYSICAL_DEFENSE).modifyOperation(ModifierOperation.ADD)
+                .modifyValue(3.0).modifyTrigger(TriggerContext.ALWAYS).duration(3)
+                .requiresTarget(true).extraSuccessEffect("DURATION")
+                .threadOptions(new ArrayList<>(List.of(
+                        OPT_DISPLAY,
+                        SpellThreadOption.builder()
+                                .label("Wirkung Verstärken (+1 Bild: +1 KV, Angreifer −1)")
+                                .type(SpellThreadOptionType.BUFF_VALUE).value(1).build())))
+                .build();
     }
 
     /** Schadenszauber mit Ziel: ZV 5, Wurf 10 -> (10-5)/5 = 1 Übererfolg -> +2 Schadensstufen. */

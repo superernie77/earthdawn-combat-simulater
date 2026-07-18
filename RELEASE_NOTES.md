@@ -2,6 +2,10 @@
 
 ## v1.2.0 (in Entwicklung)
 
+**Phantomkrieger: Übererfolge und Zusatzfäden wirken jetzt mechanisch**
+- **Übererfolge** beim Zauberwurf verlängern die Wirkungsdauer um **2 Runden je Übererfolg** (statt fix 3 Runden). Das gilt generell für Buff-/Debuff-Zauber mit „Dauer verlängern"-Übererfolg — auch die anderen Zauber aus dieser Liste profitieren.
+- Der Zusatzfaden **„Wirkung Verstärken (+1 Bild)"** wird jetzt verrechnet: jedes zusätzliche Abbild gibt **+1 KV auf das Ziel und −1 auf Angriffe gegen das Ziel** — zusätzlich zu den +3/−3 der Grundwirkung, mehrfach wählbar (bis Fadenweben-Rang).
+
 **Bugfix: Ausrüstungsformulare schnitten Felder ab**
 In den Hinzufügen-Zeilen der Ausrüstung wurden die flexiblen Felder (Name, Beschreibung) von den festen Nachbarfeldern — etwa den neuen Kurz/Mittel/Weit-Reichweiten — auf Splitterbreite gequetscht. Alle flexiblen Felder haben jetzt eine Mindestbreite und brechen stattdessen in eine zweite Zeile um.
 

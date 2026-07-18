@@ -404,6 +404,7 @@ public class DataInitializer {
             "Illusionärer Blitz", "Ersticken", "Suggestive Stimme",
             "Tanzender Drache", "Gedächtnisnotiz", "Band der Verschwiegenheit",
             "Halt, Stehenbleiben", "Gedankennebel", "Rebellische Gliedmaße",
+            "Phantomkrieger",
             // Geisterbeschwörer laut Tabelle (Wirkungsdauer verlängern)
             "Kreis der Kälte", "Astralschlund", "Herzbeklemmung", "Üble Dämpfe"
         );
@@ -509,12 +510,41 @@ public class DataInitializer {
         setThreadOptions("Niemand Da",
                 display("Reichweite Erhöhen (+2 Schritt)"), display(DAUER_2MIN));
         setThreadOptions("Phantomkrieger",
-                display(REICHWEITE_10), display("Wirkung Verstärken (+1 Bild)"), display(ZIEL_RANG));
+                display(REICHWEITE_10),
+                buffValue("Wirkung Verstärken (+1 Bild: +1 KV, Angreifer −1)", 1),
+                display(ZIEL_RANG));
+
+        // Bestehende Datenbanken: die alte Anzeige-Option "+1 Bild" auf verrechnet umstellen
+        migratePhantomkriegerBildOption();
     }
 
     private SpellThreadOption display(String label) {
         return SpellThreadOption.builder()
                 .label(label).type(SpellThreadOptionType.DISPLAY).value(0).build();
+    }
+
+    private SpellThreadOption buffValue(String label, int value) {
+        return SpellThreadOption.builder()
+                .label(label).type(SpellThreadOptionType.BUFF_VALUE).value(value).build();
+    }
+
+    /** Stellt die frühere Anzeige-Option "+1 Bild" des Phantomkriegers auf BUFF_VALUE(1) um. */
+    private void migratePhantomkriegerBildOption() {
+        spellRepo.findAll().stream()
+                .filter(s -> "Phantomkrieger".equals(s.getName()))
+                .forEach(s -> {
+                    boolean changed = false;
+                    for (SpellThreadOption o : s.getThreadOptions()) {
+                        if (o.getLabel() != null && o.getLabel().contains("+1 Bild")
+                                && o.getType() != SpellThreadOptionType.BUFF_VALUE) {
+                            o.setType(SpellThreadOptionType.BUFF_VALUE);
+                            o.setValue(1);
+                            o.setLabel("Wirkung Verstärken (+1 Bild: +1 KV, Angreifer −1)");
+                            changed = true;
+                        }
+                    }
+                    if (changed) spellRepo.save(s);
+                });
     }
 
     private SpellThreadOption effectStep(String label, int value) {
