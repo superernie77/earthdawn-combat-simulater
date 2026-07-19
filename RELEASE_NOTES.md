@@ -2,7 +2,8 @@
 
 ## v1.3.0 (in Entwicklung)
 
-_Noch keine Einträge._
+**Prod-Hotfix: Boot-Schleife nach dem v1.2.0-Deploy**
+Alt-Datenbanken (vor Flyway von Hibernate angelegt) tragen CHECK-Constraints auf Enum-Spalten, die nur die damaligen Werte erlauben. Der neue Wert `DODGE_STEP` (Nebelschild) verletzte `spell_definitions_modify_stat_check` — das Backend starb beim Start, Docker startete es endlos neu (Dauer-CPU). Flyway `V38` entfernt alle diese Alt-Constraints (die Flyway-Baseline definiert selbst keine; die Wertebereichs-Prüfung liegt in der Anwendung). Auf per Baseline erzeugten Datenbanken ist die Migration ein No-op.
 
 ## v1.2.0 (18.07.2026)
 
