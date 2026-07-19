@@ -871,6 +871,7 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 ### Changelog
 
 #### 1.3.0 (in development)
+- **New gear: Kletterausrüstung** — quick-add button on the character sheet's gear section (like Schwimmkristall/Leichte Stiefel): a `GEAR` item granting **+4 on Klettern probes** via the existing `probeBonusTalentName` mechanism. Frontend-only, no backend or migration change.
 - **Prod hotfix — boot loop after the v1.2.0 deploy** — databases created by Hibernate before Flyway carry CHECK constraints on enum columns listing only the values of that era; the new `DODGE_STEP` (Nebelschild) violated `spell_definitions_modify_stat_check`, the startup data migration failed, and `restart: always` turned it into a boot loop pegging the CPU. Flyway `V38` drops all such legacy enum checks on the app tables (the Flyway baseline defines none itself; value safety lives in `@Enumerated(EnumType.STRING)`). No-op on baseline-created databases. This would otherwise also have broken `MAP_MOVE` log entries and Nebelschild/Schmerzen effects at combat time (`combat_logs_action_type_check`, `active_effect_modifiers_target_stat_check`).
 
 #### 1.2.0 (released 2026-07-18)

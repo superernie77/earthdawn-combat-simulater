@@ -730,6 +730,10 @@ import { ProbeResult } from '../../models/dice.model';
                   matTooltip="Schwimmkristall: +3 auf Schwimmen, erlaubt Unterwasseratmung von Rang Minuten">
                   <mat-icon>add</mat-icon> Schwimmkristall
                 </button>
+                <button mat-stroked-button (click)="addKletterausruestung()"
+                  matTooltip="Kletterausrüstung: +4 auf Klettern-Proben">
+                  <mat-icon>add</mat-icon> Kletterausrüstung
+                </button>
               </div>
               <div class="equip-add-form">
                 <mat-form-field appearance="fill" style="flex:2 1 160px;min-width:160px">
@@ -1955,6 +1959,19 @@ export class CharacterSheetComponent implements OnInit {
       physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
       probeBonusTalentName: 'Schwimmen', probeBonusValue: 3,
       description: 'Erlaubt Unterwasseratmung von Rang Minuten.'
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
+  }
+
+  /** Schnellanlage: Kletterausrüstung (+4 auf Klettern-Proben). */
+  addKletterausruestung(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Kletterausrüstung', type: 'GEAR',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      probeBonusTalentName: 'Klettern', probeBonusValue: 4,
+      description: 'Seile, Haken und Steigeisen — +4 auf Klettern-Proben.'
     };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
   }
