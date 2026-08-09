@@ -5,7 +5,7 @@ import {
   CombatSession, DialogState, AttackActionRequest, CombatActionResult,
   CombatLog, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
-  FearRequest, FearResult, FearResistResult,
+  FearRequest, FearResult, HearteningLaughRequest, HearteningLaughResult, FearResistResult,
   NeutralizeMagicRequest, NeutralizeMagicResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
@@ -147,6 +147,10 @@ export class CombatService {
 
   performFear(sessionId: number, req: FearRequest): Observable<FearResult> {
     return this.http.post<FearResult>(`${this.base}/sessions/${sessionId}/fear`, req);
+  }
+
+  hearteningLaugh(sessionId: number, req: HearteningLaughRequest): Observable<HearteningLaughResult> {
+    return this.http.post<HearteningLaughResult>(`${this.base}/sessions/${sessionId}/heartening-laugh`, req);
   }
 
   resistFear(sessionId: number, combatantId: number): Observable<FearResistResult> {

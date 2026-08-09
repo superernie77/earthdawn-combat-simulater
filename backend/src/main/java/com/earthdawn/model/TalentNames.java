@@ -8,6 +8,9 @@ public final class TalentNames {
     public static final String STARRSINN               = "Starrsinn";
     public static final String EISERNER_WILLE          = "Eiserner Wille";
     public static final String VERSPOTTEN              = "Verspotten";
+    public static final String HERZLICHES_LACHEN       = "Herzliches Lachen";
+    /** Buff-Effekt von Herzliches Lachen (Soziale VK + Furcht-Widerstand). */
+    public static final String EFFECT_HERZLICHES_LACHEN = "Herzliches Lachen";
     public static final String ABLENKEN                = "Ablenken";
     public static final String AKROBATISCHE_VERTEIDIGUNG = "Akrobatische Verteidigung";
     public static final String KAMPFSINN               = "Kampfsinn";

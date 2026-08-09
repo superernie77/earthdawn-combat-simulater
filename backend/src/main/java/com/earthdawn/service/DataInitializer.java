@@ -1603,6 +1603,18 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Tierfreundschaft' hinzugefügt.");
         }
+        if (talentRepo.findByName("Herzliches Lachen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Herzliches Lachen")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Stärkt mit befreiendem Lachen die Moral der Verbündeten: Einfache Aktion, "
+                            + "1 Überanstrengung. CHA + Rang vs. höchste Soziale VK der Gegner. Bei Erfolg +2 "
+                            + "pro Erfolg auf Soziale VK und Furcht-Widerstand aller Verbündeten für Rang Runden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Herzliches Lachen' hinzugefügt.");
+        }
         if (talentRepo.findByName("Erster Eindruck").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Erster Eindruck")

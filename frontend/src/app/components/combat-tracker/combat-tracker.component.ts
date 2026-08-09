@@ -22,6 +22,7 @@ import {
   CombatActionResult, ActiveEffect, FreeActionRequest, FreeActionResult,
   TauntRequest, TauntResult,
   FearRequest, FearResult, FearResistResult,
+  HearteningLaughRequest, HearteningLaughResult,
   NeutralizeMagicRequest, NeutralizeMagicResult,
   AcrobaticDefenseResult, CombatSenseRequest, CombatSenseResult,
   DistractRequest, DistractResult, IronWillResult,
@@ -384,6 +385,13 @@ export interface EffectChoice {
                   (click)="openFearDialog(c)"
                   matTooltip="Verängstigen (Standardaktion · WIL + Rang vs. Mystische VK · 0 Überanstrengung · −2/Erfolg auf Aktionsproben für Rang Runden)">
                   <mat-icon>mood_bad</mat-icon><span class="btn-label">Verängstigen</span></button>
+                <!-- Herzliches Lachen: Einfache Aktion, bufft Soziale VK + Furcht-Widerstand der Verbündeten -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasHearteningLaughTalent(c) && !c.defeated"
+                  class="combat-option-btn heartening-laugh-btn"
+                  [disabled]="!isActiveTurn(c)"
+                  (click)="openHearteningLaughDialog(c)"
+                  matTooltip="Herzliches Lachen (Einfache Aktion · CHA + Rang vs. höchste Soziale VK der Gegner · 1 Überanstrengung · +2/Erfolg auf Soziale VK und Furcht-Widerstand aller Verbündeten für Rang Runden). Verbraucht keine Hauptaktion.">
+                  <mat-icon>sentiment_very_satisfied</mat-icon><span class="btn-label">Herzliches Lachen</span></button>
                 <!-- Magie neutralisieren: beendet einen aktiven Effekt (Aktion + 1 Überanstrengung) -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'ACTION' && hasNeutralizeMagicTalent(c) && !c.defeated"
                   class="combat-option-btn neutralize-btn"
@@ -2516,6 +2524,80 @@ export interface EffectChoice {
     </div>
 
     <!-- Verängstigen Result Modal -->
+    <!-- Herzliches-Lachen Dialog -->
+    <div class="attack-dialog" *ngIf="hearteningLaughDialog.open">
+      <div class="dialog-backdrop" (click)="hearteningLaughDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ffca28">sentiment_very_satisfied</mat-icon>Herzliches Lachen: {{ hearteningLaughDialog.actor?.character?.name }}</h3>
+        <p style="color:#999;font-size:0.85rem;margin:4px 0 12px">
+          Einfache Aktion · CHA + Rang vs. höchste Soziale VK der Gegner · 1 Überanstrengung.
+          Alle Verbündeten erhalten +2 je Erfolg auf Soziale VK und Furcht-Widerstand für Rang Runden.
+        </p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="karma-toggle"
+            [class.active]="hearteningLaughDialog.spendKarma"
+            [class.disabled]="(hearteningLaughDialog.actor?.currentKarma ?? 0) <= 0"
+            (click)="(hearteningLaughDialog.actor?.currentKarma ?? 0) > 0 && (hearteningLaughDialog.spendKarma = !hearteningLaughDialog.spendKarma)">
+            <mat-icon>auto_awesome</mat-icon> Karma
+            <span class="karma-count-badge" [class.empty]="(hearteningLaughDialog.actor?.currentKarma ?? 0) <= 0">
+              {{ hearteningLaughDialog.actor?.currentKarma ?? 0 }}
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button mat-stroked-button (click)="hearteningLaughDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" (click)="performHearteningLaugh()">
+            <mat-icon>sentiment_very_satisfied</mat-icon> Lachen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Herzliches-Lachen Result Modal -->
+    <div class="result-modal" *ngIf="hearteningLaughModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="hearteningLaughModal.result as r">
+        <div class="result-outcome" [class.hit]="r.success" [class.miss]="!r.success">
+          <mat-icon>{{ r.success ? 'sentiment_very_satisfied' : 'sentiment_neutral' }}</mat-icon>
+          {{ r.success ? 'MORAL GESTÄRKT!' : 'VERPUFFT' }}
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-block">
+            <div class="roll-block-header">
+              <span class="roll-block-label">Herzliches Lachen · Step {{ r.rollStep }}</span>
+              <div class="roll-block-totals">
+                <span class="roll-big-total">{{ r.roll.total + (r.karmaRoll?.total ?? 0) }}</span>
+                <span class="roll-big-vs">vs</span>
+                <span class="roll-big-target">SV {{ r.targetNumber }}</span>
+              </div>
+            </div>
+            <div class="dice-breakdown-mini">
+              <div class="die-mini" *ngFor="let d of r.roll.dice" [class.exploded]="d.exploded">
+                <span class="die-mini-sides">W{{ d.sides }}</span>
+                <span class="die-mini-rolls">{{ d.rolls.join(' + ') }}<span *ngIf="d.rolls.length > 1" class="die-mini-sum"> = {{ d.total }}</span></span>
+                <span *ngIf="d.exploded" class="explode-mini">💥</span>
+              </div>
+              <div class="die-mini karma-die" *ngIf="r.karmaRoll">
+                <span class="die-mini-sides" style="color:#c9a84c">★ W6</span>
+                <span class="die-mini-rolls">{{ r.karmaRoll.dice[0].rolls.join(' + ') }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="r.success" class="spell-effect-banner buff" style="margin-top:12px">
+          <mat-icon>groups</mat-icon>
+          {{ r.successes }} Erfolg(e) → +{{ r.bonus }} auf Soziale VK &amp; Furcht-Widerstand · {{ r.duration }} Runden
+        </div>
+        <div *ngIf="r.success && r.affectedAllies.length" style="margin-top:8px;color:#bdb2a0;font-size:0.85rem">
+          Begünstigt: {{ r.affectedAllies.join(', ') }}
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
+      </div>
+    </div>
+
     <div class="result-modal" *ngIf="fearModal.open">
       <div class="dialog-backdrop" (click)="dismissModal()"></div>
       <div class="dialog-box result-box" *ngIf="fearModal.result as r">
@@ -3266,6 +3348,8 @@ export interface EffectChoice {
     .combat-option-btn.karma-init-btn { color: #d4b85a; border-color: #6b5a1e; }
     .combat-option-btn.karma-init-btn:not([disabled]):hover { border-color: #d4b85a; background: rgba(212,184,90,0.1); }
     .combat-option-btn.karma-init-btn.active { border-color: #d4b85a; color: #d4b85a; background: rgba(212,184,90,0.15); }
+    .combat-option-btn.heartening-laugh-btn { color: #ffca28; border-color: #5a4a1a; }
+    .combat-option-btn.heartening-laugh-btn:not([disabled]):hover { border-color: #ffca28; background: rgba(255,202,40,0.1); }
     .combat-option-btn.fear-btn { color: #b39ddb; border-color: #3a2c55; }
     .combat-option-btn.fear-btn:not([disabled]):hover { border-color: #b39ddb; background: rgba(179,157,219,0.1); }
     .combat-option-btn.fear-resist-btn { color: #80cbc4; border-color: #2e6e66; }
@@ -3572,6 +3656,14 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   fearModal: { open: boolean; result?: FearResult } = { open: false };
 
+  hearteningLaughDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    spendKarma: boolean;
+  } = { open: false, spendKarma: false };
+
+  hearteningLaughModal: { open: boolean; result?: HearteningLaughResult } = { open: false };
+
   fearResistModal: { open: boolean; result?: FearResistResult } = { open: false };
 
   /** Auswahldialog für Magie neutralisieren — via WebSocket bei allen Clients geöffnet. */
@@ -3748,6 +3840,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'FEAR':
         this.fearModal = { open: true, result: payload };
         break;
+      case 'HEARTENING_LAUGH':
+        this.hearteningLaughModal = { open: true, result: payload };
+        break;
       case 'FEAR_RESIST':
         this.fearResistModal = { open: true, result: payload };
         break;
@@ -3785,6 +3880,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     if (this.riposteModal) this.riposteModal.open = false;
     if (this.combatEndedModal) this.combatEndedModal.open = false;
     if (this.fearModal) this.fearModal.open = false;
+    if (this.hearteningLaughModal) this.hearteningLaughModal.open = false;
     if (this.fearResistModal) this.fearResistModal.open = false;
     if (this.neutralizeSelectModal) this.neutralizeSelectModal.open = false;
     if (this.neutralizeModal) this.neutralizeModal.open = false;
@@ -5059,6 +5155,32 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   hasFearTalent(c: CombatantState): boolean {
     return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Verängstigen');
+  }
+
+  hasHearteningLaughTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Herzliches Lachen');
+  }
+
+  openHearteningLaughDialog(actor: CombatantState): void {
+    this.hearteningLaughDialog = { open: true, actor, spendKarma: false };
+  }
+
+  performHearteningLaugh(): void {
+    if (!this.session || !this.hearteningLaughDialog.actor) return;
+    const req: HearteningLaughRequest = {
+      sessionId: this.session.id,
+      actorCombatantId: this.hearteningLaughDialog.actor.id,
+      bonusSteps: 0,
+      spendKarma: this.hearteningLaughDialog.spendKarma
+    };
+    this.combatService.hearteningLaugh(this.session.id, req).subscribe({
+      next: result => {
+        this.hearteningLaughDialog.open = false;
+        this.hearteningLaughModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
   }
 
   /** True, wenn der Kombattant den Verängstigt-Effekt trägt. */

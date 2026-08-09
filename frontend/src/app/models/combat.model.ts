@@ -616,6 +616,30 @@ export interface SchwanzangriffRequest {
   spendKarma: boolean;
 }
 
+export interface HearteningLaughRequest {
+  sessionId: number;
+  actorCombatantId: number;
+  bonusSteps: number;
+  spendKarma: boolean;
+}
+
+export interface HearteningLaughResult {
+  actorName: string;
+  rollStep: number;
+  roll: RollResult;
+  karmaRoll?: RollResult | null;
+  /** Höchste Soziale VK der Gegner (Mindestwurf). */
+  targetNumber: number;
+  success: boolean;
+  successes: number;
+  /** +Bonus auf Soziale VK und Furcht-Widerstand (= Erfolge × 2). */
+  bonus: number;
+  duration: number;
+  /** Namen der begünstigten Verbündeten. */
+  affectedAllies: string[];
+  description: string;
+}
+
 export interface FearRequest {
   sessionId: number;
   actorCombatantId: number;

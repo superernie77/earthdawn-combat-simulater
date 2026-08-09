@@ -362,6 +362,7 @@ POST   /api/combat/sessions/{id}/attack              AttackActionRequest
 POST   /api/combat/sessions/{id}/dodge               DodgeRequest
 POST   /api/combat/sessions/{id}/free-action         FreeActionRequest
 POST   /api/combat/sessions/{id}/taunt               TauntRequest
+POST   /api/combat/sessions/{id}/heartening-laugh   HearteningLaughRequest (Herzliches Lachen)
 POST   /api/combat/sessions/{id}/fear                FearRequest { actorCombatantId, targetCombatantId, bonusSteps, spendKarma } — Verängstigen (WIL vs. MV)
 POST   /api/combat/sessions/{id}/combatants/{cId}/resist-fear   → WIL-Widerstandsprobe gegen Verängstigt (1×/Runde)
 POST   /api/combat/sessions/{id}/combatants/{cId}/neutralize-magic/open → broadcastet den Auswahldialog (NEUTRALIZE_MAGIC_SELECT) an alle Clients

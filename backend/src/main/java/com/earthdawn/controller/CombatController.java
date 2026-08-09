@@ -123,6 +123,12 @@ public class CombatController {
         return combatService.performFreeAction(id, req);
     }
 
+    @PostMapping("/sessions/{id}/heartening-laugh")
+    public com.earthdawn.dto.HearteningLaughResult hearteningLaugh(@PathVariable Long id,
+            @RequestBody com.earthdawn.dto.HearteningLaughRequest req) {
+        return combatService.performHearteningLaugh(id, req);
+    }
+
     @PostMapping("/sessions/{id}/taunt")
     public TauntResult performTaunt(@PathVariable Long id, @RequestBody TauntRequest req) {
         return combatService.performTaunt(id, req);

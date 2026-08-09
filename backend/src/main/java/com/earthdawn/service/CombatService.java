@@ -1730,7 +1730,10 @@ public class CombatService {
                 .orElseThrow(() -> new IllegalStateException(targetName + " ist nicht verängstigt."));
 
         int tn = fear.getResistTargetNumber() != null ? fear.getResistTargetNumber() : 0;
-        int resistStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower()) - target.getWounds());
+        // Herzliches Lachen: +Bonus auf Willenskraftproben zum Abschütteln von Furcht-/Einschüchterungseffekten
+        int laughBonus = hearteningLaughBonus(target);
+        int resistStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower())
+                - target.getWounds() + laughBonus);
         RollResult roll = diceService.roll(resistStep);
         boolean success = roll.getTotal() >= tn;
         target.setFearResistUsedThisRound(true);
@@ -1738,7 +1741,8 @@ public class CombatService {
         String desc;
         if (success) {
             target.getActiveEffects().remove(fear);
-            desc = targetName + " schüttelt die Furcht ab! (WIL " + roll.getTotal() + " vs. " + tn + ")";
+            desc = targetName + " schüttelt die Furcht ab! (WIL " + roll.getTotal() + " vs. " + tn + ")"
+                    + (laughBonus > 0 ? " [+" + laughBonus + " Herzliches Lachen]" : "");
         } else {
             desc = targetName + " bleibt verängstigt. (WIL " + roll.getTotal() + " vs. " + tn + ")";
         }
@@ -3417,6 +3421,104 @@ public class CombatService {
                     name + " durchschaut die Blindheit (Wurf " + rollTotal + " > 17) — der Zauber endet.",
                     true);
         }
+    }
+
+    /**
+     * Herzliches Lachen (Heartening Laugh): Einfache Aktion, 1 Überanstrengung. Der Adept würfelt
+     * CHA-Stufe + Rang gegen die höchste Soziale VK aller nicht besiegten Gegner. Bei Erfolg
+     * erhalten alle Verbündeten (gleiche Seite, inkl. Anwender) +2 pro Erfolg auf ihre Soziale VK
+     * (gegen Furcht-/Einschüchterungseffekte) und auf Willenskraftproben zum Abschütteln solcher
+     * Effekte, für Rang Runden. Verbraucht KEINE Hauptaktion (hasActedThisRound unverändert).
+     */
+    public HearteningLaughResult performHearteningLaugh(Long sessionId, HearteningLaughRequest req) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor = findCombatant(session, req.getActorCombatantId());
+        String actorName = actor.getDisplayName() != null ? actor.getDisplayName() : actor.getCharacter().getName();
+
+        if (actor.isDefeated()) throw new IllegalStateException(actorName + " ist besiegt und kann nicht handeln.");
+        if (session.getPhase() != CombatPhase.ACTION)
+            throw new IllegalStateException("Aktionen sind nur in der Aktionsphase möglich.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.HERZLICHES_LACHEN.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Herzliches Lachen' nicht gefunden."));
+
+        // 1 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        // Würfelstufe: CHA-Stufe + Rang + Bonus − Wunden
+        int chaStep = Math.max(1, diceService.attributeToStep(actor.getCharacter().getCharisma()) - actor.getWounds());
+        int rollStep = Math.max(1, chaStep + ct.getRank() + req.getBonusSteps());
+
+        RollResult karmaRoll = null;
+        if (req.isSpendKarma() && actor.getCurrentKarma() > 0) {
+            karmaRoll = diceService.roll(4); // W6
+            actor.setCurrentKarma(Math.max(0, actor.getCurrentKarma() - 1));
+        }
+        RollResult roll = diceService.roll(rollStep);
+        int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
+
+        // Höchste Soziale VK aller nicht besiegten Gegner (0 = keine Gegner → automatischer Erfolg)
+        int tn = session.getCombatants().stream()
+                .filter(c -> c.isNpc() != actor.isNpc() && !c.isDefeated())
+                .mapToInt(c -> modifiers.getEffectiveValue(c, StatType.SOCIAL_DEFENSE, TriggerContext.ON_SOCIAL_ACTION))
+                .max().orElse(0);
+
+        boolean success = total >= tn;
+        int successes = success ? 1 + (total - tn) / 5 : 0;
+        int bonus = 2 * successes;
+        int duration = ct.getRank();
+
+        java.util.List<String> allies = new java.util.ArrayList<>();
+        if (success) {
+            for (CombatantState ally : session.getCombatants()) {
+                if (ally.isNpc() != actor.isNpc() || ally.isDefeated()) continue;
+                ally.getActiveEffects().removeIf(e -> TalentNames.EFFECT_HERZLICHES_LACHEN.equals(e.getName()));
+                ally.getActiveEffects().add(ActiveEffect.builder()
+                        .combatantState(ally)
+                        .name(TalentNames.EFFECT_HERZLICHES_LACHEN)
+                        .description("+" + bonus + " auf Soziale VK und Furcht-Widerstand (durch " + actorName + ")")
+                        .sourceType(SourceType.TALENT)
+                        .remainingRounds(duration)
+                        .negative(false)
+                        .modifiers(List.of(ModifierEntry.builder()
+                                .targetStat(StatType.SOCIAL_DEFENSE)
+                                .operation(ModifierOperation.ADD)
+                                .value(bonus)
+                                .triggerContext(TriggerContext.ON_SOCIAL_ACTION)
+                                .build()))
+                        .build());
+                allies.add(ally.getDisplayName() != null ? ally.getDisplayName() : ally.getCharacter().getName());
+            }
+        }
+
+        String desc = success
+                ? actorName + " lacht herzlich (" + total + " vs SV " + tn + "): " + successes + " Erfolg(e) → +"
+                        + bonus + " auf Soziale VK und Furcht-Widerstand für " + duration + " Runden ("
+                        + allies.size() + " Verbündete)."
+                : actorName + " lacht herzlich, doch es verpufft (" + total + " vs SV " + tn + ").";
+
+        addLog(session, actorName, null, ActionType.HERZLICHES_LACHEN, desc, success);
+        sessionRepo.save(session);
+
+        HearteningLaughResult result = HearteningLaughResult.builder()
+                .actorName(actorName).rollStep(rollStep).roll(roll).karmaRoll(karmaRoll)
+                .targetNumber(tn).success(success).successes(successes).bonus(bonus)
+                .duration(duration).affectedAllies(allies).description(desc)
+                .build();
+        broadcastWithModal(session, "HEARTENING_LAUGH", result);
+        return result;
+    }
+
+    /** Aktueller Herzliches-Lachen-Bonus eines Kombattanten (0 = kein Effekt aktiv). */
+    private int hearteningLaughBonus(CombatantState c) {
+        return c.getActiveEffects().stream()
+                .filter(e -> TalentNames.EFFECT_HERZLICHES_LACHEN.equals(e.getName()))
+                .flatMap(e -> e.getModifiers().stream())
+                .filter(m -> m.getTargetStat() == StatType.SOCIAL_DEFENSE)
+                .mapToInt(m -> (int) m.getValue())
+                .max().orElse(0);
     }
 
     void addLog(CombatSession session, String actorName, String targetName,

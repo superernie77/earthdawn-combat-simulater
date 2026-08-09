@@ -36,5 +36,6 @@ public enum ActionType {
     SCHWANZANGRIFF,
     FEAR,
     NEUTRALIZE_MAGIC,
-    MAP_MOVE
+    MAP_MOVE,
+    HERZLICHES_LACHEN
 }

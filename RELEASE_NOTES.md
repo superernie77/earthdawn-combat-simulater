@@ -2,6 +2,9 @@
 
 ## v1.3.0 (in Entwicklung)
 
+**Neues Talent: Herzliches Lachen**
+Staerkt mit befreiendem Lachen die Moral der Gefaehrten. Einfache Aktion (verbraucht KEINE Hauptaktion — der Adept kann in derselben Runde noch angreifen), 1 Ueberanstrengung. Probe: CHA + Rang gegen die hoechste Soziale VK der Gegner. Bei Erfolg erhalten alle Verbuendeten (inkl. Anwender) **+2 pro Erfolg auf ihre Soziale VK und auf Willenskraftproben zum Abschuetteln von Furcht-/Einschuechterungseffekten**, fuer Rang Runden. Eigener Button und Ergebnisfenster im Kampf, fuer alle Zuschauer synchronisiert.
+
 **Sechs weitere Talente ohne Kampfrelevanz**
 Erster Eindruck, Gefuehlsmelodie, Etikette (Charisma), Empathische Wahrnehmung, Forschen, Fremdsprachen (Wahrnehmung). Als Probe testbar, auf dem Charakterbogen und im Wuerfelwurf.
 
