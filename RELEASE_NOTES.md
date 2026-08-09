@@ -2,6 +2,9 @@
 
 ## v1.3.0 (in Entwicklung)
 
+**Neuer Gegenstand: Espagrastiefel**
+Schnellanlage-Knopf im Ausruestungs-Tab: **+1 auf Heimlicher Schritt und +2 auf Ausweichen** (Hieb ausweichen). Dafuer koennen Gegenstaende jetzt **zwei verschiedene Probenboni** tragen — beide erscheinen als Badge am Gegenstand und im Wuerfelwurf. Der Ausweichen-Bonus wirkt auch **im Kampf beim Ausweichen**.
+
 **Karma auf Schadensproben je Disziplin**
 Bisher konnte nur mit Krallenhand-Waffen 1 Karma auf den Schadenswurf gesetzt werden. Jetzt zusätzlich disziplinabhaengig: **Krieger** (Nahkampf, ab 5. Kreis), **Schuetze** (Fernkampf), **Schwertmeister** (Nahkampfwaffe), **Luftpirat** (Nahkampf-/Wurfwaffen), **Tiermeister** (waffenlos). Der Karma-auf-Schaden-Schalter im Angriffsdialog erscheint automatisch, wenn Disziplin und Waffe es erlauben. (Die Groessenbedingung des Luftpiraten wird mangels Waffengroessen-Daten nicht geprueft.)
 

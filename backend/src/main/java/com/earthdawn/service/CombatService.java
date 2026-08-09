@@ -1281,7 +1281,10 @@ public class CombatService {
         // Probe: DEX-Stufe + Rang + Bonus - Wunden + Ausweichen-Boni (z.B. Nebelschild)
         int dexStep = Math.max(1, diceService.attributeToStep(defender.getCharacter().getDexterity()) - defender.getWounds());
         int dodgeBonus = modifiers.getEffectiveValue(defender, StatType.DODGE_STEP, TriggerContext.ALWAYS);
-        int rollStep = Math.max(1, dexStep + dodgeTalent.getRank() + req.getBonusSteps() + dodgeBonus);
+        // Ausrüstung mit Probenbonus auf Ausweichen (z.B. Espagrastiefel +2)
+        int dodgeGearBonus = ProbeService.equipmentProbeBonus(defender.getCharacter(), TalentNames.AUSWEICHEN);
+        int rollStep = Math.max(1, dexStep + dodgeTalent.getRank() + req.getBonusSteps()
+                + dodgeBonus + dodgeGearBonus);
         RollResult roll = diceService.roll(rollStep);
         int total = roll.getTotal() + (karmaRoll != null ? karmaRoll.getTotal() : 0);
         durchschauenCheck(session, defender, total);

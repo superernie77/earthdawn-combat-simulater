@@ -713,6 +713,9 @@ import { ProbeResult } from '../../models/dice.model';
                     <span class="equip-badge shield-phys" *ngIf="g.probeBonusTalentName">
                       +{{ g.probeBonusValue }} auf {{ g.probeBonusTalentName }}
                     </span>
+                    <span class="equip-badge shield-phys" *ngIf="g.probeBonusTalentName2">
+                      +{{ g.probeBonusValue2 }} auf {{ g.probeBonusTalentName2 }}
+                    </span>
                     <span class="equip-desc" *ngIf="g.description">{{ g.description }}</span>
                   </div>
                   <button mat-icon-button color="warn" (click)="removeEquipment(g)" matTooltip="Entfernen">
@@ -733,6 +736,10 @@ import { ProbeResult } from '../../models/dice.model';
                 <button mat-stroked-button (click)="addKletterausruestung()"
                   matTooltip="Kletterausrüstung: +4 auf Klettern-Proben">
                   <mat-icon>add</mat-icon> Kletterausrüstung
+                </button>
+                <button mat-stroked-button (click)="addEspagrastiefel()"
+                  matTooltip="Espagrastiefel: +1 auf Heimlicher Schritt, +2 auf Ausweichen (Hieb ausweichen)">
+                  <mat-icon>add</mat-icon> Espagrastiefel
                 </button>
               </div>
               <div class="equip-add-form">
@@ -1959,6 +1966,20 @@ export class CharacterSheetComponent implements OnInit {
       physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
       probeBonusTalentName: 'Schwimmen', probeBonusValue: 3,
       description: 'Erlaubt Unterwasseratmung von Rang Minuten.'
+    };
+    this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
+  }
+
+  /** Schnellanlage: Espagrastiefel (+1 Heimlicher Schritt, +2 Ausweichen). */
+  addEspagrastiefel(): void {
+    if (!this.character?.id) return;
+    const eq: Equipment = {
+      name: 'Espagrastiefel', type: 'GEAR',
+      damageBonus: 0, physicalArmor: 0, mysticalArmor: 0, initiativePenalty: 0,
+      physicalDefenseBonus: 0, mysticDefenseBonus: 0, quantity: 1, healStep: 0,
+      probeBonusTalentName: 'Heimlicher Schritt', probeBonusValue: 1,
+      probeBonusTalentName2: 'Ausweichen', probeBonusValue2: 2,
+      description: 'Leichte Stiefel aus Espagras-Leder: +1 Heimlicher Schritt, +2 Hieb ausweichen.'
     };
     this.characterService.addEquipment(this.character.id, eq).subscribe(c => { this.character = c; });
   }

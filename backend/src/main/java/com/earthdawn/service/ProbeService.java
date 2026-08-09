@@ -86,14 +86,23 @@ public class ProbeService {
                 .build();
     }
 
-    /** Summe der Ausrüstungs-Probenboni (GEAR) für ein Talent/eine Fertigkeit anhand des Namens. */
+    /**
+     * Summe der Ausrüstungs-Probenboni (GEAR) für ein Talent/eine Fertigkeit anhand des Namens.
+     * Ein Gegenstand kann auf zwei verschiedene Proben wirken (z.B. Espagrastiefel).
+     */
     private int probeEquipmentBonus(GameCharacter c, String probeName) {
-        if (c.getEquipment() == null || probeName == null) return 0;
-        return c.getEquipment().stream()
-                .filter(e -> e.getProbeBonusTalentName() != null
-                          && e.getProbeBonusTalentName().equalsIgnoreCase(probeName))
-                .mapToInt(Equipment::getProbeBonusValue)
-                .sum();
+        return equipmentProbeBonus(c, probeName);
+    }
+
+    /** Statisch nutzbar (auch aus CombatService): Probenbonus aller GEAR-Gegenstände für einen Probennamen. */
+    static int equipmentProbeBonus(GameCharacter c, String probeName) {
+        if (c == null || c.getEquipment() == null || probeName == null) return 0;
+        int sum = 0;
+        for (Equipment e : c.getEquipment()) {
+            if (probeName.equalsIgnoreCase(e.getProbeBonusTalentName()))  sum += e.getProbeBonusValue();
+            if (probeName.equalsIgnoreCase(e.getProbeBonusTalentName2())) sum += e.getProbeBonusValue2();
+        }
+        return sum;
     }
 
     private int getAttributeValue(GameCharacter c, AttributeType attr) {

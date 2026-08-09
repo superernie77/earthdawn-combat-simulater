@@ -153,6 +153,14 @@ public class Equipment {
     @Builder.Default
     private int probeBonusValue = 0;
 
+    /** Zweite Probe, auf die derselbe Gegenstand einen Bonus gibt (z.B. Espagrastiefel: Ausweichen). */
+    @Column(name = "probe_bonus_talent_name2")
+    private String probeBonusTalentName2;
+
+    @Column(name = "probe_bonus_value2")
+    @Builder.Default
+    private int probeBonusValue2 = 0;
+
     // --- Waffen: Zuordnung zu einem Angriffstalent/-fertigkeit ---
 
     /**

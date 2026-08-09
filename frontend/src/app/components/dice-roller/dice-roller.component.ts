@@ -698,10 +698,17 @@ export class DiceRollerComponent implements OnInit {
   }
 
   /** Ausrüstungs-Probenbonus (GEAR, z.B. Leichte Stiefel) für ein Talent/eine Fertigkeit anhand des Namens. */
+  /** Ausrüstungs-Probenbonus für eine Probe. Ein Gegenstand kann auf zwei Proben wirken. */
   equipmentProbeBonus(name: string): number {
+    const wanted = name.toLowerCase();
     return (this.activeChar?.equipment ?? [])
-      .filter(e => e.type === 'GEAR' && (e.probeBonusTalentName ?? '').toLowerCase() === name.toLowerCase())
-      .reduce((sum, e) => sum + (e.probeBonusValue ?? 0), 0);
+      .filter(e => e.type === 'GEAR')
+      .reduce((sum, e) => {
+        let v = 0;
+        if ((e.probeBonusTalentName ?? '').toLowerCase() === wanted)  v += e.probeBonusValue ?? 0;
+        if ((e.probeBonusTalentName2 ?? '').toLowerCase() === wanted) v += e.probeBonusValue2 ?? 0;
+        return sum + v;
+      }, 0);
   }
 
   /** Wunden des aktiven Charakters zur Anzeige (Wundenmalus auf Würfe). */

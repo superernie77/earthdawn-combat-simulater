@@ -158,4 +158,38 @@ class ProbeServiceTest {
         req.setSpendKarma(false);
         return req;
     }
+    // --- Ausrüstungs-Probenboni: ein Gegenstand kann auf zwei Proben wirken ---
+
+    @Test
+    void equipmentProbeBonus_sumsBothBonusPairsAcrossItems() {
+        com.earthdawn.model.GameCharacter c = com.earthdawn.model.GameCharacter.builder()
+                .id(1L).name("Held")
+                .equipment(new java.util.ArrayList<>(java.util.List.of(
+                        // Espagrastiefel: +1 Heimlicher Schritt UND +2 Ausweichen
+                        com.earthdawn.model.Equipment.builder()
+                                .name("Espagrastiefel")
+                                .type(com.earthdawn.model.enums.EquipmentType.GEAR)
+                                .probeBonusTalentName("Heimlicher Schritt").probeBonusValue(1)
+                                .probeBonusTalentName2("Ausweichen").probeBonusValue2(2)
+                                .build(),
+                        // Leichte Stiefel: nur erstes Paar
+                        com.earthdawn.model.Equipment.builder()
+                                .name("Leichte Stiefel")
+                                .type(com.earthdawn.model.enums.EquipmentType.GEAR)
+                                .probeBonusTalentName("Heimlicher Schritt").probeBonusValue(2)
+                                .build())))
+                .talents(new java.util.ArrayList<>()).skills(new java.util.ArrayList<>())
+                .spells(new java.util.ArrayList<>())
+                .build();
+
+        // Beide Gegenstände zahlen auf Heimlicher Schritt ein (1 + 2)
+        assertThat(ProbeService.equipmentProbeBonus(c, "Heimlicher Schritt")).isEqualTo(3);
+        // Nur das zweite Paar der Stiefel
+        assertThat(ProbeService.equipmentProbeBonus(c, "Ausweichen")).isEqualTo(2);
+        // Groß-/Kleinschreibung egal, unbekannte Probe = 0
+        assertThat(ProbeService.equipmentProbeBonus(c, "ausweichen")).isEqualTo(2);
+        assertThat(ProbeService.equipmentProbeBonus(c, "Klettern")).isZero();
+        assertThat(ProbeService.equipmentProbeBonus(c, null)).isZero();
+    }
+
 }

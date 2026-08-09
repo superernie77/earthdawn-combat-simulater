@@ -114,6 +114,9 @@ export interface Equipment {
   autoStowed?: boolean;
   /** GEAR: Name des Talents/der Fertigkeit, auf die der Gegenstand einen Probenbonus gibt. */
   probeBonusTalentName?: string;
+  /** GEAR: zweite Probe mit Bonus (z.B. Espagrastiefel: Heimlicher Schritt + Ausweichen). */
+  probeBonusTalentName2?: string;
+  probeBonusValue2?: number;
   /** GEAR: Höhe des Probenbonus (z.B. +2 Leichte Stiefel). */
   probeBonusValue?: number;
 }
