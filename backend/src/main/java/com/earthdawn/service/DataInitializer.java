@@ -1603,6 +1603,66 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Tierfreundschaft' hinzugefügt.");
         }
+        if (talentRepo.findByName("Erster Eindruck").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Erster Eindruck")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Hinterlässt bei einer ersten Begegnung einen gezielten Eindruck. CHA + Rang vs. Soziale Verteidigung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Erster Eindruck' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Gefühlsmelodie").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Gefühlsmelodie")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Weckt mit Musik oder Gesang bestimmte Gefühle im Publikum. CHA + Rang vs. Soziale Verteidigung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Gefühlsmelodie' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Etikette").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Etikette")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Kennt Sitten, Gebräuche und angemessenes Verhalten verschiedener Gesellschaften. CHA + Rang vs. Schwierigkeitswert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Etikette' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Empathische Wahrnehmung").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Empathische Wahrnehmung")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Erfasst die Gefühle und Stimmungen anderer. WAH + Rang vs. Soziale Verteidigung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Empathische Wahrnehmung' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Forschen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Forschen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Findet Informationen in Bibliotheken, Archiven und durch Nachforschungen. WAH + Rang vs. Schwierigkeitswert.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Forschen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Fremdsprachen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Fremdsprachen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Versteht und spricht fremde Sprachen. WAH + Rang vs. Schwierigkeitswert der Sprache.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Fremdsprachen' hinzugefügt.");
+        }
         log.info("Utility-Talente migriert.");
     }
 

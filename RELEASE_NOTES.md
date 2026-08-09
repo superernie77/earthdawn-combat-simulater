@@ -2,6 +2,9 @@
 
 ## v1.3.0 (in Entwicklung)
 
+**Sechs weitere Talente ohne Kampfrelevanz**
+Erster Eindruck, Gefuehlsmelodie, Etikette (Charisma), Empathische Wahrnehmung, Forschen, Fremdsprachen (Wahrnehmung). Als Probe testbar, auf dem Charakterbogen und im Wuerfelwurf.
+
 **Fadenweben fuer jede Disziplin**
 Bisher hatten nur die magischen Disziplinen ein Fadenweben-Talent (ueber ihr Zauber-Webtalent). Jetzt bekommt jede nicht-magische Disziplin ein eigenes **Fadenweben (Disziplin)** — z.B. Fadenweben (Krieger), Fadenweben (Dieb). Wahrnehmungsbasiert, als Probe testbar, ohne Kampfrelevanz (Faeden zu Gegenstaenden und Mustern weben). Es steht automatisch in der Talentliste der jeweiligen Disziplin.
 
