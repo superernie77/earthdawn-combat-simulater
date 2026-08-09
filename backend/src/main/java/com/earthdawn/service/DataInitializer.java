@@ -697,6 +697,17 @@ public class DataInitializer {
                 log.info("Disziplin '{}' Zugriffsliste aktualisiert.", d.getName());
             }
         });
+
+        // Generisches Fadenweben (<Disziplin>) in die Zugriffsliste einhängen (idempotent).
+        for (String disc : disziplinenOhneWebtalent()) {
+            disciplineRepo.findByName(disc).ifPresent(d -> {
+                String tname = fadenwebenTalentName(disc);
+                if (!d.getAccessTalentNames().contains(tname)) {
+                    d.getAccessTalentNames().add(tname);
+                    disciplineRepo.save(d);
+                }
+            });
+        }
     }
 
     private void migrateKarmaModifier() {
@@ -937,6 +948,44 @@ public class DataInitializer {
                 log.info("Fadenweben-Talent '{}' hinzugefügt.", fw.name());
             }
         }
+
+        // Generisches "Fadenweben (<Disziplin>)" für alle übrigen Disziplinen. Reines
+        // Fertigkeits-/Talent-Weben (Fäden zu magischen Gegenständen/Mustern) — KEINE
+        // Kampfrelevanz, spielt nicht ins Spruch-Fadenweben hinein. Die vier magischen
+        // Disziplinen haben ihr Webtalent bereits (Elementarismus etc.).
+        for (String disc : disziplinenOhneWebtalent()) {
+            String tname = fadenwebenTalentName(disc);
+            if (talentRepo.findByName(tname).isEmpty()) {
+                talentRepo.save(TalentDefinition.builder()
+                        .name(tname)
+                        .attribute(AttributeType.PERCEPTION)
+                        .description("Webt Fäden zu Mustern und magischen Gegenständen (WAH + Rang). "
+                                + "Disziplintalent des " + disc + ".")
+                        .testable(true)
+                        .attackTalent(false)
+                        .build());
+                log.info("Fadenweben-Talent '{}' hinzugefügt.", tname);
+            }
+        }
+    }
+
+    /** Name des generischen Fadenweben-Talents einer Disziplin. */
+    private String fadenwebenTalentName(String discipline) {
+        return "Fadenweben (" + discipline + ")";
+    }
+
+    /**
+     * Alle Disziplinen (außer "Keine Disziplin"), die noch KEIN eigenes Web-Talent haben —
+     * die vier magischen Disziplinen weben über Elementarismus/Illusionismus/Magie/
+     * Geisterbeschwörung und bekommen daher kein generisches Fadenweben.
+     */
+    private java.util.List<String> disziplinenOhneWebtalent() {
+        java.util.Set<String> mitEigenemWebtalent = java.util.Set.of(
+                "Keine Disziplin", "Elementarist", "Illusionist", "Magier", "Geisterbeschwörer");
+        return disciplineRepo.findAll().stream()
+                .map(DisciplineDefinition::getName)
+                .filter(n -> !mitEigenemWebtalent.contains(n))
+                .toList();
     }
 
     // --- Geisterbeschwörer-Disziplin ---

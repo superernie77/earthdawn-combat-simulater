@@ -1,8 +1,15 @@
 # Release Notes
 
-**Prod-Hotfix
+## v1.3.0 (in Entwicklung)
+
+**Fadenweben fuer jede Disziplin**
+Bisher hatten nur die magischen Disziplinen ein Fadenweben-Talent (ueber ihr Zauber-Webtalent). Jetzt bekommt jede nicht-magische Disziplin ein eigenes **Fadenweben (Disziplin)** — z.B. Fadenweben (Krieger), Fadenweben (Dieb). Wahrnehmungsbasiert, als Probe testbar, ohne Kampfrelevanz (Faeden zu Gegenstaenden und Mustern weben). Es steht automatisch in der Talentliste der jeweiligen Disziplin.
+
+**Neuer Gegenstand: Kletterausruestung**
+Schnellanlage-Knopf im Ausruestungs-Tab (Rubrik Gegenstaende) analog zu Schwimmkristall: **+4 auf Klettern-Proben**.
+
 **Prod-Hotfix: Boot-Schleife nach dem v1.2.0-Deploy**
-Alt-Datenbanken (vor Flyway von Hibernate angelegt) tragen CHECK-Constraints auf Enum-Spalten, die nur die damaligen Werte erlauben. Der neue Wert `DODGE_STEP` (Nebelschild) verletzte `spell_definitions_modify_stat_check` — das Backend starb beim Start, Docker startete es endlos neu (Dauer-CPU). Flyway `V38` entfernt alle diese Alt-Constraints (die Flyway-Baseline definiert selbst keine; die Wertebereichs-Prüfung liegt in der Anwendung). Auf per Baseline erzeugten Datenbanken ist die Migration ein No-op.
+Alt-Datenbanken (vor Flyway von Hibernate angelegt) tragen CHECK-Constraints auf Enum-Spalten, die nur die damaligen Werte erlauben. Der neue Wert `DODGE_STEP` (Nebelschild) verletzte `spell_definitions_modify_stat_check` — das Backend starb beim Start, Docker startete es endlos neu (Dauer-CPU). Flyway `V38` entfernt alle diese Alt-Constraints (die Flyway-Baseline definiert selbst keine; die Wertebereichs-Pruefung liegt in der Anwendung). Auf per Baseline erzeugten Datenbanken ist die Migration ein No-op.
 
 ## v1.2.0 (18.07.2026)
 
