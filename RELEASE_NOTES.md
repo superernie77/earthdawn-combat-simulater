@@ -2,6 +2,9 @@
 
 ## v1.3.0 (in Entwicklung)
 
+**Karma auf Schadensproben je Disziplin**
+Bisher konnte nur mit Krallenhand-Waffen 1 Karma auf den Schadenswurf gesetzt werden. Jetzt zusätzlich disziplinabhaengig: **Krieger** (Nahkampf, ab 5. Kreis), **Schuetze** (Fernkampf), **Schwertmeister** (Nahkampfwaffe), **Luftpirat** (Nahkampf-/Wurfwaffen), **Tiermeister** (waffenlos). Der Karma-auf-Schaden-Schalter im Angriffsdialog erscheint automatisch, wenn Disziplin und Waffe es erlauben. (Die Groessenbedingung des Luftpiraten wird mangels Waffengroessen-Daten nicht geprueft.)
+
 **Neues Talent: Herzliches Lachen**
 Staerkt mit befreiendem Lachen die Moral der Gefaehrten. Einfache Aktion (verbraucht KEINE Hauptaktion — der Adept kann in derselben Runde noch angreifen), 1 Ueberanstrengung. Probe: CHA + Rang gegen die hoechste Soziale VK der Gegner. Bei Erfolg erhalten alle Verbuendeten (inkl. Anwender) **+2 pro Erfolg auf ihre Soziale VK und auf Willenskraftproben zum Abschuetteln von Furcht-/Einschuechterungseffekten**, fuer Rang Runden. Eigener Button und Ergebnisfenster im Kampf, fuer alle Zuschauer synchronisiert.
 

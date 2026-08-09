@@ -384,17 +384,21 @@ public class CombatService {
             attacker.getActiveEffects().removeIf(e -> TalentNames.MAGISCHE_MARKIERUNG.equals(e.getName()));
         }
 
+        String attackSourceName = null;
         if (req.getTalentId() != null) {
-            attackStep += attacker.getCharacter().getTalents().stream()
-                    .filter(t -> t.getTalentDefinition().getId().equals(req.getTalentId()))
-                    .findFirst().map(CharacterTalent::getRank).orElse(0);
+            var t = attacker.getCharacter().getTalents().stream()
+                    .filter(x -> x.getTalentDefinition().getId().equals(req.getTalentId()))
+                    .findFirst().orElse(null);
+            if (t != null) { attackStep += t.getRank(); attackSourceName = t.getTalentDefinition().getName(); }
         }
         // Waffen-Fertigkeit (alternativ zum Talent): Rang wie beim Talent, aber kein Karma
         if (req.getSkillId() != null) {
-            attackStep += attacker.getCharacter().getSkills().stream()
-                    .filter(s -> s.getSkillDefinition().getId().equals(req.getSkillId()))
-                    .findFirst().map(CharacterSkill::getRank).orElse(0);
+            var sk = attacker.getCharacter().getSkills().stream()
+                    .filter(x -> x.getSkillDefinition().getId().equals(req.getSkillId()))
+                    .findFirst().orElse(null);
+            if (sk != null) { attackStep += sk.getRank(); attackSourceName = sk.getSkillDefinition().getName(); }
         }
+        final String attackSource = attackSourceName;
         attackStep += req.getBonusSteps();
 
         // Verzweiflungsschlag-Amulette auf den Angriffswurf (+6 je Amulett, entlädt sie)
@@ -597,12 +601,12 @@ public class CombatService {
 
             RollResult damageRoll = diceService.roll(damageStep);
 
-            // 6a. Karma auf Schaden — nur bei Krallenhand-Waffe erlaubt
+            // 6a. Karma auf Schaden — Krallenhand oder disziplinabhängige Freigabe
             RollResult damageKarmaRoll = null;
             if (req.isSpendKarmaForDamage()) {
-                if (!weaponIsClaw) {
+                if (!karmaOnDamageAllowed(attacker, weaponIsClaw, attackSource)) {
                     throw new IllegalStateException(
-                            "Karma auf den Schadenswurf ist nur bei Krallenhand-Waffen erlaubt.");
+                            "Diese Disziplin darf mit dieser Waffe kein Karma auf den Schadenswurf einsetzen.");
                 }
                 if (attacker.getCurrentKarma() <= 0) {
                     throw new IllegalStateException(attacker.getCharacter().getName() + " hat kein Karma mehr.");
@@ -3519,6 +3523,35 @@ public class CombatService {
                 .filter(m -> m.getTargetStat() == StatType.SOCIAL_DEFENSE)
                 .mapToInt(m -> (int) m.getValue())
                 .max().orElse(0);
+    }
+
+    /**
+     * Darf der Angreifer 1 Karma auf den Schadenswurf einsetzen? Krallenhand-Waffen erlauben es
+     * generell (Bestandsverhalten). Sonst disziplinabhängig nach der jeweiligen Regel:
+     *  - Krieger:        ab dem 5. Kreis, im Nahkampf (Nahkampfwaffen oder waffenlos)
+     *  - Schütze:        Fernkampfwaffen (Projektil- oder Wurfwaffen)
+     *  - Schwertmeister: mit einer Nahkampfwaffe
+     *  - Luftpirat:      Nahkampf- oder Wurfwaffen (Größenbedingung mangels Waffengröße nicht prüfbar)
+     *  - Tiermeister:    waffenloser Kampf
+     * {@code sourceName} ist der Name des Angriffstalents/-fertigkeit (Nahkampfwaffen,
+     * Projektilwaffen, Wurfwaffen, Waffenloser Kampf).
+     */
+    boolean karmaOnDamageAllowed(CombatantState attacker, boolean weaponIsClaw, String sourceName) {
+        if (weaponIsClaw) return true;
+        GameCharacter c = attacker.getCharacter();
+        String disc = c.getDiscipline() != null ? c.getDiscipline().getName() : "";
+        boolean nahkampf  = "Nahkampfwaffen".equals(sourceName);
+        boolean waffenlos = "Waffenloser Kampf".equals(sourceName);
+        boolean projektil = "Projektilwaffen".equals(sourceName);
+        boolean wurf      = "Wurfwaffen".equals(sourceName);
+        return switch (disc) {
+            case "Krieger"        -> c.getCircle() >= 5 && (nahkampf || waffenlos);
+            case "Schütze"        -> projektil || wurf;
+            case "Schwertmeister" -> nahkampf;
+            case "Luftpirat"      -> nahkampf || wurf;
+            case "Tiermeister"    -> waffenlos;
+            default -> false;
+        };
     }
 
     void addLog(CombatSession session, String actorName, String targetName,

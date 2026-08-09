@@ -1148,11 +1148,11 @@ export interface EffectChoice {
             </span>
           </label>
           <label class="karma-toggle"
-            *ngIf="lufttanzAttackDialog.actor && isLufttanzClawWeapon(lufttanzAttackDialog.actor)"
+            *ngIf="canUseKarmaForDamage(lufttanzAttackDialog, 'Nahkampfwaffen')"
             [class.active]="lufttanzAttackDialog.spendKarmaForDamage"
             [class.disabled]="(lufttanzAttackDialog.actor?.currentKarma ?? 0) <= (lufttanzAttackDialog.spendKarma ? 1 : 0)"
             (click)="toggleKarmaForDamage(lufttanzAttackDialog)"
-            matTooltip="Krallenhand: zusätzliches Karma auf den Schadenswurf">
+            matTooltip="Zusätzliches Karma auf den Schadenswurf (Disziplin/Waffe erlaubt es)">
             <mat-icon>local_fire_department</mat-icon>
             Karma (Schaden)
           </label>
@@ -1343,11 +1343,11 @@ export interface EffectChoice {
             Fertigkeit: kein Karma
           </span>
           <label class="karma-toggle"
-            *ngIf="isClawWeaponSelected(attackDialog)"
+            *ngIf="canUseKarmaForDamage(attackDialog, selectedAttackSourceNameFor())"
             [class.active]="attackDialog.spendKarmaForDamage"
             [class.disabled]="(attackDialog.attacker?.currentKarma ?? 0) <= (attackDialog.spendKarma ? 1 : 0)"
             (click)="toggleKarmaForDamage(attackDialog)"
-            matTooltip="Krallenhand: zusätzliches Karma auf den Schadenswurf">
+            matTooltip="Zusätzliches Karma auf den Schadenswurf (Disziplin/Waffe erlaubt es)">
             <mat-icon>local_fire_department</mat-icon>
             Karma (Schaden)
           </label>
@@ -4167,6 +4167,36 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       this.combatantNameById(this.attackDialog.defenderId),
       weapon?.name
     );
+  }
+
+  /** Name des im Angriffsdialog gewählten Talents/der Fertigkeit (für die Karma-auf-Schaden-Regel). */
+  selectedAttackSourceNameFor(): string {
+    return this.selectedAttackSourceName();
+  }
+
+  /**
+   * Darf mit der aktuellen Auswahl 1 Karma auf den Schadenswurf gesetzt werden? Spiegelt die
+   * Backend-Regel: Krallenhand generell, sonst disziplinabhängig nach Waffenart (und Kreis).
+   */
+  canUseKarmaForDamage(dialog: { attacker?: CombatantState; weaponId?: number }, sourceName: string): boolean {
+    const attacker = dialog.attacker;
+    if (!attacker) return false;
+    const weapon = (attacker.character.equipment ?? []).find(e => e.id === dialog.weaponId);
+    if (weapon?.clawWeapon) return true;
+    const disc = attacker.character.discipline?.name ?? '';
+    const circle = attacker.character.circle ?? 0;
+    const nahkampf = sourceName === 'Nahkampfwaffen';
+    const waffenlos = sourceName === 'Waffenloser Kampf';
+    const projektil = sourceName === 'Projektilwaffen';
+    const wurf = sourceName === 'Wurfwaffen';
+    switch (disc) {
+      case 'Krieger':        return circle >= 5 && (nahkampf || waffenlos);
+      case 'Schütze':        return projektil || wurf;
+      case 'Schwertmeister': return nahkampf;
+      case 'Luftpirat':      return nahkampf || wurf;
+      case 'Tiermeister':    return waffenlos;
+      default:               return false;
+    }
   }
 
   /** True wenn die im Dialog ausgewählte Waffe eine Krallenhand ist. */
