@@ -1148,7 +1148,7 @@ export interface EffectChoice {
             </span>
           </label>
           <label class="karma-toggle"
-            *ngIf="canUseKarmaForDamage(lufttanzAttackDialog, 'Nahkampfwaffen')"
+            *ngIf="canUseKarmaForDamage(lufttanzAttackDialog.actor, lufttanzAttackDialog.actor?.pendingLufttanzWeaponId, 'Nahkampfwaffen')"
             [class.active]="lufttanzAttackDialog.spendKarmaForDamage"
             [class.disabled]="(lufttanzAttackDialog.actor?.currentKarma ?? 0) <= (lufttanzAttackDialog.spendKarma ? 1 : 0)"
             (click)="toggleKarmaForDamage(lufttanzAttackDialog)"
@@ -1343,7 +1343,7 @@ export interface EffectChoice {
             Fertigkeit: kein Karma
           </span>
           <label class="karma-toggle"
-            *ngIf="canUseKarmaForDamage(attackDialog, selectedAttackSourceNameFor())"
+            *ngIf="canUseKarmaForDamage(attackDialog.attacker, attackDialog.weaponId, selectedAttackSourceNameFor())"
             [class.active]="attackDialog.spendKarmaForDamage"
             [class.disabled]="(attackDialog.attacker?.currentKarma ?? 0) <= (attackDialog.spendKarma ? 1 : 0)"
             (click)="toggleKarmaForDamage(attackDialog)"
@@ -4178,10 +4178,10 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
    * Darf mit der aktuellen Auswahl 1 Karma auf den Schadenswurf gesetzt werden? Spiegelt die
    * Backend-Regel: Krallenhand generell, sonst disziplinabhängig nach Waffenart (und Kreis).
    */
-  canUseKarmaForDamage(dialog: { attacker?: CombatantState; weaponId?: number }, sourceName: string): boolean {
-    const attacker = dialog.attacker;
+  canUseKarmaForDamage(attacker: CombatantState | undefined, weaponId: number | undefined,
+                       sourceName: string): boolean {
     if (!attacker) return false;
-    const weapon = (attacker.character.equipment ?? []).find(e => e.id === dialog.weaponId);
+    const weapon = (attacker.character.equipment ?? []).find(e => e.id === weaponId);
     if (weapon?.clawWeapon) return true;
     const disc = attacker.character.discipline?.name ?? '';
     const circle = attacker.character.circle ?? 0;
