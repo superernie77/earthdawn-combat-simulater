@@ -870,7 +870,9 @@ The project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PAT
 
 ### Changelog
 
-#### 1.3.0 (in development)
+#### 1.4.0 (in development)
+
+#### 1.3.0 (released 2026-08-16)
 - **New gear: Espagrastiefel (+1 Heimlicher Schritt, +2 Ausweichen)** — GEAR items can now carry a **second probe bonus** (`probeBonusTalentName2`/`probeBonusValue2`, Flyway `V39`), since some items affect two different tests. Both pairs are summed in `ProbeService.equipmentProbeBonus()` and shown in the dice roller. The Ausweichen bonus also applies to the **dodge reaction in combat** (`resolveDodge` adds the gear bonus alongside `DODGE_STEP`).
 - **Karma on damage by discipline** — previously only Krallenhand weapons allowed spending 1 karma on the damage roll. Now also enabled per discipline: Krieger (melee, from 5th circle), Schütze (ranged), Schwertmeister (melee weapon), Luftpirat (melee/thrown), Tiermeister (unarmed). Backend rule `karmaOnDamageAllowed(...)` keyed on discipline + attack talent/skill (+ circle); frontend mirrors it in `canUseKarmaForDamage()`. The size condition for Luftpirat is not enforced (no weapon-size data).
 - **New talent: Herzliches Lachen (Heartening Laugh)** — simple action (does not consume the main action), 1 strain. Rolls CHA-step + rank vs. the highest Social Defense among enemies; on success every ally on the same side (incl. the caster) gains **+2 per success on Social Defense and on Willpower tests to shake off fear/intimidation** for rank rounds. Stored as an ActiveEffect (SOCIAL_DEFENSE +bonus, ON_SOCIAL_ACTION); resistFear reads the buff and adds it to the resist step. Backend endpoint `POST .../heartening-laugh`, broadcast modal, tracker button + dialog. CHA talent seeded in migrateUtilityTalents.

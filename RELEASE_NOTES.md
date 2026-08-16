@@ -1,27 +1,41 @@
 # Release Notes
 
-## v1.3.0 (in Entwicklung)
+## v1.4.0 (in Entwicklung)
 
-**Neuer Gegenstand: Espagrastiefel**
-Schnellanlage-Knopf im Ausruestungs-Tab: **+1 auf Heimlicher Schritt und +2 auf Ausweichen** (Hieb ausweichen). Dafuer koennen Gegenstaende jetzt **zwei verschiedene Probenboni** tragen — beide erscheinen als Badge am Gegenstand und im Wuerfelwurf. Der Ausweichen-Bonus wirkt auch **im Kampf beim Ausweichen**.
+_Noch keine Einträge._
+
+## v1.3.0 (16.08.2026)
+
+### 🪄 Neue Talente
+
+**Herzliches Lachen**
+Stärkt mit befreiendem Lachen die Moral der Gefährten. **Einfache Aktion** — verbraucht keine Hauptaktion, der Adept kann in derselben Runde noch angreifen — und kostet 1 Überanstrengung. Probe: CHA + Rang gegen die höchste Soziale Verteidigung der Gegner. Bei Erfolg erhalten alle Verbündeten (inklusive Anwender) **+2 pro Erfolg auf ihre Soziale Verteidigung und auf Willenskraftproben zum Abschütteln von Furcht- und Einschüchterungseffekten**, für Rang Runden. Eigener Button und Ergebnisfenster im Kampf, bei allen Zuschauern synchronisiert.
+
+**Fadenweben für jede Disziplin**
+Bisher hatten nur die magischen Disziplinen ein Fadenweben-Talent. Jetzt bekommt jede nicht-magische Disziplin ein eigenes **Fadenweben (Disziplin)** — etwa Fadenweben (Krieger) oder Fadenweben (Dieb). Wahrnehmungsbasiert, als Probe testbar, ohne Kampfrelevanz. Steht automatisch in der Talentliste der jeweiligen Disziplin.
+
+**Sechs Talente ohne Kampfrelevanz**
+Erster Eindruck, Gefühlsmelodie, Etikette (Charisma) sowie Empathische Wahrnehmung, Forschen, Fremdsprachen (Wahrnehmung) — als Probe testbar, auf dem Charakterbogen und im Würfelwurf.
+
+### ⚔️ Kampfregeln
 
 **Karma auf Schadensproben je Disziplin**
-Bisher konnte nur mit Krallenhand-Waffen 1 Karma auf den Schadenswurf gesetzt werden. Jetzt zusätzlich disziplinabhaengig: **Krieger** (Nahkampf, ab 5. Kreis), **Schuetze** (Fernkampf), **Schwertmeister** (Nahkampfwaffe), **Luftpirat** (Nahkampf-/Wurfwaffen), **Tiermeister** (waffenlos). Der Karma-auf-Schaden-Schalter im Angriffsdialog erscheint automatisch, wenn Disziplin und Waffe es erlauben. (Die Groessenbedingung des Luftpiraten wird mangels Waffengroessen-Daten nicht geprueft.)
+Bisher ging Karma auf den Schadenswurf nur mit Krallenhand-Waffen. Jetzt zusätzlich disziplinabhängig: **Krieger** (Nahkampf, ab 5. Kreis), **Schütze** (Fernkampf), **Schwertmeister** (Nahkampfwaffe), **Luftpirat** (Nahkampf- oder Wurfwaffen), **Tiermeister** (waffenlos). Der Karma-auf-Schaden-Schalter im Angriffsdialog erscheint automatisch, wenn Disziplin und Waffe es erlauben. *(Die Größenbedingung des Luftpiraten wird mangels Waffengrößen-Daten nicht geprüft.)*
 
-**Neues Talent: Herzliches Lachen**
-Staerkt mit befreiendem Lachen die Moral der Gefaehrten. Einfache Aktion (verbraucht KEINE Hauptaktion — der Adept kann in derselben Runde noch angreifen), 1 Ueberanstrengung. Probe: CHA + Rang gegen die hoechste Soziale VK der Gegner. Bei Erfolg erhalten alle Verbuendeten (inkl. Anwender) **+2 pro Erfolg auf ihre Soziale VK und auf Willenskraftproben zum Abschuetteln von Furcht-/Einschuechterungseffekten**, fuer Rang Runden. Eigener Button und Ergebnisfenster im Kampf, fuer alle Zuschauer synchronisiert.
+### 🎒 Ausrüstung
 
-**Sechs weitere Talente ohne Kampfrelevanz**
-Erster Eindruck, Gefuehlsmelodie, Etikette (Charisma), Empathische Wahrnehmung, Forschen, Fremdsprachen (Wahrnehmung). Als Probe testbar, auf dem Charakterbogen und im Wuerfelwurf.
+**Espagrastiefel** — **+1 auf Heimlicher Schritt und +2 auf Ausweichen** (Hieb ausweichen). Dafür können Gegenstände jetzt **zwei verschiedene Probenboni** tragen; beide erscheinen als Badge am Gegenstand und im Würfelwurf. Der Ausweichen-Bonus wirkt auch **im Kampf bei der Ausweichen-Reaktion**.
 
-**Fadenweben fuer jede Disziplin**
-Bisher hatten nur die magischen Disziplinen ein Fadenweben-Talent (ueber ihr Zauber-Webtalent). Jetzt bekommt jede nicht-magische Disziplin ein eigenes **Fadenweben (Disziplin)** — z.B. Fadenweben (Krieger), Fadenweben (Dieb). Wahrnehmungsbasiert, als Probe testbar, ohne Kampfrelevanz (Faeden zu Gegenstaenden und Mustern weben). Es steht automatisch in der Talentliste der jeweiligen Disziplin.
+**Kletterausrüstung** — +4 auf Klettern-Proben.
 
-**Neuer Gegenstand: Kletterausruestung**
-Schnellanlage-Knopf im Ausruestungs-Tab (Rubrik Gegenstaende) analog zu Schwimmkristall: **+4 auf Klettern-Proben**.
+**Anlege-Knöpfe verschwinden**, sobald der Charakter den jeweiligen Gegenstand besitzt — kein versehentliches Doppelanlegen mehr.
+
+### 🐛 Bugfixes
 
 **Prod-Hotfix: Boot-Schleife nach dem v1.2.0-Deploy**
-Alt-Datenbanken (vor Flyway von Hibernate angelegt) tragen CHECK-Constraints auf Enum-Spalten, die nur die damaligen Werte erlauben. Der neue Wert `DODGE_STEP` (Nebelschild) verletzte `spell_definitions_modify_stat_check` — das Backend starb beim Start, Docker startete es endlos neu (Dauer-CPU). Flyway `V38` entfernt alle diese Alt-Constraints (die Flyway-Baseline definiert selbst keine; die Wertebereichs-Pruefung liegt in der Anwendung). Auf per Baseline erzeugten Datenbanken ist die Migration ein No-op.
+Alt-Datenbanken (vor Flyway von Hibernate angelegt) tragen CHECK-Constraints auf Enum-Spalten, die nur die damaligen Werte erlauben. Der neue Wert `DODGE_STEP` (Nebelschild) verletzte diese Prüfung — das Backend starb beim Start und wurde endlos neu gestartet, was den Server dauerhaft auslastete. Flyway `V38` entfernt die Alt-Constraints; auf regulär angelegten Datenbanken ist die Migration wirkungslos. Ohne den Fix wären dieselben Fehler später auch im Kampf aufgetreten (Bewegungs-Logeinträge, Nebelschild- und Schmerzen-Effekte).
+
+**Produktions-Build brach ab** — ein Typfehler im Angriffsdialog fiel erst im Produktions-Build auf und ließ den Docker-Build scheitern. Behoben; Frontend-Änderungen werden seitdem mit der Produktionskonfiguration geprüft.
 
 ## v1.2.0 (18.07.2026)
 
