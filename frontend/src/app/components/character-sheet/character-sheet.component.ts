@@ -725,19 +725,19 @@ import { ProbeResult } from '../../models/dice.model';
                 <div class="equip-empty" *ngIf="!gear().length">Keine sonstige Ausrüstung</div>
               </div>
               <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
-                <button mat-stroked-button (click)="addLeichteStiefel()"
+                <button mat-stroked-button *ngIf="!hasGear('Leichte Stiefel')" (click)="addLeichteStiefel()"
                   matTooltip="Leichte Stiefel: +2 auf Heimlicher Schritt">
                   <mat-icon>add</mat-icon> Leichte Stiefel
                 </button>
-                <button mat-stroked-button (click)="addSchwimmkristall()"
+                <button mat-stroked-button *ngIf="!hasGear('Schwimmkristall')" (click)="addSchwimmkristall()"
                   matTooltip="Schwimmkristall: +3 auf Schwimmen, erlaubt Unterwasseratmung von Rang Minuten">
                   <mat-icon>add</mat-icon> Schwimmkristall
                 </button>
-                <button mat-stroked-button (click)="addKletterausruestung()"
+                <button mat-stroked-button *ngIf="!hasGear('Kletterausrüstung')" (click)="addKletterausruestung()"
                   matTooltip="Kletterausrüstung: +4 auf Klettern-Proben">
                   <mat-icon>add</mat-icon> Kletterausrüstung
                 </button>
-                <button mat-stroked-button (click)="addEspagrastiefel()"
+                <button mat-stroked-button *ngIf="!hasGear('Espagrastiefel')" (click)="addEspagrastiefel()"
                   matTooltip="Espagrastiefel: +1 auf Heimlicher Schritt, +2 auf Ausweichen (Hieb ausweichen)">
                   <mat-icon>add</mat-icon> Espagrastiefel
                 </button>
@@ -1921,6 +1921,12 @@ export class CharacterSheetComponent implements OnInit {
 
   gear(): Equipment[] {
     return (this.character?.equipment ?? []).filter(e => e.type === 'GEAR');
+  }
+
+  /** True, wenn der Charakter diesen Ausrüstungsgegenstand bereits besitzt (blendet den Anlege-Knopf aus). */
+  hasGear(name: string): boolean {
+    return (this.character?.equipment ?? [])
+      .some(e => (e.name ?? '').toLowerCase() === name.toLowerCase());
   }
 
   /** Namen aller Talente + Fertigkeiten des Charakters (für die GEAR-Bonus-Zuordnung). */
