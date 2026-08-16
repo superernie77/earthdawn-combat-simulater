@@ -91,6 +91,7 @@ public class ModifierAggregator {
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
             case DODGE_STEP           -> 0;
             case MOVEMENT_HEXES       -> c.getMovementHexes();
+            case WILLPOWER_RESIST_STEP -> 0;
         };
     }
 
@@ -119,6 +120,7 @@ public class ModifierAggregator {
             case CARRYING_CAPACITY    -> c.getStrength() * 10;
             case DODGE_STEP           -> 0;
             case MOVEMENT_HEXES       -> c.getMovementHexes();
+            case WILLPOWER_RESIST_STEP -> 0;
         };
     }
 

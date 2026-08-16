@@ -239,6 +239,9 @@ public class CombatService {
             rollsById.put(combatant.getId(), roll);
             stepsById.put(combatant.getId(), initStep);
         }
+        // Kobrastoß auswerten, solange alle Initiativen dieser Runde feststehen
+        resolveKobrastoss(session);
+
         session.getCombatants().sort(Comparator
                 .comparingInt(CombatantState::getInitiative).reversed()
                 .thenComparingInt(c -> c.isNpc() ? 1 : 0)); // heroes before NPCs on tie
@@ -412,6 +415,13 @@ public class CombatService {
             attackStep += pending;
             attackBonusNotes.add("Manövrieren " + (pending >= 0 ? "+" : "") + pending);
             attacker.setPendingAttackBonus(0);
+        }
+
+        // Kobrastoß: gilt nur für den ersten Angriff gegen genau das angesagte Ziel
+        int kobrastossBonus = consumeKobrastossBonus(attacker, defender);
+        if (kobrastossBonus != 0) {
+            attackStep += kobrastossBonus;
+            attackBonusNotes.add("Kobrastoß +" + kobrastossBonus);
         }
 
         // Aggressive/defensive Haltung werden in der Ansagephase deklariert — die zugehörigen
@@ -840,6 +850,9 @@ public class CombatService {
             combatant.setPendingLufttanzTargetId(-1L);
             combatant.setPendingLufttanzWeaponId(-1L);
             combatant.setBlattschussUsedThisRound(false);
+            combatant.setKobrastossUsedThisRound(false);
+            combatant.setKobrastossTargetId(-1L);
+            combatant.setPendingKobrastossBonus(0);
             combatant.setKarmaInitiativeThisRound(false);
             combatant.setMovedHexesThisRound(0);
             clearBlattschussPending(combatant);
@@ -1561,7 +1574,9 @@ public class CombatService {
                 .findFirst();
 
         if (resistTalent.isPresent()) {
-            int wilStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower()) - target.getWounds());
+            // Löwenherz ersetzt auch hier die WIL-Stufe durch die Löwenherzstufe (WIL + Rang)
+            int wilStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower())
+                    - target.getWounds() + loewenherzBonus(target));
             resistStep = Math.max(1, wilStep + resistTalent.get().getRank());
             resistRoll = diceService.roll(resistStep);
             resisted = resistRoll.getTotal() >= total; // Gegenprobe vs Verspotten-Ergebnis
@@ -1739,19 +1754,22 @@ public class CombatService {
         int tn = fear.getResistTargetNumber() != null ? fear.getResistTargetNumber() : 0;
         // Herzliches Lachen: +Bonus auf Willenskraftproben zum Abschütteln von Furcht-/Einschüchterungseffekten
         int laughBonus = hearteningLaughBonus(target);
+        // Löwenherz: Löwenherzstufe (WIL + Rang) statt reiner WIL-Stufe
+        int lionBonus = loewenherzBonus(target);
         int resistStep = Math.max(1, diceService.attributeToStep(target.getCharacter().getWillpower())
-                - target.getWounds() + laughBonus);
+                - target.getWounds() + laughBonus + lionBonus);
         RollResult roll = diceService.roll(resistStep);
         boolean success = roll.getTotal() >= tn;
         target.setFearResistUsedThisRound(true);
 
+        String bonusNote = (laughBonus > 0 ? " [+" + laughBonus + " Herzliches Lachen]" : "")
+                + (lionBonus > 0 ? " [+" + lionBonus + " Löwenherz]" : "");
         String desc;
         if (success) {
             target.getActiveEffects().remove(fear);
-            desc = targetName + " schüttelt die Furcht ab! (WIL " + roll.getTotal() + " vs. " + tn + ")"
-                    + (laughBonus > 0 ? " [+" + laughBonus + " Herzliches Lachen]" : "");
+            desc = targetName + " schüttelt die Furcht ab! (WIL " + roll.getTotal() + " vs. " + tn + ")" + bonusNote;
         } else {
-            desc = targetName + " bleibt verängstigt. (WIL " + roll.getTotal() + " vs. " + tn + ")";
+            desc = targetName + " bleibt verängstigt. (WIL " + roll.getTotal() + " vs. " + tn + ")" + bonusNote;
         }
         addLog(session, targetName, null, ActionType.FEAR, desc, success);
         sessionRepo.save(session);
@@ -2351,8 +2369,9 @@ public class CombatService {
         // 1 Überanstrengung (freie Aktion — kein hasActedThisRound)
         actor.setCurrentDamage(actor.getCurrentDamage() + 1);
 
-        // Würfelschritt: WIL-Step + Rang − Wunden
-        int wilStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower()) - actor.getWounds());
+        // Würfelschritt: WIL-Step + Rang − Wunden (Löwenherz ersetzt die WIL-Stufe durch WIL + Rang)
+        int wilStep  = Math.max(1, diceService.attributeToStep(actor.getCharacter().getWillpower())
+                - actor.getWounds() + loewenherzBonus(actor));
         int rollStep = Math.max(1, wilStep + ct.getRank());
 
         RollResult karmaRoll = null;
@@ -2789,6 +2808,270 @@ public class CombatService {
         return result;
     }
 
+    // --- Sprint ---
+
+    /**
+     * Sprint: einfache Aktion, 1 Überanstrengung, kein Würfelwurf. Die Bewegungsrate steigt in der
+     * aktuellen Runde um den Rang (Stufe = Rang, ohne Attribut). Verbraucht keine Hauptaktion — in
+     * derselben Runde ist zusätzlich eine Standardaktion möglich. Rang kommt aus dem Talent oder,
+     * falls nicht vorhanden, aus der gleichnamigen weltlichen Fertigkeit. Erneutes Wirken ersetzt
+     * den bestehenden Effekt statt zu stapeln.
+     */
+    public SprintResult performSprint(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+
+        int rank = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.SPRINT.equals(t.getTalentDefinition().getName()))
+                .findFirst().map(CharacterTalent::getRank)
+                .orElseGet(() -> actor.getCharacter().getSkills().stream()
+                        .filter(sk -> TalentNames.SPRINT.equals(sk.getSkillDefinition().getName()))
+                        .findFirst().map(CharacterSkill::getRank)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Talent oder Fertigkeit 'Sprint' nicht gefunden.")));
+
+        // 1 Überanstrengung; einfache Aktion — kein hasActedThisRound
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        actor.getActiveEffects().removeIf(e -> TalentNames.SPRINT.equals(e.getName()));
+        actor.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(actor)
+                .name(TalentNames.SPRINT)
+                .description("+" + rank + " Bewegungsrate für diese Runde")
+                .sourceType(SourceType.TALENT)
+                .remainingRounds(1)
+                .negative(false)
+                .modifiers(List.of(ModifierEntry.builder()
+                        .targetStat(StatType.MOVEMENT_HEXES)
+                        .operation(ModifierOperation.ADD)
+                        .value(rank)
+                        .triggerContext(TriggerContext.ALWAYS)
+                        .build()))
+                .build());
+
+        int newMovement = modifiers.getEffectiveValue(actor, StatType.MOVEMENT_HEXES, TriggerContext.ALWAYS);
+
+        String actorName = actor.getCharacter().getName();
+        String desc = actorName + " sprintet (Rang " + rank + "): Bewegungsrate +" + rank
+                + " für diese Runde (jetzt " + newMovement + "). Einfache Aktion, kostet 1 Überanstrengung — "
+                + "eine Standardaktion ist weiterhin möglich.";
+
+        addLog(session, actorName, null, ActionType.SPRINT, desc, true);
+        sessionRepo.save(session);
+
+        SprintResult result = SprintResult.builder()
+                .actorName(actorName)
+                .rank(rank)
+                .movementBonus(rank)
+                .newMovement(newMovement)
+                .damageTaken(1)
+                .description(desc)
+                .build();
+        broadcastWithModal(session, "SPRINT", result);
+        return result;
+    }
+
+    // --- Löwenherz ---
+
+    /**
+     * Löwenherz: freie Aktion, 1 Überanstrengung. Die Löwenherzstufe (WIL + Rang) tritt bis zum
+     * Rundenende an die Stelle der normalen Willenskraftstufe, wenn eine Probe abgelegt wird, um
+     * die Wirkung von Talenten, Zaubern oder Fähigkeiten abzuschütteln. Umgesetzt als ActiveEffect
+     * mit +Rang auf WILLPOWER_RESIST_STEP — mathematisch identisch, und Wundenabzüge bleiben
+     * erhalten. Erneutes Wirken ersetzt den bestehenden Effekt statt zu stapeln.
+     */
+    public LoewenherzResult performLoewenherz(Long sessionId, Long actorCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.LOEWENHERZ.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Löwenherz' nicht gefunden."));
+
+        int rank = ct.getRank();
+
+        // 1 Überanstrengung; freie Aktion — verbraucht keine Hauptaktion
+        actor.setCurrentDamage(actor.getCurrentDamage() + 1);
+
+        actor.getActiveEffects().removeIf(e -> TalentNames.LOEWENHERZ.equals(e.getName()));
+        actor.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(actor)
+                .name(TalentNames.LOEWENHERZ)
+                .description("+" + rank + " Stufen auf Willenskraftproben zum Abschütteln (WIL+Rang statt WIL-Stufe)")
+                .sourceType(SourceType.TALENT)
+                .remainingRounds(1)
+                .negative(false)
+                .modifiers(List.of(ModifierEntry.builder()
+                        .targetStat(StatType.WILLPOWER_RESIST_STEP)
+                        .operation(ModifierOperation.ADD)
+                        .value(rank)
+                        .triggerContext(TriggerContext.ALWAYS)
+                        .build()))
+                .build());
+
+        String actorName = actor.getCharacter().getName();
+        String desc = actorName + " ruft Löwenherz (Rang " + rank + "): +" + rank
+                + " Stufen auf Willenskraftproben zum Abschütteln von Talenten, Zaubern und Fähigkeiten. "
+                + "Kostet 1 Überanstrengung.";
+
+        addLog(session, actorName, null, ActionType.LOEWENHERZ, desc, true);
+        sessionRepo.save(session);
+
+        LoewenherzResult result = LoewenherzResult.builder()
+                .actorName(actorName)
+                .rank(rank)
+                .resistBonus(rank)
+                .damageTaken(1)
+                .description(desc)
+                .build();
+        broadcastWithModal(session, "LOEWENHERZ", result);
+        return result;
+    }
+
+    /**
+     * Bonusstufen aus einem aktiven Löwenherz auf Willenskraft-Widerstandsproben
+     * (0, wenn nicht aktiv). Package-private für Tests.
+     */
+    int loewenherzBonus(CombatantState c) {
+        return c.getActiveEffects().stream()
+                .filter(e -> TalentNames.LOEWENHERZ.equals(e.getName()))
+                .flatMap(e -> e.getModifiers().stream())
+                .filter(m -> m.getTargetStat() == StatType.WILLPOWER_RESIST_STEP)
+                .mapToInt(m -> (int) m.getValue())
+                .max().orElse(0);
+    }
+
+    // --- Kobrastoß ---
+
+    /**
+     * Kobrastoß: freie Aktion in der Ansagephase, 2 Überanstrengung, 1× pro Runde.
+     * Die Kobrastoßstufe (GES + Rang) ersetzt die Initiativestufe — umgesetzt als
+     * ActiveEffect mit +Rang auf INITIATIVE_STEP, mathematisch identisch und mit
+     * erhaltenem Rüstungsmalus. Der Vergleich gegen die Initiative des angesagten
+     * Gegners und die Bonusberechnung passieren beim Initiativewurf
+     * (siehe {@link #resolveKobrastoss(CombatSession)}).
+     */
+    public KobrastossResult performKobrastoss(Long sessionId, Long actorCombatantId, Long targetCombatantId) {
+        CombatSession session = findById(sessionId);
+        CombatantState actor  = findCombatant(session, actorCombatantId);
+        CombatantState target = findCombatant(session, targetCombatantId);
+
+        if (actor.isDefeated()) throw new IllegalStateException(actor.getCharacter().getName() + " ist besiegt.");
+        if (target.isDefeated()) throw new IllegalStateException(target.getCharacter().getName() + " ist besiegt.");
+        if (actor.getId().equals(target.getId()))
+            throw new IllegalStateException("Kobrastoß braucht einen gegnerischen Kombattanten als Ziel.");
+        if (session.getPhase() != CombatPhase.DECLARATION)
+            throw new IllegalStateException("Kobrastoß kann nur in der Ansagephase angesagt werden.");
+        if (actor.isKobrastossUsedThisRound())
+            throw new IllegalStateException("Kobrastoß wurde bereits in dieser Runde eingesetzt.");
+
+        CharacterTalent ct = actor.getCharacter().getTalents().stream()
+                .filter(t -> TalentNames.KOBRASTOSS.equals(t.getTalentDefinition().getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Talent 'Kobrastoß' nicht gefunden."));
+
+        int rank = ct.getRank();
+
+        // 2 Überanstrengung
+        actor.setCurrentDamage(actor.getCurrentDamage() + 2);
+        actor.setKobrastossUsedThisRound(true);
+        actor.setKobrastossTargetId(target.getId());
+        actor.setPendingKobrastossBonus(0);
+
+        actor.getActiveEffects().add(ActiveEffect.builder()
+                .combatantState(actor)
+                .name(TalentNames.KOBRASTOSS)
+                .description("+" + rank + " Stufen auf Initiative-Probe (GES+Rang statt GES-Stufe)")
+                .sourceType(SourceType.TALENT)
+                .remainingRounds(1)
+                .negative(false)
+                .modifiers(List.of(ModifierEntry.builder()
+                        .targetStat(StatType.INITIATIVE_STEP)
+                        .operation(ModifierOperation.ADD)
+                        .value(rank)
+                        .triggerContext(TriggerContext.ON_INITIATIVE)
+                        .build()))
+                .build());
+
+        String actorName  = actor.getCharacter().getName();
+        String targetName = target.getCharacter().getName();
+        String desc = actorName + " sagt Kobrastoß gegen " + targetName + " an (Rang " + rank + "): +" + rank
+                + " Stufen auf die Initiative-Probe, je Erfolg gegen " + targetName
+                + " +2 auf den ersten Angriff gegen ihn. Kostet 2 Überanstrengung.";
+
+        addLog(session, actorName, targetName, ActionType.KOBRASTOSS, desc, true);
+        sessionRepo.save(session);
+
+        KobrastossResult result = KobrastossResult.builder()
+                .actorName(actorName)
+                .targetName(targetName)
+                .rank(rank)
+                .initiativeBonus(rank)
+                .damageTaken(2)
+                .description(desc)
+                .build();
+        broadcastWithModal(session, "KOBRASTOSS", result);
+        return result;
+    }
+
+    /**
+     * Wertet nach dem Initiativewurf alle angesagten Kobrastöße aus: Erfolge aus dem Vergleich
+     * der eigenen Initiative mit der des angesagten Gegners, daraus +2 je Erfolg auf den ersten
+     * Angriff gegen genau dieses Ziel. Der Vergleich erfolgt einmalig hier — verzögert der Gegner
+     * seine Handlung später, ändert das am Ergebnis nichts.
+     */
+    void resolveKobrastoss(CombatSession session) {   // package-private für Tests
+        for (CombatantState actor : session.getCombatants()) {
+            Long targetId = actor.getKobrastossTargetId();
+            if (targetId == null || targetId < 0 || actor.isDefeated()) continue;
+
+            CombatantState target = session.getCombatants().stream()
+                    .filter(c -> c.getId().equals(targetId))
+                    .findFirst().orElse(null);
+            if (target == null) {           // Ziel entfernt — Ansage verfällt
+                actor.setKobrastossTargetId(-1L);
+                continue;
+            }
+
+            int successes = actor.getInitiative() >= target.getInitiative()
+                    ? 1 + (actor.getInitiative() - target.getInitiative()) / 5
+                    : 0;
+            int bonus = successes * 2;
+            actor.setPendingKobrastossBonus(bonus);
+
+            String desc = bonus > 0
+                    ? actor.getCharacter().getName() + " gewinnt den Kobrastoß-Vergleich gegen "
+                      + target.getCharacter().getName() + " (" + actor.getInitiative() + " vs "
+                      + target.getInitiative() + "): " + successes + " Erfolg(e) → +" + bonus
+                      + " auf den ersten Angriff gegen " + target.getCharacter().getName() + "."
+                    : actor.getCharacter().getName() + " verliert den Kobrastoß-Vergleich gegen "
+                      + target.getCharacter().getName() + " (" + actor.getInitiative() + " vs "
+                      + target.getInitiative() + "): kein Angriffsbonus.";
+            addLog(session, actor.getCharacter().getName(), target.getCharacter().getName(),
+                    ActionType.KOBRASTOSS, desc, bonus > 0);
+        }
+    }
+
+    /**
+     * Liefert den Kobrastoß-Angriffsbonus, wenn dieser Angriff sich gegen das angesagte Ziel
+     * richtet, und verbraucht ihn dabei — der Bonus gilt nur für die erste Angriffsprobe gegen
+     * genau diesen Gegner. Angriffe gegen andere Ziele lassen ihn unangetastet.
+     */
+    int consumeKobrastossBonus(CombatantState attacker, CombatantState defender) {   // package-private für Tests
+        Long targetId = attacker.getKobrastossTargetId();
+        if (targetId == null || targetId < 0 || defender == null || !targetId.equals(defender.getId())) return 0;
+
+        int bonus = attacker.getPendingKobrastossBonus();
+        attacker.setPendingKobrastossBonus(0);
+        attacker.setKobrastossTargetId(-1L);   // verbraucht — kein zweiter Angriff profitiert
+        return bonus;
+    }
+
     // --- Blattschuss ---
 
     /**
@@ -3049,6 +3332,8 @@ public class CombatService {
             attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
             attacker.setPendingAttackBonus(0);
         }
+        // Kobrastoß zählt für die erste Angriffsprobe gegen das angesagte Ziel — auch hier
+        attackStep = Math.max(1, attackStep + consumeKobrastossBonus(attacker, defender));
 
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
@@ -3174,6 +3459,8 @@ public class CombatService {
             attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
             attacker.setPendingAttackBonus(0);
         }
+        // Kobrastoß zählt für die erste Angriffsprobe gegen das angesagte Ziel — auch hier
+        attackStep = Math.max(1, attackStep + consumeKobrastossBonus(attacker, defender));
 
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {
@@ -3309,6 +3596,8 @@ public class CombatService {
             attackStep = Math.max(1, attackStep + attacker.getPendingAttackBonus());
             attacker.setPendingAttackBonus(0);
         }
+        // Kobrastoß zählt für die erste Angriffsprobe gegen das angesagte Ziel — auch hier
+        attackStep = Math.max(1, attackStep + consumeKobrastossBonus(attacker, defender));
 
         RollResult karmaRoll = null;
         if (req.isSpendKarma() && attacker.getCurrentKarma() > 0) {

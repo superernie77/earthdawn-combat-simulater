@@ -152,6 +152,25 @@ These consume `hasActedThisRound = true`. All cost 1 Überanstrengung (damage).
 - **`CombatActionResult`**: `blattschussActive`, `blattschussCanAddKarma`, `blattschussKarmaUsed`, `blattschussRank` für UI.
 - **Flyway V16**: 7 neue Spalten auf `combatant_states`.
 
+### Löwenherz
+- **Aktivierung**: Freie Aktion (jederzeit, auch außerhalb der eigenen Handlung), 1 Schaden. Endpoint: `POST /api/combat/sessions/{id}/combatants/{cId}/loewenherz`, gibt `LoewenherzResult` zurück.
+- **Effekt**: ActiveEffect mit `+rank` auf den neuen StatType `WILLPOWER_RESIST_STEP` (Basis 0, `ALWAYS`) — mathematisch identisch zu „Löwenherzstufe = WIL + Rang statt WIL-Stufe", Wundenabzüge bleiben erhalten. Läuft nach 1 Runde aus; erneutes Wirken **ersetzt** den Effekt statt zu stapeln.
+- **Wirkt auf** (gelesen über `loewenherzBonus(c)`): `resistFear` (Furcht abschütteln), die Starrsinn-Gegenprobe in `performTaunt` und `performIronWill` (Eiserner Wille). Bewusst **nicht** auf die Furcht-Probe des Anwenders selbst, auf „Magie neutralisieren" (aktive Aktion, keine Widerstandsprobe) oder auf das Abbrechen der eigenen Zaubervorbereitung.
+- **Kein Flyway nötig** — der Effekt lebt in `active_effects`. Der neue StatType-Wert ist dank V38 (Drop der Legacy-CHECK-Constraints) auch auf Alt-Datenbanken unkritisch.
+
+### Sprint
+- **Aktivierung**: **Einfache Aktion** — setzt `hasActedThisRound` NICHT, die Standardaktion bleibt in derselben Runde möglich. 1 Schaden, kein Würfelwurf. Endpoint: `POST /api/combat/sessions/{id}/combatants/{cId}/sprint`, gibt `SprintResult` zurück.
+- **Effekt**: ActiveEffect mit `+rank` auf `MOVEMENT_HEXES` (`ALWAYS`), Dauer 1 Runde. Wirkt dadurch automatisch auf der Hexkarte, weil `CombatMapService.effectiveMovement()` denselben Aggregator liest. Erneutes Wirken ersetzt statt zu stapeln.
+- **Stufe = Rang** (ohne Attribut). Der Rang kommt aus dem Talent oder — falls nicht vorhanden — aus der gleichnamigen weltlichen **Fertigkeit** (Kategorie „Bewegung"), beide werden geseedet.
+
+### Kobrastoß
+- **Ansage**: Freie Aktion in der **DECLARATION-Phase** mit Zielangabe, 2 Schaden, 1×/Runde (`kobrastossUsedThisRound`). Endpoint: `POST /api/combat/sessions/{id}/combatants/{cId}/kobrastoss?targetCombatantId=`, gibt `KobrastossResult` zurück.
+- **Initiative-Effekt**: ActiveEffect mit `+rank` auf `INITIATIVE_STEP` (mathematisch identisch zu „Kobrastoßstufe = GES + Rang statt GES-Stufe"; Rüstungsmalus und übrige Effekte bleiben erhalten). Erlischt nach 1 Runde.
+- **Auswertung**: `resolveKobrastoss(session)` läuft in `rerollInitiative()`, sobald alle Initiativen der Runde feststehen. Erfolge = `1 + (eigeneInit − zielInit) / 5` bei `eigeneInit ≥ zielInit`, sonst 0. `pendingKobrastossBonus = 2 × Erfolge`. Der Vergleich findet **einmalig** statt — verzögert der Gegner später seine Handlung, ändert das nichts.
+- **Verbrauch**: `consumeKobrastossBonus(attacker, defender)` addiert den Bonus auf `attackStep`, aber nur wenn `defender.id == kobrastossTargetId`. Danach ist er verbraucht (`kobrastossTargetId = -1`) — gilt also nur für die **erste** Angriffsprobe gegen genau dieses Ziel. Eingehängt in `performAttack`, `performZweitwaffe`, `performNachtreten` und `performSchwanzangriff`.
+- **CombatantState**: `kobrastossUsedThisRound`, `kobrastossTargetId` (-1 = keine Ansage), `pendingKobrastossBonus`. Alle drei werden in `nextRound()` zurückgesetzt.
+- **Flyway V40**: 3 neue Spalten auf `combatant_states`.
+
 ### Lufttanz
 - **Aktivierung**: Freie Aktion in der **DECLARATION-Phase**, 2 Schaden, 1×/Runde (`lufttanzActivatedThisRound`).
 - **Initiative-Effekt**: ActiveEffect mit `+rank` auf `INITIATIVE_STEP` (mathematisch identisch zu „Lufttanzstufe = Rang+DEX statt DEX-Stufe"). Erlischt nach 1 Runde.
@@ -266,6 +285,7 @@ The "Ausrüstung" tab on the character sheet has separate sections per type. The
 ## Core Architecture: Modifier Engine
 Every bonus/penalty goes through `ModifierAggregator`. Modifiers have:
 - `targetStat`: which stat is modified (PHYSICAL_DEFENSE, ATTACK_STEP, INITIATIVE_STEP, MYSTIC_ARMOR, etc.)
+  - Basis-0-Typen für reine Bonusstufen: `DODGE_STEP` (Ausweichen), `WILLPOWER_RESIST_STEP` (Löwenherz). Jeder neue StatType muss in **beide** exhaustive switches im `ModifierAggregator` (`getBaseValue` + `getBaseValueFromCharacter`).
 - `operation`: ADD | MULTIPLY | OVERRIDE | SET_MIN | SET_MAX
 - `triggerContext`: ALWAYS | ON_MELEE_ATTACK | ON_RANGED_ATTACK | ON_MELEE_DEFENSE | ON_RANGED_DEFENSE | ON_SOCIAL_ACTION | ON_INITIATIVE | ON_DAMAGE_RECEIVED | ON_DAMAGE_DEALT
 - `value`: numeric value
@@ -380,6 +400,9 @@ POST   /api/combat/sessions/{id}/zweitwaffe          ZweitwaffeRequest { actorCo
 POST   /api/combat/sessions/{id}/nachtreten          NachtretenRequest { actorCombatantId, defenderCombatantId, bonusSteps, spendKarma } — waffenloser Zusatzangriff, nur vs. niedrigere Initiative
 POST   /api/combat/sessions/{id}/schwanzangriff       SchwanzangriffRequest { actorCombatantId, defenderCombatantId, weaponId?, bonusSteps, spendKarma } — T'skrang-Schwanzangriff, −2 auf alle Proben der Runde
 POST   /api/combat/sessions/{id}/combatants/{cId}/tigersprung   → no body; initiative += rank, costs 1 damage
+POST   /api/combat/sessions/{id}/combatants/{cId}/loewenherz    → freie Aktion: +rank auf Willenskraft-Widerstandsproben (1 Runde), kostet 1 Schaden
+POST   /api/combat/sessions/{id}/combatants/{cId}/sprint        → einfache Aktion: +rank Bewegungsrate (1 Runde), kein Wurf, kostet 1 Schaden
+POST   /api/combat/sessions/{id}/combatants/{cId}/kobrastoss   ?targetCombatantId= → Ansage in DECLARATION: +rank Initiative, +2/Erfolg auf ersten Angriff gegen das Ziel, kostet 2 Schaden
 POST   /api/combat/sessions/{id}/combatants/{cId}/lufttanz      → no body; +rank initiative (DECLARATION), enables bonus melee attack, costs 2 damage
 POST   /api/combat/sessions/{id}/lufttanz-attack                LufttanzAttackRequest (bonus melee attack, no hasActedThisRound consumed)
 POST   /api/combat/sessions/{id}/combatants/{cId}/blattschuss-add-karma → rollt +W6 auf pending Blattschuss-Angriff
@@ -420,7 +443,9 @@ Seeded automatically (idempotent) on first start via migration methods in `migra
 - Recon: Schwachstelle erkennen (PER, ziel-spezifischer Schadensbonus, nur physisch)
 - Schützen: Blattschuss (PER, bis zu Rang Karmawürfel auf Fernkampf-Probe — auch nachträglich nach Fehlschlag)
 - Additional attacks: Zweitwaffe (DEX), Nachtreten (DEX, waffenlos, nur vs. niedrigere Initiative)
-- Initiative: Tigersprung (DEX, once/round, no roll), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
+- Widerstand: Löwenherz (WIL, freie Aktion, +rank auf Willenskraftproben zum Abschütteln)
+- Bewegung: Sprint (Rang-basiert, einfache Aktion, +rank Bewegungsrate; auch als Fertigkeit)
+- Initiative: Tigersprung (DEX, once/round, no roll), Kobrastoß (DEX, Ansage mit Ziel, Initiative-Vergleich → Angriffsbonus), Lufttanz (DEX, +rank Initiative + Bonus-Nahkampfangriff bei Init-Vorsprung ≥10)
 - Charaktertalente (außerhalb Kampf): Holzhaut (ZÄH), Krallenhand (STR — auto-managed Equipment mit `clawWeapon=true`)
 - Matrizen: Zaubermatritze (PER, `maxInstances=3`, `rankFromCircle`), **Erweiterte Matrize** (PER, `maxInstances=3`, `rankFromCircle`) — siehe unten
 

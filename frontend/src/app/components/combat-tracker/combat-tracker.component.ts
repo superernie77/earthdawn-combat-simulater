@@ -33,6 +33,9 @@ import {
   RiposteRequest, RiposteResult,
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
+  KobrastossResult,
+  LoewenherzResult,
+  SprintResult,
   ZweitwaffeRequest,
   NachtretenRequest,
   SchwanzangriffRequest,
@@ -452,6 +455,27 @@ export interface EffectChoice {
                   (click)="performTigersprung(c)"
                   matTooltip="Tigersprung: +Rang auf Initiative — nur in der Ansagephase aktivierbar, einmal/Runde, kostet 1 Überanstrengung">
                   <mat-icon>bolt</mat-icon><span class="btn-label">Tigersprung</span></button>
+                <!-- Kobrastoß: Ansage in der Ansagephase, Bonus wird beim Initiativewurf ermittelt -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasKobrastossTalent(c) && !c.defeated"
+                  class="combat-option-btn kobrastoss-btn"
+                  [disabled]="c.kobrastossUsedThisRound"
+                  (click)="openKobrastossDialog(c)"
+                  matTooltip="Kobrastoß: Initiative mit GES+Rang statt GES-Stufe. Je Erfolg gegen die Initiative des angesagten Gegners +2 auf den ersten Angriff gegen ihn — nur in der Ansagephase, einmal/Runde, kostet 2 Überanstrengung">
+                  <mat-icon>flash_on</mat-icon><span class="btn-label">Kobrastoß</span></button>
+                <!-- Löwenherz: freie Aktion, stärkt Willenskraft-Widerstandsproben -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && hasLoewenherzTalent(c) && !c.defeated"
+                  class="combat-option-btn loewenherz-btn"
+                  [disabled]="hasLoewenherzActive(c)"
+                  (click)="performLoewenherz(c)"
+                  matTooltip="Löwenherz: Willenskraftproben zum Abschütteln von Talenten, Zaubern und Fähigkeiten werden mit WIL+Rang statt der WIL-Stufe gewürfelt — freie Aktion, kostet 1 Überanstrengung, gilt bis Rundenende">
+                  <mat-icon>psychology</mat-icon><span class="btn-label">Löwenherz</span></button>
+                <!-- Sprint: einfache Aktion, kein Wurf, +Rang Bewegungsrate -->
+                <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && hasSprintTalent(c) && !c.defeated"
+                  class="combat-option-btn sprint-btn"
+                  [disabled]="hasSprintActive(c)"
+                  (click)="performSprint(c)"
+                  matTooltip="Sprint: +Rang auf die Bewegungsrate für diese Runde, kein Würfelwurf — einfache Aktion (Standardaktion bleibt möglich), kostet 1 Überanstrengung">
+                  <mat-icon>directions_run</mat-icon><span class="btn-label">Sprint</span></button>
                 <!-- Lufttanz: freie Aktion in der Ansagephase, ermöglicht Bonusangriff -->
                 <button mat-stroked-button *ngIf="session!.status === 'ACTIVE' && session!.phase === 'DECLARATION' && hasLufttanzTalent(c) && !c.defeated"
                   class="combat-option-btn lufttanz-btn"
@@ -925,6 +949,129 @@ export interface EffectChoice {
         </div>
         <div style="color:#aaa;font-size:0.82rem;margin-top:8px">{{ r.description }}</div>
         <button mat-raised-button style="width:100%;margin-top:16px" (click)="riposteModal.open = false">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Löwenherz Result Modal -->
+    <div class="result-modal" *ngIf="loewenherzModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="loewenherzModal.result as r">
+        <div class="result-outcome hit">
+          <mat-icon>psychology</mat-icon>
+          LÖWENHERZ! +{{ r.resistBonus }} auf Willenskraft-Widerstandsproben
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-row" style="background:rgba(186,104,200,0.08)">
+            <span class="roll-label">Widerstand</span>
+            <span class="roll-expr">WIL + Rang {{ r.rank }} statt WIL-Stufe</span>
+            <span class="roll-value" style="color:#ba68c8">+{{ r.resistBonus }}</span>
+          </div>
+          <div class="roll-row" style="background:rgba(186,104,200,0.08)">
+            <span class="roll-label">Gilt für</span>
+            <span class="roll-expr">Talente, Zauber und Fähigkeiten abschütteln</span>
+            <span class="roll-value" style="color:#ba68c8">1 Runde</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Sprint Result Modal -->
+    <div class="result-modal" *ngIf="sprintModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="sprintModal.result as r">
+        <div class="result-outcome hit">
+          <mat-icon>directions_run</mat-icon>
+          SPRINT! +{{ r.movementBonus }} Bewegungsrate
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-row" style="background:rgba(129,199,132,0.08)">
+            <span class="roll-label">Bewegung</span>
+            <span class="roll-expr">+{{ r.movementBonus }} (Rang {{ r.rank }}) für diese Runde</span>
+            <span class="roll-value" style="color:#81c784">{{ r.newMovement }}</span>
+          </div>
+          <div class="roll-row" style="background:rgba(129,199,132,0.08)">
+            <span class="roll-label">Aktion</span>
+            <span class="roll-expr">Einfache Aktion — Standardaktion bleibt möglich</span>
+            <span class="roll-value" style="color:#81c784">frei</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
+      </div>
+    </div>
+
+    <!-- Kobrastoß Dialog: nur Zielwahl, der Wurf passiert bei der Initiative -->
+    <div class="attack-dialog" *ngIf="kobrastossDialog.open">
+      <div class="dialog-backdrop" (click)="kobrastossDialog.open = false"></div>
+      <div class="dialog-box">
+        <h3><mat-icon style="vertical-align:middle;margin-right:6px;color:#ff8a65">flash_on</mat-icon>Kobrastoß: {{ kobrastossDialog.actor?.character?.name }}</h3>
+        <mat-form-field appearance="fill" style="width:100%">
+          <mat-label>Gegner für den Initiative-Vergleich</mat-label>
+          <mat-select [(ngModel)]="kobrastossDialog.targetId">
+            <mat-option *ngFor="let c of possibleTargets(kobrastossDialog.actor)" [value]="c.id">{{ cn(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div style="color:#888;font-size:0.85rem;margin-bottom:12px">
+          Initiative wird mit GES + Rang gewürfelt (Rüstungsmalus bleibt). Je Erfolg gegen die Initiative
+          des Gegners +2 auf den <b>ersten</b> Angriff gegen genau ihn. Würfelt er höher, gibt es keinen Bonus —
+          auch dann nicht, wenn er später verzögert. Kostet 2 Überanstrengung.
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button mat-stroked-button (click)="kobrastossDialog.open = false">Abbrechen</button>
+          <button mat-raised-button color="primary" [disabled]="!kobrastossDialog.targetId" (click)="performKobrastoss()">
+            <mat-icon>flash_on</mat-icon> Ansagen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kobrastoß Result Modal -->
+    <div class="result-modal" *ngIf="kobrastossModal.open">
+      <div class="dialog-backdrop" (click)="dismissModal()"></div>
+      <div class="dialog-box result-box" *ngIf="kobrastossModal.result as r">
+        <div class="result-outcome hit">
+          <mat-icon>flash_on</mat-icon>
+          KOBRASTOSS ANGESAGT! +{{ r.initiativeBonus }} auf die Initiative-Probe
+        </div>
+        <div class="result-names">
+          <span class="result-actor" [style.color]="nameColor(r.actorName)">{{ r.actorName }}</span>
+          <span style="color:#888;margin:0 6px">→</span>
+          <span class="result-actor" [style.color]="nameColor(r.targetName)">{{ r.targetName }}</span>
+        </div>
+        <div class="result-rolls">
+          <div class="roll-row" style="background:rgba(255,138,101,0.08)">
+            <span class="roll-label">Initiative</span>
+            <span class="roll-expr">GES + Rang {{ r.rank }} (+{{ r.initiativeBonus }} Stufen)</span>
+            <span class="roll-value" style="color:#ff8a65">Wurf folgt</span>
+          </div>
+          <div class="roll-row" style="background:rgba(255,138,101,0.08)">
+            <span class="roll-label">Angriffsbonus</span>
+            <span class="roll-expr">+2 je Erfolg vs. {{ r.targetName }} — erster Angriff</span>
+            <span class="roll-value" style="color:#ff8a65">?</span>
+          </div>
+          <div class="roll-row" style="background:rgba(239,83,80,0.08)">
+            <span class="roll-label">Kosten</span>
+            <span class="roll-expr">Überanstrengung</span>
+            <span class="roll-value" style="color:#ef5350">−{{ r.damageTaken }}</span>
+          </div>
+        </div>
+        <button mat-raised-button style="width:100%;margin-top:16px" (click)="dismissModal()">Schließen</button>
       </div>
     </div>
 
@@ -3307,6 +3454,12 @@ export interface EffectChoice {
     .combat-option-btn.manoeuver-btn:not([disabled]):hover { border-color: #80deea; background: rgba(128,222,234,0.1); }
     .combat-option-btn.tigersprung-btn { color: #ffee58; border-color: #3a3010; }
     .combat-option-btn.tigersprung-btn:not([disabled]):hover { border-color: #ffee58; background: rgba(255,238,88,0.1); }
+    .combat-option-btn.kobrastoss-btn { color: #ff8a65; border-color: #3a2018; }
+    .combat-option-btn.kobrastoss-btn:not([disabled]):hover { border-color: #ff8a65; background: rgba(255,138,101,0.1); }
+    .combat-option-btn.loewenherz-btn { color: #ba68c8; border-color: #2e1a33; }
+    .combat-option-btn.loewenherz-btn:not([disabled]):hover { border-color: #ba68c8; background: rgba(186,104,200,0.1); }
+    .combat-option-btn.sprint-btn { color: #81c784; border-color: #1b2e1d; }
+    .combat-option-btn.sprint-btn:not([disabled]):hover { border-color: #81c784; background: rgba(129,199,132,0.1); }
     .combat-option-btn.lufttanz-btn { color: #b3e5fc; border-color: #1a3040; }
     .combat-option-btn.lufttanz-btn:not([disabled]):hover { border-color: #b3e5fc; background: rgba(179,229,252,0.1); }
     .combat-option-btn.lufttanz-attack-btn { color: #fff; background: #29b6f6; }
@@ -3573,6 +3726,18 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
 
   manoeuverModal: { open: boolean; result?: ManoeuverResult } = { open: false };
 
+  kobrastossDialog: {
+    open: boolean;
+    actor?: CombatantState;
+    targetId?: number;
+  } = { open: false };
+
+  kobrastossModal: { open: boolean; result?: KobrastossResult } = { open: false };
+
+  loewenherzModal: { open: boolean; result?: LoewenherzResult } = { open: false };
+
+  sprintModal: { open: boolean; result?: SprintResult } = { open: false };
+
   tigersprungModal: { open: boolean; result?: TigersprungResult } = { open: false };
 
   lufttanzModal: { open: boolean; result?: LufttanzActivationResult } = { open: false };
@@ -3804,6 +3969,15 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       case 'TIGERSPRUNG':
         this.tigersprungModal = { open: true, result: payload };
         break;
+      case 'KOBRASTOSS':
+        this.kobrastossModal = { open: true, result: payload };
+        break;
+      case 'LOEWENHERZ':
+        this.loewenherzModal = { open: true, result: payload };
+        break;
+      case 'SPRINT':
+        this.sprintModal = { open: true, result: payload };
+        break;
       case 'LUFTTANZ':
         this.lufttanzModal = { open: true, result: payload };
         break;
@@ -3868,6 +4042,9 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     this.resultModal.open = false;
     this.initiativeModal.open = false;
     this.tigersprungModal.open = false;
+    if (this.kobrastossModal) this.kobrastossModal.open = false;
+    if (this.loewenherzModal) this.loewenherzModal.open = false;
+    if (this.sprintModal) this.sprintModal.open = false;
     this.lufttanzModal.open = false;
     if (this.tauntModal) this.tauntModal.open = false;
     if (this.distractModal) this.distractModal.open = false;
@@ -5699,6 +5876,73 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
       next: result => {
         this.manoeuverDialog.open = false;
         this.manoeuverModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Löwenherz ---
+
+  hasLoewenherzTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Löwenherz');
+  }
+
+  hasLoewenherzActive(c: CombatantState): boolean {
+    return (c.activeEffects ?? []).some(e => e.name === 'Löwenherz');
+  }
+
+  performLoewenherz(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.performLoewenherz(this.session.id, c.id).subscribe({
+      next: result => {
+        this.loewenherzModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Sprint ---
+
+  /** Sprint kann als Talent oder als weltliche Fertigkeit vorliegen. */
+  hasSprintTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Sprint')
+        || (c.character.skills ?? []).some(sk => sk.skillDefinition.name === 'Sprint');
+  }
+
+  hasSprintActive(c: CombatantState): boolean {
+    return (c.activeEffects ?? []).some(e => e.name === 'Sprint');
+  }
+
+  performSprint(c: CombatantState): void {
+    if (!this.session) return;
+    this.combatService.performSprint(this.session.id, c.id).subscribe({
+      next: result => {
+        this.sprintModal = { open: true, result };
+        this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
+      },
+      error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })
+    });
+  }
+
+  // --- Kobrastoß ---
+
+  hasKobrastossTalent(c: CombatantState): boolean {
+    return (c.character.talents ?? []).some(t => t.talentDefinition.name === 'Kobrastoß');
+  }
+
+  openKobrastossDialog(actor: CombatantState): void {
+    this.kobrastossDialog = { open: true, actor, targetId: undefined };
+  }
+
+  performKobrastoss(): void {
+    const actor = this.kobrastossDialog.actor;
+    if (!this.session || !actor || !this.kobrastossDialog.targetId) return;
+    this.combatService.performKobrastoss(this.session.id, actor.id, this.kobrastossDialog.targetId).subscribe({
+      next: result => {
+        this.kobrastossDialog.open = false;
+        this.kobrastossModal = { open: true, result };
         this.combatService.findById(this.session!.id).subscribe(s => this.session = s);
       },
       error: err => this.snack.open('Fehler: ' + (err?.error?.message ?? err.message), 'OK', { duration: 5000 })

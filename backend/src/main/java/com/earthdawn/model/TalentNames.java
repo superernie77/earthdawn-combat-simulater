@@ -27,6 +27,9 @@ public final class TalentNames {
     public static final String SCHWACHSTELLE_ERKENNEN  = "Schwachstelle erkennen";
     public static final String LUFTTANZ                = "Lufttanz";
     public static final String BLATTSCHUSS             = "Blattschuss";
+    public static final String KOBRASTOSS              = "Kobrastoß";
+    public static final String LOEWENHERZ              = "Löwenherz";
+    public static final String SPRINT                  = "Sprint";
 
     public static final String ZAUBERMATRITZE            = "Zaubermatritze";
     public static final String ERWEITERTE_MATRIZE        = "Erweiterte Matrize";

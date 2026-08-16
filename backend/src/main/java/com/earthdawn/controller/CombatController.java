@@ -337,6 +337,22 @@ public class CombatController {
         return combatService.performTigersprung(id, combatantId);
     }
 
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/sprint")
+    public SprintResult performSprint(@PathVariable Long id, @PathVariable Long combatantId) {
+        return combatService.performSprint(id, combatantId);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/loewenherz")
+    public LoewenherzResult performLoewenherz(@PathVariable Long id, @PathVariable Long combatantId) {
+        return combatService.performLoewenherz(id, combatantId);
+    }
+
+    @PostMapping("/sessions/{id}/combatants/{combatantId}/kobrastoss")
+    public KobrastossResult performKobrastoss(@PathVariable Long id, @PathVariable Long combatantId,
+                                              @RequestParam Long targetCombatantId) {
+        return combatService.performKobrastoss(id, combatantId, targetCombatantId);
+    }
+
     @PostMapping("/sessions/{id}/zweitwaffe")
     public CombatActionResult performZweitwaffe(@PathVariable Long id, @RequestBody ZweitwaffeRequest req) {
         req.setSessionId(id);

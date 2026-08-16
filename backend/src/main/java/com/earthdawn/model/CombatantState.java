@@ -119,6 +119,24 @@ public class CombatantState {
     @Builder.Default
     private boolean lufttanzBonusUsedThisRound = false;
 
+    /** Kobrastoß wurde in dieser Runde eingesetzt (1×/Runde). */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean kobrastossUsedThisRound = false;
+
+    /** Gegner, gegen den Kobrastoß angesagt wurde — Vergleichsziel der Initiative (-1 = keiner). */
+    @Column(columnDefinition = "bigint default -1")
+    @Builder.Default
+    private Long kobrastossTargetId = -1L;
+
+    /**
+     * Angriffsbonus aus Kobrastoß (+2 je Erfolg), gilt nur für den ersten Angriff gegen
+     * {@link #kobrastossTargetId} in dieser Runde. 0 = kein Bonus (auch bei verlorenem Vergleich).
+     */
+    @Column(columnDefinition = "integer default 0")
+    @Builder.Default
+    private int pendingKobrastossBonus = 0;
+
     /** Blattschuss bereits diese Runde verwendet (1×/Runde). */
     @Column(columnDefinition = "boolean default false")
     @Builder.Default

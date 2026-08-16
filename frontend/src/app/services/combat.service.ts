@@ -16,6 +16,9 @@ import {
   RiposteRequest, RiposteResult,
   ManoeuverRequest, ManoeuverResult,
   TigersprungResult,
+  KobrastossResult,
+  LoewenherzResult,
+  SprintResult,
   ZweitwaffeRequest,
   NachtretenRequest,
   SchwanzangriffRequest,
@@ -286,6 +289,25 @@ export class CombatService {
   performTigersprung(sessionId: number, combatantId: number): Observable<TigersprungResult> {
     return this.http.post<TigersprungResult>(
       `${this.base}/sessions/${sessionId}/combatants/${combatantId}/tigersprung`, {}
+    );
+  }
+
+  performLoewenherz(sessionId: number, combatantId: number): Observable<LoewenherzResult> {
+    return this.http.post<LoewenherzResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/loewenherz`, {}
+    );
+  }
+
+  performSprint(sessionId: number, combatantId: number): Observable<SprintResult> {
+    return this.http.post<SprintResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/sprint`, {}
+    );
+  }
+
+  performKobrastoss(sessionId: number, combatantId: number, targetCombatantId: number): Observable<KobrastossResult> {
+    return this.http.post<KobrastossResult>(
+      `${this.base}/sessions/${sessionId}/combatants/${combatantId}/kobrastoss`
+      + `?targetCombatantId=${targetCombatantId}`, {}
     );
   }
 

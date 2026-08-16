@@ -88,6 +88,9 @@ export interface CombatantState {
   pendingLufttanzTargetId: number;
   pendingLufttanzWeaponId: number;
   blattschussUsedThisRound: boolean;
+  kobrastossUsedThisRound?: boolean;
+  kobrastossTargetId?: number;
+  pendingKobrastossBonus?: number;
   schwanzangriffUsedThisRound?: boolean;
   fearResistUsedThisRound?: boolean;
   karmaInitiativeThisRound?: boolean;
@@ -585,6 +588,35 @@ export interface TigersprungResult {
   rank: number;
   initiativeBonus: number;
   newInitiative: number;
+  damageTaken: number;
+  description: string;
+}
+
+// --- Löwenherz ---
+export interface LoewenherzResult {
+  actorName: string;
+  rank: number;
+  resistBonus: number;
+  damageTaken: number;
+  description: string;
+}
+
+// --- Sprint ---
+export interface SprintResult {
+  actorName: string;
+  rank: number;
+  movementBonus: number;
+  newMovement: number;
+  damageTaken: number;
+  description: string;
+}
+
+// --- Kobrastoß ---
+export interface KobrastossResult {
+  actorName: string;
+  targetName: string;
+  rank: number;
+  initiativeBonus: number;
   damageTaken: number;
   description: string;
 }

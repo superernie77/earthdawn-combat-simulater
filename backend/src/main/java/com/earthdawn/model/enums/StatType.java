@@ -18,5 +18,7 @@ public enum StatType {
     /** Bonusstufen auf die Ausweichen-Reaktionsprobe (Basis 0; z.B. Nebelschild). */
     DODGE_STEP,
     /** Bewegungsrate auf der Kampfkarte in Feldern (Basis = characters.movement_hexes). */
-    MOVEMENT_HEXES
+    MOVEMENT_HEXES,
+    /** Bonusstufen auf Willenskraftproben zum Abschütteln von Effekten (Basis 0; z.B. Löwenherz). */
+    WILLPOWER_RESIST_STEP
 }

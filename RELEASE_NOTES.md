@@ -2,7 +2,34 @@
 
 ## v1.4.0 (in Entwicklung)
 
-_Noch keine Einträge._
+### ⚔️ Kampfregeln
+
+**Löwenherz**
+Stärkt die mentale Entschlossenheit magisch. **Freie Aktion**, 1 Überanstrengung: bis zum Rundenende tritt die Löwenherzstufe **WIL + Rang** an die Stelle der normalen Willenskraftstufe, wenn eine Probe abgelegt wird, um die Wirkung von Talenten, Zaubern oder Fähigkeiten abzuschütteln. Greift damit beim **Abschütteln von Furcht**, bei der **Starrsinn-Gegenprobe gegen Verspotten** und beim **Eisernen Willen**. Erneutes Wirken ersetzt den Effekt, statt ihn zu stapeln.
+
+**Sprint**
+Steigert die Bewegungsrate magisch — **einfache Aktion**, also bleibt in derselben Runde noch eine Standardaktion (Angriff, Zauber) möglich. Kein Würfelwurf: die Bewegungsrate steigt für die aktuelle Runde um den Rang, 1 Überanstrengung. Wirkt direkt auf der **Hexfeld-Kampfkarte** — das Bewegungsbudget des Tokens wächst entsprechend. Auch als weltliche Fertigkeit (Kategorie Bewegung) nutzbar, nach denselben Regeln.
+
+**Kobrastoß**
+Steigert die Reaktionsgeschwindigkeit magisch. In der **Ansagephase** wird das Talent gegen einen bestimmten Gegner angesagt (2 Überanstrengung, einmal pro Runde). Die Initiative wird dann mit der Kobrastoßstufe **GES + Rang** statt der reinen GES-Stufe gewürfelt — Rüstungsmalus und andere Effekte bleiben erhalten. Anschließend wird das Ergebnis mit der Initiative des angesagten Gegners verglichen: **je Erfolg +2 auf die erste Angriffsprobe gegen genau diesen Gegner** in derselben Runde. Würfelt der Gegner höher, gibt es keinen Bonus — auch dann nicht, wenn er seine Handlung später verzögert und der Adept faktisch zuerst handelt.
+
+Der Bonus erscheint im Angriffsergebnis als eigene Zeile und wird nur einmal verbraucht; Angriffe gegen andere Ziele lassen ihn unangetastet.
+
+### 🪄 Neue Talente
+
+**Acht Schwertmeister-Talente ohne Kampfrelevanz**
+Damit ist die Schwertmeister-Talentliste bis auf die reinen Kampftalente vollständig. Alle acht sind als Probe auf dem Charakterbogen und im Würfelwurf testbar (Attributsstufe + Rang gegen Schwierigkeitswert bzw. Soziale Verteidigung):
+
+- **Einschätzen** (WAH) — schätzt Kampfkraft, Rang oder Absichten eines Gegenübers ab
+- **Beeindrucken** (STÄ) — Zurschaustellung von Kraft und Können
+- **Gefahrensinn** (WAH) — spürt drohende Gefahr, bevor sie sichtbar wird
+- **Gewinnendes Lächeln** (CHA) — entwaffnet mit charmantem Auftreten
+- **Bleibender Eindruck** (CHA) — bleibt dauerhaft im Gedächtnis
+- **Eleganter Abgang** (CHA) — verlässt eine Szene mit Stil
+- **Wortgeplänkel** (CHA) — Schlagabtausch aus Spott und Witz
+- **Luftgleiten** (GES) — gleitet kontrolliert durch die Luft und mildert Stürze
+
+Damit ist die **komplette Schwertmeister-Talentliste umgesetzt**. *(Unempfindlichkeit ist bereits über die Bonus-Lebenspunkte pro Kreis der Disziplin abgebildet.)*
 
 ## v1.3.0 (16.08.2026)
 

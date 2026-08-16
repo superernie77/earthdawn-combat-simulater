@@ -153,6 +153,60 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Lufttanz' hinzugefügt.");
         }
+        if (talentRepo.findByName("Kobrastoß").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Kobrastoß")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Steigert die Reaktionsgeschwindigkeit magisch. Kobrastoßstufe = GES + Rang. " +
+                            "Wird bei der Initiativeprobe statt der reinen GES-Stufe verwendet (Modifikatoren " +
+                            "wie Rüstungsmalus bleiben). Das Ergebnis wird mit der Initiative eines angesagten " +
+                            "Gegners verglichen: je Erfolg +2 auf die erste Angriffsprobe gegen genau diesen " +
+                            "Gegner in derselben Runde. Würfelt der Gegner höher, gibt es keinen Bonus — auch " +
+                            "dann nicht, wenn er seine Handlung später verzögert. Freie Aktion in der " +
+                            "Ansagephase, kostet 2 Überanstrengung, 1× pro Runde.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Kobrastoß' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Löwenherz").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Löwenherz")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Stärkt die mentale Entschlossenheit magisch. Löwenherzstufe = WIL + Rang. " +
+                            "Wird anstelle der normalen Willenskraftstufe verwendet, wenn eine Probe abgelegt " +
+                            "wird, um die Wirkung von Talenten, Zaubern oder Fähigkeiten abzuschütteln — " +
+                            "sofern diese eine Willenskraftprobe zum Widerstand erlauben. Freie Aktion, " +
+                            "kostet 1 Überanstrengung, wirkt bis zum Ende der Runde.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Löwenherz' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Sprint").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Sprint")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Steigert die Bewegungsrate magisch. Stufe = Rang (kein Attribut wird addiert), " +
+                            "kein Würfelwurf nötig: die Bewegungsrate steigt in der aktuellen Runde um den Rang. " +
+                            "Einfache Aktion — in derselben Runde ist zusätzlich noch eine Standardaktion " +
+                            "(Angriff, Zauber) möglich. Kostet 1 Überanstrengung. Auch als weltliche " +
+                            "Fertigkeit (Kategorie Bewegung) erlernbar, nach denselben Regeln.")
+                    .testable(false)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Sprint' hinzugefügt.");
+        }
+        if (!skillRepo.existsByName("Sprint")) {
+            skillRepo.save(SkillDefinition.builder()
+                    .name("Sprint")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Weltliche Fertigkeitsversion von Sprint: +Rang auf die Bewegungsrate " +
+                            "für die aktuelle Runde. Einfache Aktion, kostet 1 Überanstrengung.")
+                    .category("Bewegung")
+                    .build());
+            log.info("Fertigkeit 'Sprint' hinzugefügt.");
+        }
         if (talentRepo.findByName("Schwachstelle erkennen").isEmpty()) {
             talentRepo.save(TalentDefinition.builder()
                     .name("Schwachstelle erkennen")
@@ -1674,6 +1728,86 @@ public class DataInitializer {
                     .attackTalent(false)
                     .build());
             log.info("Talent 'Fremdsprachen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Einschätzen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Einschätzen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Schätzt Kampfkraft, Rang oder Absichten eines Gegenübers ab. WAH + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Einschätzen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Beeindrucken").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Beeindrucken")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Beeindruckt durch eine Zurschaustellung von Kraft und Können. STÄ + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Beeindrucken' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Gefahrensinn").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Gefahrensinn")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Spürt drohende Gefahr, bevor sie sichtbar wird. WAH + Rang vs. Schwierigkeitswert der Bedrohung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Gefahrensinn' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Gewinnendes Lächeln").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Gewinnendes Lächeln")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Entwaffnet ein Gegenüber mit charmantem Auftreten. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Gewinnendes Lächeln' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Bleibender Eindruck").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Bleibender Eindruck")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Bleibt einem Gegenüber dauerhaft im Gedächtnis. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Bleibender Eindruck' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Eleganter Abgang").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Eleganter Abgang")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Verlässt eine Szene mit Stil und ohne Gesichtsverlust. CHA + Rang vs. Soziale Verteidigung der Zuschauer.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Eleganter Abgang' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Wortgeplänkel").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Wortgeplänkel")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Führt einen Schlagabtausch aus Spott und Witz. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Wortgeplänkel' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Luftgleiten").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Luftgleiten")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Gleitet kontrolliert durch die Luft und mildert Stürze. GES + Rang vs. Schwierigkeitswert des Manövers.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Luftgleiten' hinzugefügt.");
         }
         log.info("Utility-Talente migriert.");
     }
