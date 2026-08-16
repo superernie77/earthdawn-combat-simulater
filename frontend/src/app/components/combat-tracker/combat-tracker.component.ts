@@ -4368,7 +4368,7 @@ export class CombatTrackerComponent implements OnInit, OnDestroy {
     const wurf = sourceName === 'Wurfwaffen';
     switch (disc) {
       case 'Krieger':        return circle >= 5 && (nahkampf || waffenlos);
-      case 'Schütze':        return projektil || wurf;
+      case 'Schütze':        return circle >= 5 && (projektil || wurf);
       case 'Schwertmeister': return nahkampf;
       case 'Luftpirat':      return nahkampf || wurf;
       case 'Tiermeister':    return waffenlos;

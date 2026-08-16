@@ -54,12 +54,14 @@ class CombatServiceKarmaDamageTest {
     }
 
     @Test
-    void schuetze_rangedWeaponsOnly() {
-        CombatantState c = combatant("Schütze", 3);
+    void schuetze_rangedWeaponsOnly_fromCircleFive() {
+        CombatantState c = combatant("Schütze", 5);
         assertThat(combatService.karmaOnDamageAllowed(c, false, PRO)).isTrue();
         assertThat(combatService.karmaOnDamageAllowed(c, false, WURF)).isTrue();
         assertThat(combatService.karmaOnDamageAllowed(c, false, NAH)).isFalse();
         assertThat(combatService.karmaOnDamageAllowed(c, false, WAFFENLOS)).isFalse();
+        // Karma auf Fernkampfschaden ist eine Fähigkeit des 5. Kreises
+        assertThat(combatService.karmaOnDamageAllowed(combatant("Schütze", 4), false, PRO)).isFalse();
     }
 
     @Test

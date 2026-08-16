@@ -4,6 +4,9 @@
 
 ### ⚔️ Kampfregeln
 
+**Korrektur: Karma auf Fernkampfschaden erst ab dem 5. Kreis**
+Der Schütze durfte Karma bisher ab dem 1. Kreis auf Schadensproben mit Projektil- und Wurfwaffen einsetzen. Laut Spielerhandbuch ist das eine Fähigkeit des **5. Kreises** — wie beim Krieger im Nahkampf. Backend und Angriffsdialog prüfen den Kreis jetzt beide.
+
 **Löwenherz**
 Stärkt die mentale Entschlossenheit magisch. **Freie Aktion**, 1 Überanstrengung: bis zum Rundenende tritt die Löwenherzstufe **WIL + Rang** an die Stelle der normalen Willenskraftstufe, wenn eine Probe abgelegt wird, um die Wirkung von Talenten, Zaubern oder Fähigkeiten abzuschütteln. Greift damit beim **Abschütteln von Furcht**, bei der **Starrsinn-Gegenprobe gegen Verspotten** und beim **Eisernen Willen**. Erneutes Wirken ersetzt den Effekt, statt ihn zu stapeln.
 
@@ -16,6 +19,55 @@ Steigert die Reaktionsgeschwindigkeit magisch. In der **Ansagephase** wird das T
 Der Bonus erscheint im Angriffsergebnis als eigene Zeile und wird nur einmal verbraucht; Angriffe gegen andere Ziele lassen ihn unangetastet.
 
 ### 🪄 Neue Talente
+
+**Sechs Geisterbeschwörer-Talente als Probentalente**
+- **Geistersprache** (WAH) — versteht die Sprachen von Geistern und Astralwesen
+- **Lesen/Schreiben** (WAH) — liest und verfasst geschriebene Texte
+- **Lebensblick** (WAH) — nimmt Lebenskraft und Gesundheitszustand wahr
+- **Stählerner Blick** (CHA) — schüchtert allein durch Augenkontakt ein
+- **Nachtflieger Befehligen** (CHA) — befehligt fliegende Kreaturen der Nacht
+- **Geisterreittier** (WIL) — beschwört ein Reittier aus Nebel und Feuer
+
+Damit sind beim Geisterbeschwörer **22 von 28 Talenten** umgesetzt; offen bleibt der
+geisterspezifische Teil (Beschwören, Verbannen, Fluch Unterdrücken, Astrale Interferenz,
+Schadensverteilung, Hartnäckiges Gewebe).
+
+**Drei Schützen-Talente als Probentalente**
+- **Navigation** (WAH) — bestimmt Kurs und Position
+- **Tieranalyse** (WAH) — erkennt Werte und Schwächen einer Kreatur
+- **Beweisanalyse** (WAH) — untersucht physische Spuren
+
+Damit sind beim Schützen **28 von 30 Talenten** umgesetzt; offen bleiben Weitschuss und
+Bannmarkierung, die echte Regelmechanik brauchen.
+
+**Sechs Diebes-Talente als Probentalente**
+Aus der Diebes-Liste bis zum 5. Kreis:
+
+- **Schloss Knacken** (GES) — öffnet mechanische Schlösser
+- **Taschendiebstahl** (GES) — entwendet Gegenstände unbemerkt
+- **Fallen Entschärfen** (GES) — macht mechanische und magische Fallen unschädlich
+- **Feilschen** (CHA) — handelt Preise zum eigenen Vorteil aus
+- **Weitsprung** (STÄ) — erhöht die Sprungdistanz magisch
+- **Projektil Rufen** (WAH) — ruft abgefeuerte Munition in die Hand zurück
+
+Damit sind beim Dieb **27 von 30 Talenten** umgesetzt; offen bleiben Überraschungsschlag,
+Klingen Jonglieren und Untrüglicher Blick, die echte Regelmechanik brauchen.
+
+**Zehn Illusionisten-Talente als Probentalente**
+Aus der Illusionisten-Liste bis zum 5. Kreis, jeweils als Probe auf dem Charakterbogen und im Würfelwurf testbar:
+
+- **Struktur Verstehen** (WAH) — versteht magische Schriften und lernt daraus neue Zauber
+- **Astralsicht** (WAH) — nimmt den Astralraum und magische Muster wahr
+- **Stimmen Imitieren** (WAH) — ahmt Stimmen und Geräusche nach
+- **Konversation** (CHA) — hinterlässt im Gespräch einen vorteilhaften Eindruck
+- **Magische Maske** (CHA) — magische Verkleidung als anderer Namensgeber
+- **Arkanes Gefasel** (CHA) — beeindruckt mit magisch klingendem Kauderwelsch
+- **Schuld Abwälzen** (CHA) — lenkt Verdacht glaubhaft auf jemand anderen
+- **Totstellen** (WIL) — täuscht den eigenen Tod vor
+- **Flinke Hand** (GES) — magische Taschenspielertricks
+- **Gegenstand Verbergen** (GES) — versteckt Gegenstände am Körper
+
+Damit sind vom Illusionisten bis Kreis 5 noch **vier Talente offen**, die echte Mechanik brauchen: Illusionsverstärkung, Untrüglicher Blick, Hartnäckiges Gewebe und Machtmaskierung.
 
 **Acht Schwertmeister-Talente ohne Kampfrelevanz**
 Damit ist die Schwertmeister-Talentliste bis auf die reinen Kampftalente vollständig. Alle acht sind als Probe auf dem Charakterbogen und im Würfelwurf testbar (Attributsstufe + Rang gegen Schwierigkeitswert bzw. Soziale Verteidigung):

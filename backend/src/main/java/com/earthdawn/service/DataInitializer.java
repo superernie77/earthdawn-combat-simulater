@@ -1809,6 +1809,256 @@ public class DataInitializer {
                     .build());
             log.info("Talent 'Luftgleiten' hinzugefügt.");
         }
+        if (talentRepo.findByName("Struktur Verstehen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Struktur Verstehen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Versteht magische Schriften und Muster und lernt daraus neue Zauber. WAH + Rang vs. Schwierigkeitswert des Musters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Struktur Verstehen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Konversation").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Konversation")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Hinterlässt im Gespräch einen vorteilhaften Eindruck und lenkt soziale Situationen. CHA + Rang vs. Soziale Verteidigung des Gegenübers.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Konversation' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Magische Maske").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Magische Maske")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Verkleidet den Adepten magisch als einen anderen Namensgeber. CHA + Rang vs. Wahrnehmung des Beobachters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Magische Maske' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Arkanes Gefasel").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Arkanes Gefasel")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Beeindruckt oder verwirrt Zuhörer mit magisch klingendem Kauderwelsch. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Arkanes Gefasel' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Astralsicht").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Astralsicht")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Nimmt den Astralraum und die Muster magischer Dinge wahr. WAH + Rang vs. Schwierigkeitswert des Musters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Astralsicht' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Stimmen Imitieren").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Stimmen Imitieren")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Ahmt Stimmen und Geräusche täuschend echt nach. WAH + Rang vs. Wahrnehmung des Zuhörers.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Stimmen Imitieren' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Totstellen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Totstellen")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Täuscht den eigenen Tod vor: Atmung und Herzschlag werden nahezu unmerklich. WIL + Rang vs. Wahrnehmung des Beobachters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Totstellen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Flinke Hand").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Flinke Hand")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Magische Taschenspielertricks: Gegenstände verschwinden und tauchen wieder auf. GES + Rang vs. Wahrnehmung des Beobachters.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Flinke Hand' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Gegenstand Verbergen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Gegenstand Verbergen")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Versteckt Gegenstände magisch am eigenen Körper. GES + Rang vs. Wahrnehmung des Durchsuchenden.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Gegenstand Verbergen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Schuld Abwälzen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Schuld Abwälzen")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Lenkt Verdacht und Schuld glaubhaft auf jemand anderen. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Schuld Abwälzen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Schloss Knacken").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Schloss Knacken")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Öffnet mechanische Schlösser mit Dietrichen und Fingerspitzengefühl. GES + Rang vs. Schwierigkeitswert des Schlosses.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Schloss Knacken' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Taschendiebstahl").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Taschendiebstahl")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Entwendet Gegenstände unbemerkt aus Taschen und Gürteln. GES + Rang vs. Wahrnehmung des Opfers.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Taschendiebstahl' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Fallen Entschärfen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Fallen Entschärfen")
+                    .attribute(AttributeType.DEXTERITY)
+                    .description("Macht mechanische und magische Fallen unschädlich. GES + Rang vs. Schwierigkeitswert der Falle.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Fallen Entschärfen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Feilschen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Feilschen")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Handelt Preise und Bedingungen zum eigenen Vorteil aus. CHA + Rang vs. Soziale Verteidigung des Händlers.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Feilschen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Weitsprung").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Weitsprung")
+                    .attribute(AttributeType.STRENGTH)
+                    .description("Erhöht die Sprungdistanz magisch. STÄ + Rang vs. Schwierigkeitswert der Distanz.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Weitsprung' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Projektil Rufen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Projektil Rufen")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Ruft abgefeuerte Munition magisch in die Hand zurück. WAH + Rang vs. Schwierigkeitswert nach Entfernung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Projektil Rufen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Navigation").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Navigation")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Bestimmt Kurs und Position anhand von Gestirnen, Karten und Landmarken. WAH + Rang vs. Schwierigkeitswert der Route.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Navigation' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Tieranalyse").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Tieranalyse")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Erkennt Werte, Fähigkeiten und Schwächen einer Kreatur. WAH + Rang vs. Schwierigkeitswert der Kreatur.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Tieranalyse' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Beweisanalyse").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Beweisanalyse")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Untersucht physische Spuren und Beweise mit Logik und Magie. WAH + Rang vs. Schwierigkeitswert der Beweislage.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Beweisanalyse' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Geistersprache").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Geistersprache")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Versteht und spricht die Sprachen von Geistern und Astralwesen. WAH + Rang vs. Schwierigkeitswert des Geistes.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Geistersprache' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Lesen/Schreiben").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Lesen/Schreiben")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Liest und verfasst geschriebene Texte in bekannten Schriften. WAH + Rang vs. Schwierigkeitswert des Textes.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Lesen/Schreiben' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Lebensblick").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Lebensblick")
+                    .attribute(AttributeType.PERCEPTION)
+                    .description("Nimmt Lebenskraft und Gesundheitszustand eines Wesens wahr. WAH + Rang vs. Mystische Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Lebensblick' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Stählerner Blick").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Stählerner Blick")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Schüchtert einen Gegner allein durch Augenkontakt ein. CHA + Rang vs. Soziale Verteidigung des Ziels.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Stählerner Blick' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Nachtflieger Befehligen").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Nachtflieger Befehligen")
+                    .attribute(AttributeType.CHARISMA)
+                    .description("Befehligt fliegende Kreaturen der Nacht. CHA + Rang vs. Mystische Verteidigung der Kreatur.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Nachtflieger Befehligen' hinzugefügt.");
+        }
+        if (talentRepo.findByName("Geisterreittier").isEmpty()) {
+            talentRepo.save(TalentDefinition.builder()
+                    .name("Geisterreittier")
+                    .attribute(AttributeType.WILLPOWER)
+                    .description("Beschwört ein magisches Reittier aus Nebel und Feuer. WIL + Rang vs. Schwierigkeitswert der Beschwörung.")
+                    .testable(true)
+                    .attackTalent(false)
+                    .build());
+            log.info("Talent 'Geisterreittier' hinzugefügt.");
+        }
         log.info("Utility-Talente migriert.");
     }
 

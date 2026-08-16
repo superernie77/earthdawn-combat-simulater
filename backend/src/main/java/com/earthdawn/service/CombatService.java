@@ -3838,7 +3838,7 @@ public class CombatService {
         boolean wurf      = "Wurfwaffen".equals(sourceName);
         return switch (disc) {
             case "Krieger"        -> c.getCircle() >= 5 && (nahkampf || waffenlos);
-            case "Schütze"        -> projektil || wurf;
+            case "Schütze"        -> c.getCircle() >= 5 && (projektil || wurf);
             case "Schwertmeister" -> nahkampf;
             case "Luftpirat"      -> nahkampf || wurf;
             case "Tiermeister"    -> waffenlos;
